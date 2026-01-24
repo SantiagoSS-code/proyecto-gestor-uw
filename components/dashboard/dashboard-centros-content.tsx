@@ -6,7 +6,7 @@ import { useRouter } from "next/navigation"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Sparkles, LogOut, Building2, Calendar, Users, Settings, BarChart3 } from "lucide-react"
-import { createClient } from "@/lib/supabase/client"
+// import { createClient } from "@/lib/supabase/client"
 
 interface DashboardCentrosContentProps {
   admin: {
@@ -26,15 +26,15 @@ interface DashboardCentrosContentProps {
 
 export function DashboardCentrosContent({ admin, center }: DashboardCentrosContentProps) {
   const router = useRouter()
-  const [isLoggingOut, setIsLoggingOut] = useState(false)
+  // const [isLoggingOut, setIsLoggingOut] = useState(false)
 
-  const handleLogout = async () => {
-    setIsLoggingOut(true)
-    const supabase = createClient()
-    await supabase.auth.signOut()
-    router.push("/")
-    router.refresh()
-  }
+  // const handleLogout = async () => {
+  //   setIsLoggingOut(true)
+  //   const supabase = createClient()
+  //   await supabase.auth.signOut()
+  //   router.push("/")
+  //   router.refresh()
+  // }
 
   return (
     <div className="min-h-screen bg-background">
@@ -52,10 +52,10 @@ export function DashboardCentrosContent({ admin, center }: DashboardCentrosConte
             <span className="text-sm text-muted-foreground hidden sm:inline">
               {admin.first_name} {admin.last_name}
             </span>
-            <Button variant="ghost" size="sm" onClick={handleLogout} disabled={isLoggingOut}>
+            {/* <Button variant="ghost" size="sm" onClick={handleLogout} disabled={isLoggingOut}>
               <LogOut className="w-4 h-4 mr-2" />
               Salir
-            </Button>
+            </Button> */}
           </div>
         </div>
       </header>
