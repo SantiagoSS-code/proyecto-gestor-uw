@@ -29,7 +29,10 @@ import {
   ArrowLeft,
   ArrowRight,
 } from "lucide-react"
-import { createBrowserClient } from "@/lib/supabase/client"
+import { auth, db } from "@/lib/firebaseClient"
+import { signInWithPopup, GoogleAuthProvider, signInWithEmailAndPassword, createUserWithEmailAndPassword } from "firebase/auth"
+import { doc, setDoc, serverTimestamp } from "firebase/firestore"
+import { getStorage, ref, uploadBytes, getDownloadURL } from "firebase/storage"
 
 const DAYS_OF_WEEK = [
   { key: "monday", label: "Lunes" },
@@ -156,20 +159,18 @@ export function RegistroCentrosForm({ initialGoogleEmail, initialGoogleName }: R
   // Check if user came from Google OAuth
   useEffect(() => {
     const checkGoogleUser = async () => {
-      const supabase = createBrowserClient()
-      const {
-        data: { user },
-      } = await supabase.auth.getUser()
+      const user = auth.currentUser
 
-      if (user && user.app_metadata?.provider === "google") {
+      if (user && user.providerData.some(provider => provider.providerId === 'google.com')) {
         setIsGoogleUser(true)
         setEmailVerified(true)
+        const fullName = user.displayName || ""
         setGoogleUserData({
           email: user.email || "",
-          name: user.user_metadata?.full_name || "",
+          name: fullName,
         })
 
-        const nameParts = (user.user_metadata?.full_name || "").split(" ")
+        const nameParts = fullName.split(" ")
         setAdminData((prev) => ({
           ...prev,
           email: user.email || "",
@@ -187,17 +188,10 @@ export function RegistroCentrosForm({ initialGoogleEmail, initialGoogleName }: R
     setIsGoogleLoading(true)
 
     try {
-      const supabase = createBrowserClient()
-      const { error } = await supabase.auth.signInWithOAuth({
-        provider: "google",
-        options: {
-          redirectTo: `${process.env.NEXT_PUBLIC_DEV_SUPABASE_REDIRECT_URL || window.location.origin}/auth/callback?next=/registro-centros`,
-        },
-      })
-
-      if (error) {
-        setError(error.message)
-      }
+      const provider = new GoogleAuthProvider()
+      await signInWithPopup(auth, provider)
+      // Redirect will happen via router.push in useEffect or after signup
+      router.push('/registro-centros')
     } catch {
       setError("Ocurrió un error con Google. Por favor intenta de nuevo.")
     } finally {
@@ -415,13 +409,9 @@ export function RegistroCentrosForm({ initialGoogleEmail, initialGoogleName }: R
     setError("")
 
     try {
-      const supabase = createBrowserClient()
-
       // For Google users, we still use the existing flow since they have an active session
       if (isGoogleUser) {
-        const {
-          data: { user },
-        } = await supabase.auth.getUser()
+        const user = auth.currentUser
 
         if (!user) {
           setError("No se pudo obtener el usuario de Google. Por favor intenta de nuevo.")
@@ -431,17 +421,13 @@ export function RegistroCentrosForm({ initialGoogleEmail, initialGoogleName }: R
         // Upload image first
         let imageUrl = null
         if (centerData.image) {
+          const storage = getStorage()
           const fileExt = centerData.image.name.split(".").pop()
-          const fileName = `${user.id}-${Date.now()}.${fileExt}`
+          const fileName = `${user.uid}-${Date.now()}.${fileExt}`
+          const storageRef = ref(storage, `center-images/${fileName}`)
 
-          const { error: uploadError } = await supabase.storage.from("center-images").upload(fileName, centerData.image)
-
-          if (!uploadError) {
-            const {
-              data: { publicUrl },
-            } = supabase.storage.from("center-images").getPublicUrl(fileName)
-            imageUrl = publicUrl
-          }
+          await uploadBytes(storageRef, centerData.image)
+          imageUrl = await getDownloadURL(storageRef)
         }
 
         // Use server API for Google users too
@@ -450,7 +436,7 @@ export function RegistroCentrosForm({ initialGoogleEmail, initialGoogleName }: R
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({
             isGoogleUser: true,
-            userId: user.id,
+            userId: user.uid,
             adminData: {
               firstName: adminData.firstName,
               lastName: adminData.lastName,
@@ -492,17 +478,13 @@ export function RegistroCentrosForm({ initialGoogleEmail, initialGoogleName }: R
       // Upload image first using anon client (storage should be public for uploads)
       let imageUrl = null
       if (centerData.image) {
+        const storage = getStorage()
         const fileExt = centerData.image.name.split(".").pop()
         const fileName = `temp-${Date.now()}.${fileExt}`
+        const storageRef = ref(storage, `center-images/${fileName}`)
 
-        const { error: uploadError } = await supabase.storage.from("center-images").upload(fileName, centerData.image)
-
-        if (!uploadError) {
-          const {
-            data: { publicUrl },
-          } = supabase.storage.from("center-images").getPublicUrl(fileName)
-          imageUrl = publicUrl
-        }
+        await uploadBytes(storageRef, centerData.image)
+        imageUrl = await getDownloadURL(storageRef)
       }
 
       // Call server API to create user and insert all data
@@ -547,17 +529,14 @@ export function RegistroCentrosForm({ initialGoogleEmail, initialGoogleName }: R
 
       // Sign in the user after successful registration
       console.log("[v0] Attempting sign in with email:", adminData.email)
-      const { data: signInData, error: signInError } = await supabase.auth.signInWithPassword({
-        email: adminData.email,
-        password: adminData.password,
-      })
-
-      console.log("[v0] Sign in result:", { signInData, signInError })
-
-      if (signInError) {
-        console.log("[v0] Sign in error after registration:", signInError.message)
-        // User was created but couldn't sign in - show error and redirect to login
-        setError(`Cuenta creada pero no se pudo iniciar sesión automáticamente: ${signInError.message}. Por favor inicia sesión manualmente.`)
+      try {
+        await signInWithEmailAndPassword(auth, adminData.email, adminData.password)
+        console.log("[v0] Sign in successful")
+      } catch (signInError: any) {
+        console.log("[v0] Sign in error:", signInError)
+        setError(
+          `Cuenta creada pero no se pudo iniciar sesión automáticamente: ${signInError?.message || "Error"}. Por favor inicia sesión manualmente.`
+        )
         setTimeout(() => {
           router.push("/login-centros?registered=true")
         }, 3000)

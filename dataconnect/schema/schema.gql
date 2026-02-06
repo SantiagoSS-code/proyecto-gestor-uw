@@ -1,0 +1,50 @@
+type User @table {
+  displayName: String!
+  email: String!
+  createdAt: Timestamp!
+  photoUrl: String
+  phoneNumber: String
+}
+
+type SportsCenter @table {
+  name: String!
+  address: String!
+  createdAt: Timestamp!
+  description: String
+  contactEmail: String
+  contactPhone: String
+  website: String
+  owner: User
+}
+
+type Facility @table {
+  name: String!
+  facilityType: String!
+  hourlyRate: Float!
+  createdAt: Timestamp!
+  description: String
+  capacity: Int
+  sportsCenter: SportsCenter
+}
+
+type AvailabilitySlot @table {
+  startTime: Timestamp!
+  endTime: Timestamp!
+  date: Date!
+  isBooked: Boolean!
+  createdAt: Timestamp!
+  facility: Facility
+}
+
+type Booking @table {
+  bookingDate: Date!
+  startTime: Timestamp!
+  endTime: Timestamp!
+  totalPrice: Float!
+  status: String!
+  createdAt: Timestamp!
+  user: User
+  facility: Facility
+  availabilitySlot: AvailabilitySlot
+  specialRequests: String
+}

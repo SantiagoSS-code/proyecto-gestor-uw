@@ -1,0 +1,54 @@
+mutation CreateSportsCenter($name: String!, $address: String!, $description: String, $contactEmail: String, $contactPhone: String, $website: String) @auth(level: USER) {
+  sportsCenter_insert(data: {
+    name: $name,
+    address: $address,
+    description: $description,
+    contactEmail: $contactEmail,
+    contactPhone: $contactPhone,
+    website: $website,
+    ownerId_expr: "auth.uid"
+  })
+}
+
+query ListAvailableFacilities($facilityType: String!, $date: Date!) @auth(level: PUBLIC, insecureReason: "This operation is safe to expose to the public") {
+  facilities(where: {facilityType: {eq: $facilityType}}) {
+    id
+    name
+    description
+    hourlyRate
+    capacity
+    availabilitySlots_on_facility(where: {date: {eq: $date}, isBooked: {eq: false}}) {
+      id
+      startTime
+      endTime
+    }
+  }
+}
+
+mutation BookAvailabilitySlot($availabilitySlotId: UUID!, $bookingDate: Date!, $startTime: Timestamp!, $endTime: Timestamp!, $specialRequests: String) @auth(level: USER) {
+  booking_insert(data: {
+    availabilitySlotId: $availabilitySlotId,
+    bookingDate: $bookingDate,
+    startTime: $startTime,
+    endTime: $endTime,
+    specialRequests: $specialRequests,
+    userId_expr: "auth.uid",
+    facilityId_expr: "AvailabilitySlot.facilityId",
+    status: "pending",
+    totalPrice: 100.00
+  })
+  availabilitySlot_update(key: {id: $availabilitySlotId}, data: {isBooked: true})
+}
+
+query GetMyBookings @auth(level: USER) {
+  bookings(where: {userId_expr: "auth.uid"}) {
+    id
+    bookingDate
+    startTime
+    endTime
+    status
+    facility {
+      name
+    }
+  }
+}

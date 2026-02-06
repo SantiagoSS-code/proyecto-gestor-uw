@@ -1,45 +1,30 @@
-// import { createServerClient } from "@supabase/ssr"
-import { NextResponse, type NextRequest } from "next/server"
+import { NextResponse } from 'next/server';
+import type { NextRequest } from 'next/server';
+import { adminAuth } from "@/lib/firebase/admin"
 
 export async function proxy(request: NextRequest) {
-  // Supabase auth disabled - TODO: Implement Firebase auth
-  let supabaseResponse = NextResponse.next({
-    request,
-  })
+  const { pathname } = request.nextUrl;
 
-  // const supabase = createServerClient(
-  //   process.env.NEXT_PUBLIC_SUPABASE_URL!,
-  //   process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
-  //   {
-  //     cookies: {
-  //       getAll() {
-  //         return request.cookies.getAll()
-  //       },
-  //       setAll(cookiesToSet) {
-  //         cookiesToSet.forEach(({ name, value }) => request.cookies.set(name, value))
-  //         supabaseResponse = NextResponse.next({
-  //           request,
-  //         })
-  //         cookiesToSet.forEach(({ name, value, options }) => supabaseResponse.cookies.set(name, value, options))
-  //       },
-  //     },
-  //   },
-  // )
+  // Protect /dashboard routes
+  if (pathname.startsWith('/dashboard')) {
+    const token = request.cookies.get('__session')?.value;
+    if (!token) {
+      return NextResponse.redirect(new URL('/auth/login', request.url));
+    }
 
-  // const {
-  //   data: { user },
-  // } = await supabase.auth.getUser()
+    try {
+      const decodedToken = await adminAuth.verifyIdToken(token);
+      if (!decodedToken.email_verified) {
+        return NextResponse.redirect(new URL('/auth/verify-email', request.url));
+      }
+    } catch {
+      return NextResponse.redirect(new URL('/auth/login', request.url));
+    }
+  }
 
-  // // Protect dashboard routes
-  // if (request.nextUrl.pathname.startsWith("/dashboard-centros") && !user) {
-  //   const url = request.nextUrl.clone()
-  //   url.pathname = "/login-centros"
-  //   return NextResponse.redirect(url)
-  // }
-
-  return supabaseResponse
+  return NextResponse.next();
 }
 
 export const config = {
-  matcher: ["/((?!_next/static|_next/image|favicon.ico|.*\\.(?:svg|png|jpg|jpeg|gif|webp)$).*)"],
+  matcher: ["/dashboard/:path*"],
 }
