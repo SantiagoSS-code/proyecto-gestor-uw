@@ -6,6 +6,9 @@ const nextConfig = {
   images: {
     unoptimized: true,
   },
+  env: {
+    NEXT_PUBLIC_USE_FIREBASE_EMULATOR: process.env.USE_FIREBASE_EMULATOR,
+  },
 }
 
 export default nextConfig

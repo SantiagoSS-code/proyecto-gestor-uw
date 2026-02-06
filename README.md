@@ -28,3 +28,39 @@ Continue building your app on:
 2. Deploy your chats from the v0 interface
 3. Changes are automatically pushed to this repository
 4. Vercel deploys the latest version from this repository
+
+## Backoffice (Platform Admin)
+
+- UI lives at `/backoffice`.
+- Access is restricted server-side in [app/backoffice/layout.tsx](app/backoffice/layout.tsx) using the `__session` cookie.
+- Admin allowlist is configured via `PLATFORM_ADMIN_EMAILS` (comma-separated).
+
+### Required env vars
+
+- See [.env.example](.env.example) for Firebase client + Admin SDK env vars.
+
+### Notes
+
+- On login, the app calls `/api/auth/session` to store the Firebase ID token in an HTTP-only `__session` cookie.
+- The cookie is short-lived (ID token TTL). If you want long-lived sessions, we can switch to Firebase session cookies.
+
+## Local dev: fix `auth/user-not-found`
+
+If you have `NEXT_PUBLIC_USE_FIREBASE_EMULATORS=true`, you are signing into the Auth *emulator* (not production). Any existing production users will appear as “user not found” until you create them in the emulator.
+
+Two options:
+
+1) Create users in the Emulator UI: `http://127.0.0.1:4000/auth`
+2) Use the dev bootstrap endpoint (also seeds Firestore role + center docs):
+
+
+	`curl -X POST http://localhost:3000/api/dev/bootstrap-user \
+		-H 'content-type: application/json' \
+		-H 'x-dev-bootstrap-token: YOUR_TOKEN' \
+		-d '{"email":"santiagonicsanchez@gmail.com","password":"Courtly123!","role":"platform_admin"}'`
+
+
+	`curl -X POST http://localhost:3000/api/dev/bootstrap-user \
+		-H 'content-type: application/json' \
+		-H 'x-dev-bootstrap-token: YOUR_TOKEN' \
+		-d '{"email":"santisanchez301@gmail.com","password":"Courtly123!","role":"center_admin","centerName":"Santi Center"}'`

@@ -1,0 +1,78 @@
+mutation SeedDatabase @auth(level: NO_ACCESS) @transaction {
+  user_insertMany(
+    data: [
+      {
+        id: "67c3115b-9345-4b0d-a437-704a1801614f"
+        createdAt: "2024-04-26T12:00:00Z"
+        displayName: "Demo User 1"
+        email: "demo1@example.com"
+      }
+      {
+        id: "9b1deb4d-3b7d-4bad-9bdd-2b0d7b3dcb6d"
+        createdAt: "2024-04-26T13:00:00Z"
+        displayName: "Demo User 2"
+        email: "demo2@example.com"
+      }
+    ]
+  )
+  sportsCenter_insertMany(
+    data: [
+      {
+        id: "4c2d6f1b-9094-4b07-acec-f4a7a5a7c527"
+        ownerId: "67c3115b-9345-4b0d-a437-704a1801614f"
+        address: "123 Main St"
+        name: "Sports Center A"
+        createdAt: "2024-04-26T14:00:00Z"
+      }
+      {
+        id: "7f7c9f2d-8e5b-4c6a-b83a-3e9d7b0b5f8e"
+        ownerId: "9b1deb4d-3b7d-4bad-9bdd-2b0d7b3dcb6d"
+        address: "456 Elm St"
+        name: "Sports Center B"
+        createdAt: "2024-04-26T15:00:00Z"
+      }
+    ]
+  )
+  facility_insertMany(
+    data: [
+      {
+        id: "2a8b4c7d-1e3f-4a9b-9c8d-7e5a3b2f1a4d"
+        sportsCenterId: "4c2d6f1b-9094-4b07-acec-f4a7a5a7c527"
+        name: "Tennis Court 1"
+        facilityType: "Tennis"
+        hourlyRate: 25.0
+        createdAt: "2024-04-26T16:00:00Z"
+      }
+      {
+        id: "5e6f8a9b-3c2d-4a1e-8b9a-6f4e2d1c8b5a"
+        sportsCenterId: "7f7c9f2d-8e5b-4c6a-b83a-3e9d7b0b5f8e"
+        name: "Basketball Court 1"
+        facilityType: "Basketball"
+        hourlyRate: 30.0
+        createdAt: "2024-04-26T17:00:00Z"
+      }
+    ]
+  )
+  availabilitySlot_insertMany(
+    data: [
+      {
+        id: "8b7a9c1d-4f3e-4a2b-8c7a-9e5b1a4d3c2f"
+        facilityId: "2a8b4c7d-1e3f-4a9b-9c8d-7e5a3b2f1a4d"
+        date: "2024-04-27"
+        startTime: "2024-04-27T09:00:00Z"
+        endTime: "2024-04-27T10:00:00Z"
+        isBooked: false
+        createdAt: "2024-04-26T18:00:00Z"
+      }
+      {
+        id: "1a2b3c4d-5e6f-4a7b-8c9d-1e2a3b4c5d6e"
+        facilityId: "5e6f8a9b-3c2d-4a1e-8b9a-6f4e2d1c8b5a"
+        date: "2024-04-27"
+        startTime: "2024-04-27T10:00:00Z"
+        endTime: "2024-04-27T11:00:00Z"
+        isBooked: false
+        createdAt: "2024-04-26T19:00:00Z"
+      }
+    ]
+  )
+}

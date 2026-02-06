@@ -20,23 +20,25 @@ export async function POST(request: Request) {
           Authorization: `Bearer ${RESEND_API_KEY}`,
         },
         body: JSON.stringify({
-          from: "Padel Club <onboarding@resend.dev>",
+          from: process.env.RESEND_FROM_EMAIL || "Courtly <onboarding@resend.dev>",
           to: [email],
-          subject: "Tu código de verificación - Padel Club",
+          subject: "Tu código de verificación - Courtly",
           html: `
             <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto; padding: 20px;">
-              <h1 style="color: #333; text-align: center;">Padel Club</h1>
-              <h2 style="color: #666; text-align: center;">Código de Verificación</h2>
-              <p>Hola ${name || ""},</p>
-              <p>Tu código de verificación es:</p>
-              <div style="background-color: #f4f4f4; padding: 20px; text-align: center; margin: 20px 0; border-radius: 8px;">
-                <span style="font-size: 32px; font-weight: bold; letter-spacing: 8px; color: #333;">${code}</span>
+              <div style="text-align: center; margin-bottom: 30px;">
+                <h1 style="color: #2563eb; margin: 0;">courtly</h1>
               </div>
-              <p>Este código expira en 10 minutos.</p>
-              <p>Si no solicitaste este código, puedes ignorar este email.</p>
-              <hr style="border: none; border-top: 1px solid #eee; margin: 20px 0;" />
+              <h2 style="color: #333; text-align: center;">Código de Verificación</h2>
+              <p style="color: #666;">Hola${name ? ` ${name}` : ''},</p>
+              <p style="color: #666;">Tu código de verificación es:</p>
+              <div style="background: linear-gradient(135deg, #2563eb 0%, #7c3aed 100%); padding: 25px; text-align: center; margin: 25px 0; border-radius: 12px;">
+                <span style="font-size: 36px; font-weight: bold; letter-spacing: 10px; color: #fff;">${code}</span>
+              </div>
+              <p style="color: #666;">Este código expira en <strong>10 minutos</strong>.</p>
+              <p style="color: #999; font-size: 14px;">Si no solicitaste este código, puedes ignorar este email.</p>
+              <hr style="border: none; border-top: 1px solid #eee; margin: 30px 0;" />
               <p style="color: #999; font-size: 12px; text-align: center;">
-                © 2026 Padel Club. Todos los derechos reservados.
+                © 2026 Courtly. Todos los derechos reservados.
               </p>
             </div>
           `,
@@ -45,9 +47,9 @@ export async function POST(request: Request) {
 
       if (!response.ok) {
         const errorData = await response.json()
-        console.log("[v0] Resend error:", errorData)
+        console.log("[Courtly] Resend error:", errorData)
         // Fallback: return success but log the code for testing
-        console.log(`[v0] Verification code for ${email}: ${code}`)
+        console.log(`[Courtly] Verification code for ${email}: ${code}`)
         return NextResponse.json({
           success: true,
           message: "Código enviado (modo desarrollo)",
@@ -59,7 +61,7 @@ export async function POST(request: Request) {
     } else {
       // No Resend API key - development mode
       // Log the code so it can be used for testing
-      console.log(`[v0] Verification code for ${email}: ${code}`)
+      console.log(`[Courtly] Verification code for ${email}: ${code}`)
 
       return NextResponse.json({
         success: true,
@@ -69,7 +71,7 @@ export async function POST(request: Request) {
       })
     }
   } catch (error) {
-    console.log("[v0] Send verification code error:", error)
+    console.log("[Courtly] Send verification code error:", error)
     return NextResponse.json({ error: "Error al enviar el código de verificación" }, { status: 500 })
   }
 }
