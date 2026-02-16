@@ -1,10 +1,6 @@
 "use client"
 
-<<<<<<< Updated upstream
-import { useState, useEffect } from "react"
-=======
 import { Suspense, useMemo, useState } from "react"
->>>>>>> Stashed changes
 import Link from "next/link"
 import { useRouter } from "next/navigation"
 import { Button } from "@/components/ui/button"

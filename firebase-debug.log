@@ -1,0 +1,243 @@
+[debug] [2026-02-16T20:06:02.593Z] ----------------------------------------------------------------------
+[debug] [2026-02-16T20:06:02.609Z] Command:       /opt/homebrew/Cellar/node/25.4.0/bin/node /opt/homebrew/bin/firebase hosting:channel:deploy preview --project courtly-fc306
+[debug] [2026-02-16T20:06:02.609Z] CLI Version:   15.6.0
+[debug] [2026-02-16T20:06:02.609Z] Platform:      darwin
+[debug] [2026-02-16T20:06:02.609Z] Node Version:  v25.4.0
+[debug] [2026-02-16T20:06:02.609Z] Time:          Mon Feb 16 2026 17:06:02 GMT-0300 (Argentina Standard Time)
+[debug] [2026-02-16T20:06:02.609Z] ----------------------------------------------------------------------
+[debug] 
+[debug] [2026-02-16T20:06:02.613Z] >>> [apiv2][query] GET https://firebase-public.firebaseio.com/cli.json [none]
+[debug] [2026-02-16T20:06:05.391Z] > command requires scopes: ["email","openid","https://www.googleapis.com/auth/cloudplatformprojects.readonly","https://www.googleapis.com/auth/firebase","https://www.googleapis.com/auth/cloud-platform"]
+[debug] [2026-02-16T20:06:05.391Z] > authorizing via signed-in user (santiagonicsanchez@gmail.com)
+[debug] [2026-02-16T20:06:05.391Z] [iam] checking project courtly-fc306 for permissions ["firebase.projects.get","firebasehosting.sites.update"]
+[debug] [2026-02-16T20:06:05.392Z] Checked if tokens are valid: false, expires at: 1771267490939
+[debug] [2026-02-16T20:06:05.392Z] Checked if tokens are valid: false, expires at: 1771267490939
+[debug] [2026-02-16T20:06:05.393Z] > refreshing access token with scopes: []
+[debug] [2026-02-16T20:06:05.395Z] >>> [apiv2][query] POST https://www.googleapis.com/oauth2/v3/token [none]
+[debug] [2026-02-16T20:06:05.395Z] >>> [apiv2][body] POST https://www.googleapis.com/oauth2/v3/token [omitted]
+[debug] [2026-02-16T20:06:05.581Z] <<< [apiv2][status] POST https://www.googleapis.com/oauth2/v3/token 200
+[debug] [2026-02-16T20:06:05.581Z] <<< [apiv2][body] POST https://www.googleapis.com/oauth2/v3/token [omitted]
+[debug] [2026-02-16T20:06:05.598Z] >>> [apiv2][query] POST https://cloudresourcemanager.googleapis.com/v1/projects/courtly-fc306:testIamPermissions [none]
+[debug] [2026-02-16T20:06:05.598Z] >>> [apiv2][(partial)header] POST https://cloudresourcemanager.googleapis.com/v1/projects/courtly-fc306:testIamPermissions  x-goog-user-project=courtly-fc306
+[debug] [2026-02-16T20:06:05.598Z] >>> [apiv2][body] POST https://cloudresourcemanager.googleapis.com/v1/projects/courtly-fc306:testIamPermissions {"permissions":["firebase.projects.get","firebasehosting.sites.update"]}
+[debug] [2026-02-16T20:06:05.781Z] <<< [apiv2][status] GET https://firebase-public.firebaseio.com/cli.json 200
+[debug] [2026-02-16T20:06:05.782Z] <<< [apiv2][body] GET https://firebase-public.firebaseio.com/cli.json {"cloudBuildErrorAfter":1594252800000,"cloudBuildWarnAfter":1590019200000,"defaultNode10After":1594252800000,"minVersion":"3.0.5","node8DeploysDisabledAfter":1613390400000,"node8RuntimeDisabledAfter":1615809600000,"node8WarnAfter":1600128000000}
+[debug] [2026-02-16T20:06:06.526Z] <<< [apiv2][status] POST https://cloudresourcemanager.googleapis.com/v1/projects/courtly-fc306:testIamPermissions 200
+[debug] [2026-02-16T20:06:06.526Z] <<< [apiv2][body] POST https://cloudresourcemanager.googleapis.com/v1/projects/courtly-fc306:testIamPermissions {"permissions":["firebase.projects.get","firebasehosting.sites.update"]}
+[debug] [2026-02-16T20:06:06.527Z] Checked if tokens are valid: true, expires at: 1771275964581
+[debug] [2026-02-16T20:06:06.527Z] Checked if tokens are valid: true, expires at: 1771275964581
+[debug] [2026-02-16T20:06:06.527Z] >>> [apiv2][query] GET https://firebase.googleapis.com/v1beta1/projects/courtly-fc306 [none]
+[debug] [2026-02-16T20:06:06.999Z] <<< [apiv2][status] GET https://firebase.googleapis.com/v1beta1/projects/courtly-fc306 200
+[debug] [2026-02-16T20:06:06.999Z] <<< [apiv2][body] GET https://firebase.googleapis.com/v1beta1/projects/courtly-fc306 {"projectId":"courtly-fc306","projectNumber":"102383002552","displayName":"padel-court-booking","name":"projects/courtly-fc306","resources":{"hostingSite":"courtly-fc306"},"state":"ACTIVE","etag":"1_92c7229b-2269-4063-b97a-8ed0c1de4d56"}
+[debug] [2026-02-16T20:06:07.002Z] Checked if tokens are valid: true, expires at: 1771275964581
+[debug] [2026-02-16T20:06:07.002Z] Checked if tokens are valid: true, expires at: 1771275964581
+[debug] [2026-02-16T20:06:07.002Z] >>> [apiv2][query] GET https://firebasehosting.googleapis.com/v1beta1/projects/courtly-fc306/sites/courtly-fc306/channels/preview [none]
+[debug] [2026-02-16T20:06:07.420Z] <<< [apiv2][status] GET https://firebasehosting.googleapis.com/v1beta1/projects/courtly-fc306/sites/courtly-fc306/channels/preview 200
+[debug] [2026-02-16T20:06:07.420Z] <<< [apiv2][body] GET https://firebasehosting.googleapis.com/v1beta1/projects/courtly-fc306/sites/courtly-fc306/channels/preview {"name":"projects/courtly-fc306/sites/courtly-fc306/channels/preview","url":"https://courtly-fc306--preview-b83rsptr.web.app","createTime":"2026-02-16T17:46:36.645698388Z","updateTime":"2026-02-16T17:46:36.645698388Z","retainedReleaseCount":10,"expireTime":"2026-02-23T17:46:36.645698388Z"}
+[debug] [2026-02-16T20:06:07.420Z] [hosting] found existing channel for site courtly-fc306 {"name":"projects/courtly-fc306/sites/courtly-fc306/channels/preview","url":"https://courtly-fc306--preview-b83rsptr.web.app","createTime":"2026-02-16T17:46:36.645698388Z","updateTime":"2026-02-16T17:46:36.645698388Z","retainedReleaseCount":10,"expireTime":"2026-02-23T17:46:36.645698388Z"}
+[debug] [2026-02-16T20:06:07.420Z] Checked if tokens are valid: true, expires at: 1771275964581
+[debug] [2026-02-16T20:06:07.420Z] Checked if tokens are valid: true, expires at: 1771275964581
+[debug] [2026-02-16T20:06:07.421Z] >>> [apiv2][query] PATCH https://firebasehosting.googleapis.com/v1beta1/projects/courtly-fc306/sites/courtly-fc306/channels/preview updateMask=ttl
+[debug] [2026-02-16T20:06:07.421Z] >>> [apiv2][body] PATCH https://firebasehosting.googleapis.com/v1beta1/projects/courtly-fc306/sites/courtly-fc306/channels/preview {"ttl":"604800s"}
+[debug] [2026-02-16T20:06:07.951Z] <<< [apiv2][status] PATCH https://firebasehosting.googleapis.com/v1beta1/projects/courtly-fc306/sites/courtly-fc306/channels/preview 200
+[debug] [2026-02-16T20:06:07.951Z] <<< [apiv2][body] PATCH https://firebasehosting.googleapis.com/v1beta1/projects/courtly-fc306/sites/courtly-fc306/channels/preview {"name":"projects/courtly-fc306/sites/courtly-fc306/channels/preview","url":"https://courtly-fc306--preview-b83rsptr.web.app","createTime":"2026-02-16T17:46:36.645698388Z","updateTime":"2026-02-16T20:06:07.773778890Z","retainedReleaseCount":10,"expireTime":"2026-02-23T20:06:07.773778890Z"}
+[debug] [2026-02-16T20:06:07.951Z] [hosting] updated TTL for existing channel for site courtly-fc306 {"name":"projects/courtly-fc306/sites/courtly-fc306/channels/preview","url":"https://courtly-fc306--preview-b83rsptr.web.app","createTime":"2026-02-16T17:46:36.645698388Z","updateTime":"2026-02-16T20:06:07.773778890Z","retainedReleaseCount":10,"expireTime":"2026-02-23T20:06:07.773778890Z"}
+[debug] [2026-02-16T20:06:11.774Z] defaultcredentials: writing to file /Users/santisanchez/.config/firebase/santiagonicsanchez_gmail_com_application_default_credentials.json
+[debug] [2026-02-16T20:06:11.780Z] Checked if tokens are valid: true, expires at: 1771275964581
+[debug] [2026-02-16T20:06:11.780Z] Checked if tokens are valid: true, expires at: 1771275964581
+[debug] [2026-02-16T20:06:11.780Z] >>> [apiv2][query] GET https://firebasehosting.googleapis.com/v1beta1/projects/courtly-fc306/sites pageToken=&pageSize=10
+[debug] [2026-02-16T20:06:12.415Z] <<< [apiv2][status] GET https://firebasehosting.googleapis.com/v1beta1/projects/courtly-fc306/sites 200
+[debug] [2026-02-16T20:06:12.416Z] <<< [apiv2][body] GET https://firebasehosting.googleapis.com/v1beta1/projects/courtly-fc306/sites {"sites":[{"name":"projects/courtly-fc306/sites/courtly-fc306","defaultUrl":"https://courtly-fc306.web.app","type":"DEFAULT_SITE"}]}
+[debug] [2026-02-16T20:06:12.417Z] Checked if tokens are valid: true, expires at: 1771275964581
+[debug] [2026-02-16T20:06:12.417Z] Checked if tokens are valid: true, expires at: 1771275964581
+[debug] [2026-02-16T20:06:12.417Z] >>> [apiv2][query] GET https://firebasehosting.googleapis.com/v1beta1/projects/courtly-fc306/sites 
+[debug] [2026-02-16T20:06:13.021Z] <<< [apiv2][status] GET https://firebasehosting.googleapis.com/v1beta1/projects/courtly-fc306/sites 200
+[debug] [2026-02-16T20:06:13.021Z] <<< [apiv2][body] GET https://firebasehosting.googleapis.com/v1beta1/projects/courtly-fc306/sites {"sites":[{"name":"projects/courtly-fc306/sites/courtly-fc306","defaultUrl":"https://courtly-fc306.web.app","type":"DEFAULT_SITE"}]}
+[debug] [2026-02-16T20:06:13.021Z] Checked if tokens are valid: true, expires at: 1771275964581
+[debug] [2026-02-16T20:06:13.021Z] Checked if tokens are valid: true, expires at: 1771275964581
+[debug] [2026-02-16T20:06:13.021Z] >>> [apiv2][query] GET https://firebase.googleapis.com/v1beta1/projects/courtly-fc306/webApps/-/config [none]
+[debug] [2026-02-16T20:06:14.665Z] <<< [apiv2][status] GET https://firebase.googleapis.com/v1beta1/projects/courtly-fc306/webApps/-/config 200
+[debug] [2026-02-16T20:06:14.679Z] <<< [apiv2][body] GET https://firebase.googleapis.com/v1beta1/projects/courtly-fc306/webApps/-/config {"projectId":"courtly-fc306","appId":"1:102383002552:web:c8ae459de7705cf4a1a54d","storageBucket":"courtly-fc306.firebasestorage.app","apiKey":"AIzaSyAX-LFgpH_qDPEHmDPQgKURgEyz2MuIWME","authDomain":"courtly-fc306.firebaseapp.com","messagingSenderId":"102383002552","measurementId":"G-WFTBFF256C","projectNumber":"102383002552","version":"2"}
+[info] 
+   Thank you for trying our early preview of Next.js support on Firebase Hosting.
+   During the preview, support is best-effort and breaking changes can be expected. Proceed with caution.
+   The integration is known to work with Next.js version 12 - 15.0. You may encounter errors.
+
+   Documentation: https://firebase.google.com/docs/hosting/frameworks/nextjs
+   File a bug: https://github.com/firebase/firebase-tools/issues/new?template=bug_report.md
+   Submit a feature request: https://github.com/firebase/firebase-tools/issues/new?template=feature_request.md
+
+   We'd love to learn from you. Express your interest in helping us shape the future of Firebase Hosting: https://goo.gle/41enW5X
+
+[debug] [2026-02-16T20:06:25.904Z] Checked if tokens are valid: true, expires at: 1771275964581
+[debug] [2026-02-16T20:06:25.904Z] Checked if tokens are valid: true, expires at: 1771275964581
+[debug] [2026-02-16T20:06:25.905Z] >>> [apiv2][query] GET https://firebasehosting.googleapis.com/v1beta1/projects/courtly-fc306/sites/courtly-fc306/channels/preview [none]
+[debug] [2026-02-16T20:06:27.058Z] <<< [apiv2][status] GET https://firebasehosting.googleapis.com/v1beta1/projects/courtly-fc306/sites/courtly-fc306/channels/preview 200
+[debug] [2026-02-16T20:06:27.058Z] <<< [apiv2][body] GET https://firebasehosting.googleapis.com/v1beta1/projects/courtly-fc306/sites/courtly-fc306/channels/preview {"name":"projects/courtly-fc306/sites/courtly-fc306/channels/preview","url":"https://courtly-fc306--preview-b83rsptr.web.app","createTime":"2026-02-16T17:46:36.645698388Z","updateTime":"2026-02-16T20:06:07.773778890Z","retainedReleaseCount":10,"expireTime":"2026-02-23T20:06:07.773778890Z"}
+[info] [baseline-browser-mapping] The data in this module is over two months old.  To ensure accurate Baseline data, please update: `npm i baseline-browser-mapping@latest -D`
+
+[info]    ▲ Next.js 16.0.10 (Turbopack)
+
+[info]    - Environments: .env.local
+
+
+[info]    Creating an optimized production build ...
+
+[info] [baseline-browser-mapping] The data in this module is over two months old.  To ensure accurate Baseline data, please update: `npm i baseline-browser-mapping@latest -D`
+
+[info] 
+
+[info] > Build error occurred
+
+[info] Error: Turbopack build failed with 7 errors:
+./components/header.tsx:3:1
+Parsing ecmascript source code failed
+  1 | "use client"
+  2 |
+> 3 | <<<<<<< Updated upstream
+    | ^^^^^^^
+  4 | import { useState, useEffect } from "react"
+  5 | =======
+  6 | import { Suspense, useMemo, useState } from "react"
+
+Merge conflict marker encountered.
+
+Import trace:
+  Server Component:
+    ./components/header.tsx
+    ./app/page.tsx
+
+
+./components/header.tsx:5:1
+Parsing ecmascript source code failed
+  3 | <<<<<<< Updated upstream
+  4 | import { useState, useEffect } from "react"
+> 5 | =======
+    | ^^^^^^^
+  6 | import { Suspense, useMemo, useState } from "react"
+  7 | >>>>>>> Stashed changes
+  8 | import Link from "next/link"
+
+Merge conflict marker encountered.
+
+Import trace:
+  Server Component:
+    ./components/header.tsx
+    ./app/page.tsx
+
+
+./components/header.tsx:7:1
+Parsing ecmascript source code failed
+   5 | =======
+   6 | import { Suspense, useMemo, useState } from "react"
+>  7 | >>>>>>> Stashed changes
+     | ^^^^^^^
+   8 | import Link from "next/link"
+   9 | import { useRouter } from "next/navigation"
+  10 | import { Button } from "@/components/ui/button"
+
+Merge conflict marker encountered.
+
+Import trace:
+  Server Component:
+    ./components/header.tsx
+    ./app/page.tsx
+
+
+./app/players/signup/page.tsx:7:1
+Module not found: Can't resolve '@/lib/firebaseClient'
+   5 | import { createUserWithEmailAndPassword, sendEmailVerification, signInWithPopup, GoogleAuthProvider } from 'firebase/auth';
+   6 | import { doc, setDoc } from 'firebase/firestore';
+>  7 | import { auth, db } from '@/lib/firebaseClient';
+     | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+   8 | import { Button } from '@/components/ui/button';
+   9 | import { Input } from '@/components/ui/input';
+  10 | import { Label } from '@/components/ui/label';
+
+Import map: aliased to relative './lib/firebaseClient' inside of [project]/
+
+
+Import traces:
+  Client Component Browser:
+    ./app/players/signup/page.tsx [Client Component Browser]
+    ./app/players/signup/page.tsx [Server Component]
+
+  Client Component SSR:
+    ./app/players/signup/page.tsx [Client Component SSR]
+    ./app/players/signup/page.tsx [Server Component]
+
+https://nextjs.org/docs/messages/module-not-found
+
+
+./lib/supabase/client.ts:1:1
+Module not found: Can't resolve '@supabase/ssr'
+> 1 | import { createBrowserClient as createSupabaseBrowserClient } from "@supabase/ssr"
+    | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  2 |
+  3 | let client: ReturnType<typeof createSupabaseBrowserClient> | null = null
+  4 |
+
+
+
+Import traces:
+  Client Component Browser:
+    ./lib/supabase/client.ts [Client Component Browser]
+    ./components/auth/registro-centros-form.tsx [Client Component Browser]
+    ./components/auth/registro-centros-form.tsx [Server Component]
+    ./app/registro-centros/page.tsx [Server Component]
+
+  Client Component SSR:
+    ./lib/supabase/client.ts [Client Component SSR]
+    ./components/auth/registro-centros-form.tsx [Client Component SSR]
+    ./components/auth/registro-centros-form.tsx [Server Component]
+    ./app/registro-centros/page.tsx [Server Component]
+
+https://nextjs.org/docs/messages/module-not-found
+
+
+./lib/supabase/server.ts:1:1
+Module not found: Can't resolve '@supabase/ssr'
+> 1 | import { createServerClient as createSupabaseServerClient } from "@supabase/ssr"
+    | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  2 | import { cookies } from "next/headers"
+  3 |
+  4 | export async function createClient() {
+
+
+
+Import trace:
+  Server Component:
+    ./lib/supabase/server.ts
+    ./app/dashboard-centros/page.tsx
+
+https://nextjs.org/docs/messages/module-not-found
+
+
+./app/api/registro-centro/route.ts:1:1
+Module not found: Can't resolve '@supabase/supabase-js'
+> 1 | import { createClient } from "@supabase/supabase-js"
+    | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  2 | import { NextResponse } from "next/server"
+  3 |
+  4 | // Use service role to bypass RLS - this runs on the server only
+
+
+
+https://nextjs.org/docs/messages/module-not-found
+
+
+    at <unknown> (./components/header.tsx:3:1)
+    at <unknown> (./components/header.tsx:5:1)
+    at <unknown> (./components/header.tsx:7:1)
+    at <unknown> (./app/players/signup/page.tsx:7:1)
+    at <unknown> (https://nextjs.org/docs/messages/module-not-found)
+    at <unknown> (./lib/supabase/client.ts:1:1)
+    at <unknown> (https://nextjs.org/docs/messages/module-not-found)
+    at <unknown> (./lib/supabase/server.ts:1:1)
+    at <unknown> (https://nextjs.org/docs/messages/module-not-found)
+    at <unknown> (./app/api/registro-centro/route.ts:1:1)
+    at <unknown> (https://nextjs.org/docs/messages/module-not-found)
+
+[debug] [2026-02-16T20:06:40.892Z] Error: ENOENT: no such file or directory, open '/Users/santisanchez/Documents/GitHub/proyecto-gestor-uw/.next/server/middleware-manifest.json'
+[error] 
+[error] Error: An unexpected error has occurred.
