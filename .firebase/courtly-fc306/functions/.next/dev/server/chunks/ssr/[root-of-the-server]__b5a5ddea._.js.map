@@ -1,0 +1,6 @@
+{
+  "version": 3,
+  "sources": [],
+  "sections": [
+    {"offset": {"line": 18, "column": 0}, "map": {"version":3,"sources":["file:///Users/santisanchez/Documents/GitHub/proyecto-gestor-uw/app/backoffice/payments/page.tsx"],"sourcesContent":["export default function BackofficePaymentsPage() {\n  return (\n    <div className=\"space-y-2\">\n      <h1 className=\"text-2xl font-semibold text-slate-900\">Payments</h1>\n      <p className=\"text-sm text-slate-600\">Placeholder for MVP. Will connect to Stripe/MercadoPago later.</p>\n    </div>\n  )\n}\n"],"names":[],"mappings":";;;;;;AAAe,SAAS;IACtB,qBACE,sZAAC;QAAI,WAAU;;0BACb,sZAAC;gBAAG,WAAU;0BAAwC;;;;;;0BACtD,sZAAC;gBAAE,WAAU;0BAAyB;;;;;;;;;;;;AAG5C"}}]
+}

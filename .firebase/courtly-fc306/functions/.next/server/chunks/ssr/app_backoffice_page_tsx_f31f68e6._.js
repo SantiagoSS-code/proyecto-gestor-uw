@@ -1,0 +1,3 @@
+module.exports=[16089,a=>{"use strict";var b=a.i(82746),c=a.i(98278);function d(){let{user:a,loading:d}=(0,c.useBackofficeAuth)();return(0,b.jsxs)("div",{className:"space-y-4",children:[(0,b.jsxs)("div",{children:[(0,b.jsx)("h1",{className:"text-2xl font-semibold text-slate-900",children:"Backoffice OK"}),(0,b.jsx)("p",{className:"text-sm text-slate-600 mt-1",children:"You are signed in to the backoffice project."})]}),(0,b.jsx)("div",{className:"rounded-xl border border-slate-200/70 bg-slate-50 px-4 py-3 text-sm text-slate-700",children:d?"Loading admin session…":`Admin: ${a?.email||"Unknown"}`})]})}a.s(["default",()=>d])}];
+
+//# sourceMappingURL=app_backoffice_page_tsx_f31f68e6._.js.map

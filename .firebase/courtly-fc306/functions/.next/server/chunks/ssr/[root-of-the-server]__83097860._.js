@@ -1,0 +1,3 @@
+module.exports=[93695,(a,b,c)=>{b.exports=a.x("next/dist/shared/lib/no-fallback-error.external.js",()=>require("next/dist/shared/lib/no-fallback-error.external.js"))},70864,a=>{a.n(a.i(33290))},67244,a=>{a.n(a.i(17880))},1320,a=>{a.n(a.i(18172))},75893,a=>{a.n(a.i(7091))},54934,a=>{a.n(a.i(55669))},61544,a=>{a.n(a.i(3358))},1730,a=>{"use strict";var b=a.i(88955);function c(){return(0,b.jsxs)("div",{className:"space-y-2",children:[(0,b.jsx)("h1",{className:"text-2xl font-semibold text-slate-900",children:"Payments"}),(0,b.jsx)("p",{className:"text-sm text-slate-600",children:"Placeholder for MVP. Will connect to Stripe/MercadoPago later."})]})}a.s(["default",()=>c])}];
+
+//# sourceMappingURL=%5Broot-of-the-server%5D__83097860._.js.map

@@ -1,0 +1,3 @@
+{
+  "/api/backoffice/centers/[centerId]/route": "app/api/backoffice/centers/[centerId]/route.js"
+}

@@ -1,0 +1,10 @@
+{
+  "/api/auth/session/route": "app/api/auth/session/route.js",
+  "/api/mercadopago/create-preference/route": "app/api/mercadopago/create-preference/route.js",
+  "/auth/login/page": "app/auth/login/page.js",
+  "/centros/page": "app/centros/page.js",
+  "/clubs/[slug]/page": "app/clubs/[slug]/page.js",
+  "/dashboard-centros/page": "app/dashboard-centros/page.js",
+  "/page": "app/page.js",
+  "/players/dashboard/page": "app/players/dashboard/page.js"
+}

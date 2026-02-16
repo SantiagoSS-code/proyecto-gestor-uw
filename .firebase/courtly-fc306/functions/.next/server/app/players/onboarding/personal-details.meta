@@ -1,0 +1,17 @@
+{
+  "headers": {
+    "x-nextjs-stale-time": "300",
+    "x-nextjs-prerender": "1",
+    "x-next-cache-tags": "_N_T_/layout,_N_T_/players/layout,_N_T_/players/onboarding/layout,_N_T_/players/onboarding/personal-details/layout,_N_T_/players/onboarding/personal-details/page,_N_T_/players/onboarding/personal-details"
+  },
+  "segmentPaths": [
+    "/_tree",
+    "/_full",
+    "/players/onboarding/personal-details/__PAGE__",
+    "/players/onboarding/personal-details",
+    "/players/onboarding",
+    "/players",
+    "/_index",
+    "/_head"
+  ]
+}

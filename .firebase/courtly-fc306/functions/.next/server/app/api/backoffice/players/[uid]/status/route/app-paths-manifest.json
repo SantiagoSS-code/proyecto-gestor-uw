@@ -1,0 +1,3 @@
+{
+  "/api/backoffice/players/[uid]/status/route": "app/api/backoffice/players/[uid]/status/route.js"
+}

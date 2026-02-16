@@ -1,0 +1,3 @@
+{
+  "/api/mercadopago/create-preference/route": "app/api/mercadopago/create-preference/route.js"
+}

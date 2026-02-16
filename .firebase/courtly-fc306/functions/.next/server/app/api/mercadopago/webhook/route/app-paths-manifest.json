@@ -1,0 +1,3 @@
+{
+  "/api/mercadopago/webhook/route": "app/api/mercadopago/webhook/route.js"
+}

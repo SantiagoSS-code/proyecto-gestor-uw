@@ -1,0 +1,3 @@
+{
+  "/api/send-verification-code/route": "app/api/send-verification-code/route.js"
+}

@@ -1,0 +1,16 @@
+{
+  "headers": {
+    "x-nextjs-stale-time": "300",
+    "x-nextjs-prerender": "1",
+    "x-next-cache-tags": "_N_T_/layout,_N_T_/players/layout,_N_T_/players/profile/layout,_N_T_/players/profile/page,_N_T_/players/profile"
+  },
+  "segmentPaths": [
+    "/_tree",
+    "/_full",
+    "/players/profile/__PAGE__",
+    "/players/profile",
+    "/players",
+    "/_index",
+    "/_head"
+  ]
+}

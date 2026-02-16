@@ -1,0 +1,19 @@
+{
+  "status": 307,
+  "headers": {
+    "location": "/dashboard-centros/courts?tab=schedule",
+    "x-nextjs-stale-time": "300",
+    "x-nextjs-prerender": "1",
+    "x-next-cache-tags": "_N_T_/layout,_N_T_/dashboard-centros/layout,_N_T_/dashboard-centros/courts/layout,_N_T_/dashboard-centros/courts/schedule/layout,_N_T_/dashboard-centros/courts/schedule/page,_N_T_/dashboard-centros/courts/schedule"
+  },
+  "segmentPaths": [
+    "/_tree",
+    "/_full",
+    "/dashboard-centros/courts/schedule/__PAGE__",
+    "/dashboard-centros/courts/schedule",
+    "/dashboard-centros/courts",
+    "/dashboard-centros",
+    "/_index",
+    "/_head"
+  ]
+}

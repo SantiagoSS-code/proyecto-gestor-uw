@@ -1,0 +1,16 @@
+{
+  "headers": {
+    "x-nextjs-stale-time": "300",
+    "x-nextjs-prerender": "1",
+    "x-next-cache-tags": "_N_T_/layout,_N_T_/dashboard-centros/layout,_N_T_/dashboard-centros/courts/layout,_N_T_/dashboard-centros/courts/page,_N_T_/dashboard-centros/courts"
+  },
+  "segmentPaths": [
+    "/_tree",
+    "/_full",
+    "/dashboard-centros/courts/__PAGE__",
+    "/dashboard-centros/courts",
+    "/dashboard-centros",
+    "/_index",
+    "/_head"
+  ]
+}

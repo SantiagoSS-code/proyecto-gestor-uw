@@ -1,0 +1,15 @@
+{
+  "headers": {
+    "x-nextjs-stale-time": "300",
+    "x-nextjs-prerender": "1",
+    "x-next-cache-tags": "_N_T_/layout,_N_T_/login-centros/layout,_N_T_/login-centros/page,_N_T_/login-centros"
+  },
+  "segmentPaths": [
+    "/_tree",
+    "/_full",
+    "/login-centros/__PAGE__",
+    "/login-centros",
+    "/_index",
+    "/_head"
+  ]
+}

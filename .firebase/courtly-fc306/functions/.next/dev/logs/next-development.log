@@ -1,0 +1,103 @@
+[00:00:00.914] Server  LOG      ✓ Ready in 667ms
+[00:00:05.320] Server  LOG      ○ Compiling / ...
+[00:00:06.587] Browser INFO    %cDownload the React DevTools for a better development experience: https://react.dev/link/react-devtools font-weight:bold
+[00:00:06.817] Browser ERROR   A tree hydrated but some attributes of the server rendered HTML didn't match the client properties. This won't be patched up. This can happen if a SSR-ed Client Component used:
+
+- A server/client branch `if (typeof window !== 'undefined')`.
+- Variable input such as `Date.now()` or `Math.random()` which changes each time it's called.
+- Date formatting in a user's locale which doesn't match the server.
+- External changing data without sending a snapshot of it along with the HTML.
+- Invalid HTML tag nesting.
+
+It can also happen if the client has a browser extension installed which messes with the HTML before React loaded.
+
+%s%s https://react.dev/link/hydration-mismatch 
+
+  ...
+    <form className="flex flex-..." onSubmit={function onSubmit}>
+      <div>
+      ...
+        <PopperProvider scope={{Popper:[...]}} anchor={null} onAnchorChange={function bound dispatchSetState}>
+          <PopoverProvider scope={undefined} contentId="radix-_R_1..." triggerRef={{current:null}} open={false} ...>
+            <PopoverTrigger asChild={true}>
+              <PopperAnchor asChild={true} __scopePopper={{Popper:[...]}}>
+                <Primitive.div asChild={true} ref={function}>
+                  <Slot ref={function}>
+                    <SlotClone ref={function}>
+                      <Primitive.button type="button" aria-haspopup="dialog" aria-expanded={false} ...>
+                        <Slot type="button" aria-haspopup="dialog" aria-expanded={false} aria-controls="radix-_R_1..." ...>
+                          <SlotClone type="button" aria-haspopup="dialog" aria-expanded={false} ...>
+                            <Button variant="ghost" className="h-full w-f..." type="button" aria-haspopup="dialog" ...>
+                              <button
+                                data-slot="button"
+                                className={"inline-flex items-center gap-2 whitespace-nowrap rounded-md transition-al..."}
+                                type="button"
+                                aria-haspopup="dialog"
+                                aria-expanded={false}
++                               aria-controls="radix-_R_14sklrlb_"
+-                               aria-controls="radix-_R_4jiindlb_"
+                                data-state="closed"
+                                onClick={function handleEvent}
+                                ref={function}
+                              >
+            ...
+      ...
+        <SelectCollectionProvider scope={undefined}>
+          <SelectCollectionProviderProvider scope={undefined} itemMap={Map} collectionRef={{current:null}}>
+            <SelectProvider scope={undefined} onNativeOptionAdd={function Select.useCallback} ...>
+              <SelectTrigger className="w-full bg-...">
+                <SelectTrigger data-slot="select-tri..." data-size="default" className={"border-i..."}>
+                  <PopperAnchor asChild={true} __scopePopper={{Popper:[...]}}>
+                    <Primitive.div asChild={true} ref={function}>
+                      <Slot ref={function}>
+                        <SlotClone ref={function}>
+                          <Primitive.button type="button" role="combobox" aria-controls="radix-_R_1..." ...>
+                            <button
+                              type="button"
+                              role="combobox"
++                             aria-controls="radix-_R_16sklrlb_"
+-                             aria-controls="radix-_R_4riindlb_"
+                              aria-expanded={false}
+                              aria-required={undefined}
+                              aria-autocomplete="none"
+                              dir="ltr"
+                              data-state="closed"
+                              disabled={false}
+                              data-disabled={undefined}
+                              data-placeholder={undefined}
+                              data-slot="select-trigger"
+                              data-size="default"
+                              className={"border-input data-[placeholder]:text-muted-foreground [&_svg:not([class*='t..."}
+                              onClick={function handleEvent}
+                              onPointerDown={function handleEvent}
+                              onKeyDown={function handleEvent}
+                              ref={function}
+                            >
+              ...
+        ...
+      ...
+
+[00:00:06.817] Browser LOG     %c[Vercel Web Analytics]%c Debug mode is enabled by default in development. No requests will be sent to the server. color: rgb(120, 120, 120) color: inherit
+[00:00:06.817] Browser LOG     %c[Vercel Web Analytics]%c Running queued event color: rgb(120, 120, 120) color: inherit pageview {"path":"/","route":"/"}
+[00:00:06.817] Browser LOG     %c[Vercel Web Analytics]%c [pageview] http://localhost:3000/ color: rgb(120, 120, 120) color: inherit {"dp":"/","o":"http://localhost:3000/","r":"","sdkn":"@vercel/analytics/next","sdkv":"1.3.1","sv":"0.1.3","ts":1771259338709}
+[00:00:46.738] Browser LOG     %c[Vercel Web Analytics]%c [pageview] http://localhost:3000/centros?date=2026-02-16&time=16%3A30 color: rgb(120, 120, 120) color: inherit {"dp":"/centros","o":"http://localhost:3000/centros?date=2026-02-16&time=16%3A30","sdkn":"@vercel/analytics/next","sdkv":"1.3.1","sv":"0.1.3","ts":1771259378631}
+[00:00:51.314] Browser WARN    Club map missing googlePlaceId
+[00:00:51.314] Browser WARN    Club map missing googlePlaceId
+[00:00:51.314] Browser LOG     %c[Vercel Web Analytics]%c [pageview] http://localhost:3000/clubs/area-45-cardales color: rgb(120, 120, 120) color: inherit {"dp":"/clubs/[slug]","o":"http://localhost:3000/clubs/area-45-cardales","sdkn":"@vercel/analytics/next","sdkv":"1.3.1","sv":"0.1.3","ts":1771259383204}
+[00:01:06.778] Server  LOG     [MP] Looking for court: {}
+[00:01:06.779] Server  LOG     [Firebase/admin] privateKeyRaw length: 1704
+[00:01:06.780] Server  LOG     [Firebase/admin] privateKey length: 1703
+[00:01:06.780] Server  LOG     [Firebase/admin] privateKey first 50: "-----BEGIN PRIVATE KEY-----\nMIIEvAIBADANBgkqhkiG9w"
+[00:01:06.780] Server  LOG     [Firebase/admin] privateKey last 50: "ZpFn8J06zzT5UqfBlu3cYQ==\n-----END PRIVATE KEY-----"
+[00:01:07.984] Server  LOG     [MP] Court exists: true {}
+[00:01:41.701] Browser INFO    %cDownload the React DevTools for a better development experience: https://react.dev/link/react-devtools font-weight:bold
+[00:01:41.836] Browser WARN    Club map missing googlePlaceId
+[00:01:41.836] Browser LOG     %c[Vercel Web Analytics]%c Debug mode is enabled by default in development. No requests will be sent to the server. color: rgb(120, 120, 120) color: inherit
+[00:01:41.837] Browser LOG     %c[Vercel Web Analytics]%c Running queued event color: rgb(120, 120, 120) color: inherit pageview {"path":"/clubs/area-45-cardales","route":"/clubs/[slug]"}
+[00:01:41.837] Browser LOG     %c[Vercel Web Analytics]%c [pageview] http://localhost:3000/clubs/area-45-cardales color: rgb(120, 120, 120) color: inherit {"dp":"/clubs/[slug]","o":"http://localhost:3000/clubs/area-45-cardales","r":"","sdkn":"@vercel/analytics/next","sdkv":"1.3.1","sv":"0.1.3","ts":1771259433728}
+[00:01:43.730] Browser LOG     %c[Vercel Web Analytics]%c [pageview] http://localhost:3000/ color: rgb(120, 120, 120) color: inherit {"dp":"/","o":"http://localhost:3000/","sdkn":"@vercel/analytics/next","sdkv":"1.3.1","sv":"0.1.3","ts":1771259435591}
+[00:01:46.035] Browser LOG     %c[Vercel Web Analytics]%c [pageview] http://localhost:3000/players/dashboard color: rgb(120, 120, 120) color: inherit {"dp":"/players/dashboard","o":"http://localhost:3000/players/dashboard","sdkn":"@vercel/analytics/next","sdkv":"1.3.1","sv":"0.1.3","ts":1771259437928}
+[00:01:47.482] Browser LOG     %c[Vercel Web Analytics]%c [pageview] http://localhost:3000/ color: rgb(120, 120, 120) color: inherit {"dp":"/","o":"http://localhost:3000/","sdkn":"@vercel/analytics/next","sdkv":"1.3.1","sv":"0.1.3","ts":1771259439339}
+[00:01:50.376] Browser LOG     %c[Vercel Web Analytics]%c [pageview] http://localhost:3000/auth/login color: rgb(120, 120, 120) color: inherit {"dp":"/auth/login","o":"http://localhost:3000/auth/login","sdkn":"@vercel/analytics/next","sdkv":"1.3.1","sv":"0.1.3","ts":1771259442270}
+[00:02:01.185] Server  LOG     [AuthSession] adminProjectId=courtly-fc306 token.aud=courtly-fc306 token.uid=348leHQNoKaU1FuNTjdFQBvCNy13 token.email=santisanchez301@gmail.com
+[00:02:02.214] Browser LOG     %c[Vercel Web Analytics]%c [pageview] http://localhost:3000/dashboard-centros color: rgb(120, 120, 120) color: inherit {"dp":"/dashboard-centros","o":"http://localhost:3000/dashboard-centros","sdkn":"@vercel/analytics/next","sdkv":"1.3.1","sv":"0.1.3","ts":1771259454079}

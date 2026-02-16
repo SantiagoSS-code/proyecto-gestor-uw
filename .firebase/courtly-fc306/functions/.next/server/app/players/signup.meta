@@ -1,0 +1,16 @@
+{
+  "headers": {
+    "x-nextjs-stale-time": "300",
+    "x-nextjs-prerender": "1",
+    "x-next-cache-tags": "_N_T_/layout,_N_T_/players/layout,_N_T_/players/signup/layout,_N_T_/players/signup/page,_N_T_/players/signup"
+  },
+  "segmentPaths": [
+    "/_tree",
+    "/_full",
+    "/players/signup/__PAGE__",
+    "/players/signup",
+    "/players",
+    "/_index",
+    "/_head"
+  ]
+}

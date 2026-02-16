@@ -1,0 +1,16 @@
+{
+  "headers": {
+    "x-nextjs-stale-time": "300",
+    "x-nextjs-prerender": "1",
+    "x-next-cache-tags": "_N_T_/layout,_N_T_/dashboard-centros/layout,_N_T_/dashboard-centros/reservas/layout,_N_T_/dashboard-centros/reservas/page,_N_T_/dashboard-centros/reservas"
+  },
+  "segmentPaths": [
+    "/_tree",
+    "/_full",
+    "/dashboard-centros/reservas/__PAGE__",
+    "/dashboard-centros/reservas",
+    "/dashboard-centros",
+    "/_index",
+    "/_head"
+  ]
+}

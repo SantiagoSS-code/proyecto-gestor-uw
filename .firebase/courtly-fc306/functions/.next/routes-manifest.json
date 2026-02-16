@@ -1,0 +1,445 @@
+{
+  "version": 3,
+  "pages404": true,
+  "caseSensitive": false,
+  "basePath": "",
+  "redirects": [
+    {
+      "source": "/:path+/",
+      "destination": "/:path+",
+      "internal": true,
+      "priority": true,
+      "statusCode": 308,
+      "regex": "^(?:/((?:[^/]+?)(?:/(?:[^/]+?))*))/$"
+    }
+  ],
+  "headers": [],
+  "rewrites": {
+    "beforeFiles": [],
+    "afterFiles": [],
+    "fallback": []
+  },
+  "dynamicRoutes": [
+    {
+      "page": "/api/backoffice/centers/[centerId]",
+      "regex": "^/api/backoffice/centers/([^/]+?)(?:/)?$",
+      "routeKeys": {
+        "nxtPcenterId": "nxtPcenterId"
+      },
+      "namedRegex": "^/api/backoffice/centers/(?<nxtPcenterId>[^/]+?)(?:/)?$"
+    },
+    {
+      "page": "/api/backoffice/players/[uid]",
+      "regex": "^/api/backoffice/players/([^/]+?)(?:/)?$",
+      "routeKeys": {
+        "nxtPuid": "nxtPuid"
+      },
+      "namedRegex": "^/api/backoffice/players/(?<nxtPuid>[^/]+?)(?:/)?$"
+    },
+    {
+      "page": "/api/backoffice/players/[uid]/delete",
+      "regex": "^/api/backoffice/players/([^/]+?)/delete(?:/)?$",
+      "routeKeys": {
+        "nxtPuid": "nxtPuid"
+      },
+      "namedRegex": "^/api/backoffice/players/(?<nxtPuid>[^/]+?)/delete(?:/)?$"
+    },
+    {
+      "page": "/api/backoffice/players/[uid]/status",
+      "regex": "^/api/backoffice/players/([^/]+?)/status(?:/)?$",
+      "routeKeys": {
+        "nxtPuid": "nxtPuid"
+      },
+      "namedRegex": "^/api/backoffice/players/(?<nxtPuid>[^/]+?)/status(?:/)?$"
+    },
+    {
+      "page": "/backoffice/centers/[centerId]",
+      "regex": "^/backoffice/centers/([^/]+?)(?:/)?$",
+      "routeKeys": {
+        "nxtPcenterId": "nxtPcenterId"
+      },
+      "namedRegex": "^/backoffice/centers/(?<nxtPcenterId>[^/]+?)(?:/)?$"
+    },
+    {
+      "page": "/backoffice/players/[uid]",
+      "regex": "^/backoffice/players/([^/]+?)(?:/)?$",
+      "routeKeys": {
+        "nxtPuid": "nxtPuid"
+      },
+      "namedRegex": "^/backoffice/players/(?<nxtPuid>[^/]+?)(?:/)?$"
+    },
+    {
+      "page": "/centros/[centerId]",
+      "regex": "^/centros/([^/]+?)(?:/)?$",
+      "routeKeys": {
+        "nxtPcenterId": "nxtPcenterId"
+      },
+      "namedRegex": "^/centros/(?<nxtPcenterId>[^/]+?)(?:/)?$"
+    },
+    {
+      "page": "/clubs/[slug]",
+      "regex": "^/clubs/([^/]+?)(?:/)?$",
+      "routeKeys": {
+        "nxtPslug": "nxtPslug"
+      },
+      "namedRegex": "^/clubs/(?<nxtPslug>[^/]+?)(?:/)?$"
+    }
+  ],
+  "staticRoutes": [
+    {
+      "page": "/",
+      "regex": "^/(?:/)?$",
+      "routeKeys": {},
+      "namedRegex": "^/(?:/)?$"
+    },
+    {
+      "page": "/_global-error",
+      "regex": "^/_global\\-error(?:/)?$",
+      "routeKeys": {},
+      "namedRegex": "^/_global\\-error(?:/)?$"
+    },
+    {
+      "page": "/_not-found",
+      "regex": "^/_not\\-found(?:/)?$",
+      "routeKeys": {},
+      "namedRegex": "^/_not\\-found(?:/)?$"
+    },
+    {
+      "page": "/api/auth/session",
+      "regex": "^/api/auth/session(?:/)?$",
+      "routeKeys": {},
+      "namedRegex": "^/api/auth/session(?:/)?$"
+    },
+    {
+      "page": "/api/backoffice/bookings",
+      "regex": "^/api/backoffice/bookings(?:/)?$",
+      "routeKeys": {},
+      "namedRegex": "^/api/backoffice/bookings(?:/)?$"
+    },
+    {
+      "page": "/api/backoffice/centers",
+      "regex": "^/api/backoffice/centers(?:/)?$",
+      "routeKeys": {},
+      "namedRegex": "^/api/backoffice/centers(?:/)?$"
+    },
+    {
+      "page": "/api/backoffice/courts",
+      "regex": "^/api/backoffice/courts(?:/)?$",
+      "routeKeys": {},
+      "namedRegex": "^/api/backoffice/courts(?:/)?$"
+    },
+    {
+      "page": "/api/backoffice/me",
+      "regex": "^/api/backoffice/me(?:/)?$",
+      "routeKeys": {},
+      "namedRegex": "^/api/backoffice/me(?:/)?$"
+    },
+    {
+      "page": "/api/backoffice/overview",
+      "regex": "^/api/backoffice/overview(?:/)?$",
+      "routeKeys": {},
+      "namedRegex": "^/api/backoffice/overview(?:/)?$"
+    },
+    {
+      "page": "/api/backoffice/players",
+      "regex": "^/api/backoffice/players(?:/)?$",
+      "routeKeys": {},
+      "namedRegex": "^/api/backoffice/players(?:/)?$"
+    },
+    {
+      "page": "/api/booking-requests",
+      "regex": "^/api/booking\\-requests(?:/)?$",
+      "routeKeys": {},
+      "namedRegex": "^/api/booking\\-requests(?:/)?$"
+    },
+    {
+      "page": "/api/checkout/booking",
+      "regex": "^/api/checkout/booking(?:/)?$",
+      "routeKeys": {},
+      "namedRegex": "^/api/checkout/booking(?:/)?$"
+    },
+    {
+      "page": "/api/checkout/create-session",
+      "regex": "^/api/checkout/create\\-session(?:/)?$",
+      "routeKeys": {},
+      "namedRegex": "^/api/checkout/create\\-session(?:/)?$"
+    },
+    {
+      "page": "/api/checkout/session",
+      "regex": "^/api/checkout/session(?:/)?$",
+      "routeKeys": {},
+      "namedRegex": "^/api/checkout/session(?:/)?$"
+    },
+    {
+      "page": "/api/dev/bootstrap-user",
+      "regex": "^/api/dev/bootstrap\\-user(?:/)?$",
+      "routeKeys": {},
+      "namedRegex": "^/api/dev/bootstrap\\-user(?:/)?$"
+    },
+    {
+      "page": "/api/dev/delete-user",
+      "regex": "^/api/dev/delete\\-user(?:/)?$",
+      "routeKeys": {},
+      "namedRegex": "^/api/dev/delete\\-user(?:/)?$"
+    },
+    {
+      "page": "/api/dev/session-info",
+      "regex": "^/api/dev/session\\-info(?:/)?$",
+      "routeKeys": {},
+      "namedRegex": "^/api/dev/session\\-info(?:/)?$"
+    },
+    {
+      "page": "/api/geo/search",
+      "regex": "^/api/geo/search(?:/)?$",
+      "routeKeys": {},
+      "namedRegex": "^/api/geo/search(?:/)?$"
+    },
+    {
+      "page": "/api/mercadopago/create-preference",
+      "regex": "^/api/mercadopago/create\\-preference(?:/)?$",
+      "routeKeys": {},
+      "namedRegex": "^/api/mercadopago/create\\-preference(?:/)?$"
+    },
+    {
+      "page": "/api/mercadopago/webhook",
+      "regex": "^/api/mercadopago/webhook(?:/)?$",
+      "routeKeys": {},
+      "namedRegex": "^/api/mercadopago/webhook(?:/)?$"
+    },
+    {
+      "page": "/api/registro-centro",
+      "regex": "^/api/registro\\-centro(?:/)?$",
+      "routeKeys": {},
+      "namedRegex": "^/api/registro\\-centro(?:/)?$"
+    },
+    {
+      "page": "/api/send-verification-code",
+      "regex": "^/api/send\\-verification\\-code(?:/)?$",
+      "routeKeys": {},
+      "namedRegex": "^/api/send\\-verification\\-code(?:/)?$"
+    },
+    {
+      "page": "/api/stripe/webhook",
+      "regex": "^/api/stripe/webhook(?:/)?$",
+      "routeKeys": {},
+      "namedRegex": "^/api/stripe/webhook(?:/)?$"
+    },
+    {
+      "page": "/api/test-env",
+      "regex": "^/api/test\\-env(?:/)?$",
+      "routeKeys": {},
+      "namedRegex": "^/api/test\\-env(?:/)?$"
+    },
+    {
+      "page": "/auth/callback",
+      "regex": "^/auth/callback(?:/)?$",
+      "routeKeys": {},
+      "namedRegex": "^/auth/callback(?:/)?$"
+    },
+    {
+      "page": "/auth/forgot-password",
+      "regex": "^/auth/forgot\\-password(?:/)?$",
+      "routeKeys": {},
+      "namedRegex": "^/auth/forgot\\-password(?:/)?$"
+    },
+    {
+      "page": "/auth/login",
+      "regex": "^/auth/login(?:/)?$",
+      "routeKeys": {},
+      "namedRegex": "^/auth/login(?:/)?$"
+    },
+    {
+      "page": "/auth/signup",
+      "regex": "^/auth/signup(?:/)?$",
+      "routeKeys": {},
+      "namedRegex": "^/auth/signup(?:/)?$"
+    },
+    {
+      "page": "/auth/verify-email",
+      "regex": "^/auth/verify\\-email(?:/)?$",
+      "routeKeys": {},
+      "namedRegex": "^/auth/verify\\-email(?:/)?$"
+    },
+    {
+      "page": "/backoffice",
+      "regex": "^/backoffice(?:/)?$",
+      "routeKeys": {},
+      "namedRegex": "^/backoffice(?:/)?$"
+    },
+    {
+      "page": "/backoffice/bookings",
+      "regex": "^/backoffice/bookings(?:/)?$",
+      "routeKeys": {},
+      "namedRegex": "^/backoffice/bookings(?:/)?$"
+    },
+    {
+      "page": "/backoffice/centers",
+      "regex": "^/backoffice/centers(?:/)?$",
+      "routeKeys": {},
+      "namedRegex": "^/backoffice/centers(?:/)?$"
+    },
+    {
+      "page": "/backoffice/courts",
+      "regex": "^/backoffice/courts(?:/)?$",
+      "routeKeys": {},
+      "namedRegex": "^/backoffice/courts(?:/)?$"
+    },
+    {
+      "page": "/backoffice/login",
+      "regex": "^/backoffice/login(?:/)?$",
+      "routeKeys": {},
+      "namedRegex": "^/backoffice/login(?:/)?$"
+    },
+    {
+      "page": "/backoffice/payments",
+      "regex": "^/backoffice/payments(?:/)?$",
+      "routeKeys": {},
+      "namedRegex": "^/backoffice/payments(?:/)?$"
+    },
+    {
+      "page": "/backoffice/players",
+      "regex": "^/backoffice/players(?:/)?$",
+      "routeKeys": {},
+      "namedRegex": "^/backoffice/players(?:/)?$"
+    },
+    {
+      "page": "/booking/cancel",
+      "regex": "^/booking/cancel(?:/)?$",
+      "routeKeys": {},
+      "namedRegex": "^/booking/cancel(?:/)?$"
+    },
+    {
+      "page": "/booking/pending",
+      "regex": "^/booking/pending(?:/)?$",
+      "routeKeys": {},
+      "namedRegex": "^/booking/pending(?:/)?$"
+    },
+    {
+      "page": "/booking/success",
+      "regex": "^/booking/success(?:/)?$",
+      "routeKeys": {},
+      "namedRegex": "^/booking/success(?:/)?$"
+    },
+    {
+      "page": "/centros",
+      "regex": "^/centros(?:/)?$",
+      "routeKeys": {},
+      "namedRegex": "^/centros(?:/)?$"
+    },
+    {
+      "page": "/clubs",
+      "regex": "^/clubs(?:/)?$",
+      "routeKeys": {},
+      "namedRegex": "^/clubs(?:/)?$"
+    },
+    {
+      "page": "/dashboard-centros",
+      "regex": "^/dashboard\\-centros(?:/)?$",
+      "routeKeys": {},
+      "namedRegex": "^/dashboard\\-centros(?:/)?$"
+    },
+    {
+      "page": "/dashboard-centros/courts",
+      "regex": "^/dashboard\\-centros/courts(?:/)?$",
+      "routeKeys": {},
+      "namedRegex": "^/dashboard\\-centros/courts(?:/)?$"
+    },
+    {
+      "page": "/dashboard-centros/courts/schedule",
+      "regex": "^/dashboard\\-centros/courts/schedule(?:/)?$",
+      "routeKeys": {},
+      "namedRegex": "^/dashboard\\-centros/courts/schedule(?:/)?$"
+    },
+    {
+      "page": "/dashboard-centros/reservas",
+      "regex": "^/dashboard\\-centros/reservas(?:/)?$",
+      "routeKeys": {},
+      "namedRegex": "^/dashboard\\-centros/reservas(?:/)?$"
+    },
+    {
+      "page": "/dashboard-centros/settings",
+      "regex": "^/dashboard\\-centros/settings(?:/)?$",
+      "routeKeys": {},
+      "namedRegex": "^/dashboard\\-centros/settings(?:/)?$"
+    },
+    {
+      "page": "/login-centros",
+      "regex": "^/login\\-centros(?:/)?$",
+      "routeKeys": {},
+      "namedRegex": "^/login\\-centros(?:/)?$"
+    },
+    {
+      "page": "/players",
+      "regex": "^/players(?:/)?$",
+      "routeKeys": {},
+      "namedRegex": "^/players(?:/)?$"
+    },
+    {
+      "page": "/players/dashboard",
+      "regex": "^/players/dashboard(?:/)?$",
+      "routeKeys": {},
+      "namedRegex": "^/players/dashboard(?:/)?$"
+    },
+    {
+      "page": "/players/login",
+      "regex": "^/players/login(?:/)?$",
+      "routeKeys": {},
+      "namedRegex": "^/players/login(?:/)?$"
+    },
+    {
+      "page": "/players/onboarding/personal-details",
+      "regex": "^/players/onboarding/personal\\-details(?:/)?$",
+      "routeKeys": {},
+      "namedRegex": "^/players/onboarding/personal\\-details(?:/)?$"
+    },
+    {
+      "page": "/players/onboarding/skill-level",
+      "regex": "^/players/onboarding/skill\\-level(?:/)?$",
+      "routeKeys": {},
+      "namedRegex": "^/players/onboarding/skill\\-level(?:/)?$"
+    },
+    {
+      "page": "/players/profile",
+      "regex": "^/players/profile(?:/)?$",
+      "routeKeys": {},
+      "namedRegex": "^/players/profile(?:/)?$"
+    },
+    {
+      "page": "/players/signup",
+      "regex": "^/players/signup(?:/)?$",
+      "routeKeys": {},
+      "namedRegex": "^/players/signup(?:/)?$"
+    },
+    {
+      "page": "/pricing",
+      "regex": "^/pricing(?:/)?$",
+      "routeKeys": {},
+      "namedRegex": "^/pricing(?:/)?$"
+    },
+    {
+      "page": "/registro-centros",
+      "regex": "^/registro\\-centros(?:/)?$",
+      "routeKeys": {},
+      "namedRegex": "^/registro\\-centros(?:/)?$"
+    }
+  ],
+  "dataRoutes": [],
+  "rsc": {
+    "header": "rsc",
+    "varyHeader": "rsc, next-router-state-tree, next-router-prefetch, next-router-segment-prefetch",
+    "prefetchHeader": "next-router-prefetch",
+    "didPostponeHeader": "x-nextjs-postponed",
+    "contentTypeHeader": "text/x-component",
+    "suffix": ".rsc",
+    "prefetchSuffix": ".prefetch.rsc",
+    "prefetchSegmentHeader": "next-router-segment-prefetch",
+    "prefetchSegmentSuffix": ".segment.rsc",
+    "prefetchSegmentDirSuffix": ".segments",
+    "clientParamParsing": false,
+    "dynamicRSCPrerender": false
+  },
+  "rewriteHeaders": {
+    "pathHeader": "x-nextjs-rewritten-path",
+    "queryHeader": "x-nextjs-rewritten-query"
+  }
+}

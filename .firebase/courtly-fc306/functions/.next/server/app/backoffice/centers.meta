@@ -1,0 +1,16 @@
+{
+  "headers": {
+    "x-nextjs-stale-time": "300",
+    "x-nextjs-prerender": "1",
+    "x-next-cache-tags": "_N_T_/layout,_N_T_/backoffice/layout,_N_T_/backoffice/centers/layout,_N_T_/backoffice/centers/page,_N_T_/backoffice/centers"
+  },
+  "segmentPaths": [
+    "/_tree",
+    "/_full",
+    "/backoffice/centers/__PAGE__",
+    "/backoffice/centers",
+    "/backoffice",
+    "/_index",
+    "/_head"
+  ]
+}

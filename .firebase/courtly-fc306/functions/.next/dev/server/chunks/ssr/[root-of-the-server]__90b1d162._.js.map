@@ -1,0 +1,6 @@
+{
+  "version": 3,
+  "sources": [],
+  "sections": [
+    {"offset": {"line": 14, "column": 0}, "map": {"version":3,"sources":["file:///Users/santisanchez/Documents/GitHub/proyecto-gestor-uw/app/players/page.tsx"],"sourcesContent":["export const metadata = {\n  title: \"Área de jugadores - Courtly\",\n  description: \"Tu espacio para reservar, encontrar partidos y jugar más\",\n}\n\nexport default function PlayersHomePage() {\n  return (\n    <main className=\"min-h-screen bg-background flex items-center justify-center p-6\">\n      <div className=\"text-center space-y-2\">\n        <h1 className=\"text-2xl font-semibold text-foreground\">Área de jugadores</h1>\n        <p className=\"text-muted-foreground\">Pronto tendrás tu panel con reservas y partidos.</p>\n      </div>\n    </main>\n  )\n}\n"],"names":[],"mappings":";;;;;;;;AAAO,MAAM,WAAW;IACtB,OAAO;IACP,aAAa;AACf;AAEe,SAAS;IACtB,qBACE,sZAAC;QAAK,WAAU;kBACd,cAAA,sZAAC;YAAI,WAAU;;8BACb,sZAAC;oBAAG,WAAU;8BAAyC;;;;;;8BACvD,sZAAC;oBAAE,WAAU;8BAAwB;;;;;;;;;;;;;;;;;AAI7C"}}]
+}

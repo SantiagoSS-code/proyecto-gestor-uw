@@ -1,0 +1,27 @@
+Component,Unit price (USD),Quantity (Low),Cost (Low, USD),Quantity (Med),Cost (Med, USD),Quantity (High),Cost (High, USD),Notes
+Hosting egress ($/GB),0.12,0.24 GB,0.0288,0.6 GB,0.072,0.8 GB,0.096,Pageviews*200KB per page (200 KB = 0.0002 GB)
+Hosting storage ($/GB-month),0.026,0.1 GB,0.0026,0.1 GB,0.0026,0.1 GB,0.0026,Estimated site assets size ~100 MB
+Cloud Run (compute + requests),0.02 (est.),1,0.02,1,0.02,1,0.02,Tiny estimate for low-volume server runtime
+Firestore reads ($/100k),0.06,36000 reads,0.0216,36000 reads,0.0216,36000 reads,0.0216,Conservative reads per month (108k over 3 months -> 36k/month)
+Firestore reads ($/100k) - Realistic,0.06,126000 reads,0.0756,126000 reads,0.0756,126000 reads,0.0756,Realistic reads per month (378k over 3 months -> 126k/month)
+Firestore writes ($/100k),0.18,90 writes,0.000162,90 writes,0.000162,90 writes,0.000162,270 writes over 3 months -> 90/month
+Firestore writes (upper),0.18,180 writes,0.000324,180 writes,0.000324,180 writes,0.000324,540 writes over 3 months -> 180/month
+Firestore storage ($/GB-month),0.18,0.1 GB,0.018,0.1 GB,0.018,0.1 GB,0.018,Estimated DB size ~0.05-0.2 GB (used 0.1 GB)
+Firebase Storage (photos) storage ($/GB-month),0.026,0.043333 GB,0.0011267,0.066667 GB,0.0017333,0.083333 GB,0.0021667,Uploads/month = (total photos in 3 months)/3 ; 1 MB per photo
+Storage egress (photos) included in page size,0.12,see notes,0,see notes,0,see notes,0,Assumed thumbnails/serving included in pageviews size to avoid double-count
+Auth (email/password),0.00,50 users,0,50 users,0,50 users,0,Auth free for email/password; SMS not used
+Secret Manager (not used),0,0,0,0,0,0,0,Not required per your input
+
+Summary (Monthly totals),,,Conservative:,0.0922887,,0.1360953,,0.1605287,
+Summary (Monthly totals) - Realistic reads,,,Realistic:,0.1462887,,0.1900953,,0.2145287,
+
+Notes: All prices are approximate (region: US) and rounded in table. Monthly totals are small for these low volumes. For exact billing use Google Cloud Pricing Calculator.
+
+Assumptions:
+- Page size: 200 KB
+- Pages per visit: 4
+- Visits: Low=300, Med=750, High=1000
+- Photos: Low total=130 (30 clubs +100 users), Med total=200 (50+150), High total=250 (50+200) over 3 months
+- Photos size: 1 MB each
+- Firestore reads/writes as provided (3-month totals divided by 3 for monthly)
+- Cloud Run cost is a small estimate for very low CPU/requests use (may increase with heavy workloads)

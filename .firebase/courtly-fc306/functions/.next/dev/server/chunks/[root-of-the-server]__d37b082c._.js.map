@@ -1,0 +1,6 @@
+{
+  "version": 3,
+  "sources": [],
+  "sections": [
+    {"offset": {"line": 40, "column": 0}, "map": {"version":3,"sources":["file:///Users/santisanchez/Documents/GitHub/proyecto-gestor-uw/app/api/test-env/route.ts"],"sourcesContent":["import { NextResponse } from \"next/server\"\n\nexport async function GET() {\n  const pk = process.env.FIREBASE_ADMIN_PRIVATE_KEY || \"\"\n  return NextResponse.json({\n    length: pk.length,\n    first50: pk.slice(0, 50),\n    last30: pk.slice(-30),\n    hasYourPrivateKey: pk.includes(\"your-private-key\"),\n    hasRealKey: pk.includes(\"MIIEv\"),\n  })\n}\n"],"names":[],"mappings":";;;;AAAA;;AAEO,eAAe;IACpB,MAAM,KAAK,QAAQ,GAAG,CAAC,0BAA0B,IAAI;IACrD,OAAO,wTAAY,CAAC,IAAI,CAAC;QACvB,QAAQ,GAAG,MAAM;QACjB,SAAS,GAAG,KAAK,CAAC,GAAG;QACrB,QAAQ,GAAG,KAAK,CAAC,CAAC;QAClB,mBAAmB,GAAG,QAAQ,CAAC;QAC/B,YAAY,GAAG,QAAQ,CAAC;IAC1B;AACF"}}]
+}

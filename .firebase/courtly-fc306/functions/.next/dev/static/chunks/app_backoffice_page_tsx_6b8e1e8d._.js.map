@@ -1,0 +1,6 @@
+{
+  "version": 3,
+  "sources": [],
+  "sections": [
+    {"offset": {"line": 4, "column": 0}, "map": {"version":3,"sources":["file:///Users/santisanchez/Documents/GitHub/proyecto-gestor-uw/app/backoffice/page.tsx"],"sourcesContent":["\"use client\"\n\nimport { useBackofficeAuth } from \"@/lib/backoffice/auth-context\"\n\nexport default function BackofficeOverviewPage() {\n  const { user, loading } = useBackofficeAuth()\n\n  return (\n    <div className=\"space-y-4\">\n      <div>\n        <h1 className=\"text-2xl font-semibold text-slate-900\">Backoffice OK</h1>\n        <p className=\"text-sm text-slate-600 mt-1\">You are signed in to the backoffice project.</p>\n      </div>\n\n      <div className=\"rounded-xl border border-slate-200/70 bg-slate-50 px-4 py-3 text-sm text-slate-700\">\n        {loading ? \"Loading admin session…\" : `Admin: ${user?.email || \"Unknown\"}`}\n      </div>\n    </div>\n  )\n}\n"],"names":[],"mappings":";;;;;AAEA;;;AAFA;;AAIe,SAAS;;IACtB,MAAM,EAAE,IAAI,EAAE,OAAO,EAAE,GAAG,IAAA,6JAAiB;IAE3C,qBACE,qWAAC;QAAI,WAAU;;0BACb,qWAAC;;kCACC,qWAAC;wBAAG,WAAU;kCAAwC;;;;;;kCACtD,qWAAC;wBAAE,WAAU;kCAA8B;;;;;;;;;;;;0BAG7C,qWAAC;gBAAI,WAAU;0BACZ,UAAU,2BAA2B,CAAC,OAAO,EAAE,MAAM,SAAS,WAAW;;;;;;;;;;;;AAIlF;GAfwB;;QACI,6JAAiB;;;KADrB"}}]
+}
