@@ -241,3 +241,55 @@ https://nextjs.org/docs/messages/module-not-found
 [debug] [2026-02-16T20:06:40.892Z] Error: ENOENT: no such file or directory, open '/Users/santisanchez/Documents/GitHub/proyecto-gestor-uw/.next/server/middleware-manifest.json'
 [error] 
 [error] Error: An unexpected error has occurred.
+[debug] [2026-02-16T20:09:49.805Z] ----------------------------------------------------------------------
+[debug] [2026-02-16T20:09:49.809Z] Command:       /opt/homebrew/Cellar/node/25.4.0/bin/node /opt/homebrew/bin/firebase hosting:channel:deploy preview --project courtly-fc306
+[debug] [2026-02-16T20:09:49.809Z] CLI Version:   15.6.0
+[debug] [2026-02-16T20:09:49.809Z] Platform:      darwin
+[debug] [2026-02-16T20:09:49.809Z] Node Version:  v25.4.0
+[debug] [2026-02-16T20:09:49.809Z] Time:          Mon Feb 16 2026 17:09:49 GMT-0300 (Argentina Standard Time)
+[debug] [2026-02-16T20:09:49.809Z] ----------------------------------------------------------------------
+[debug] 
+[debug] [2026-02-16T20:09:50.625Z] > command requires scopes: ["email","openid","https://www.googleapis.com/auth/cloudplatformprojects.readonly","https://www.googleapis.com/auth/firebase","https://www.googleapis.com/auth/cloud-platform"]
+[debug] [2026-02-16T20:09:50.625Z] > authorizing via signed-in user (santiagonicsanchez@gmail.com)
+[debug] [2026-02-16T20:09:50.626Z] [iam] checking project courtly-fc306 for permissions ["firebase.projects.get","firebasehosting.sites.update"]
+[debug] [2026-02-16T20:09:50.626Z] Checked if tokens are valid: true, expires at: 1771275964581
+[debug] [2026-02-16T20:09:50.626Z] Checked if tokens are valid: true, expires at: 1771275964581
+[debug] [2026-02-16T20:09:50.627Z] >>> [apiv2][query] POST https://cloudresourcemanager.googleapis.com/v1/projects/courtly-fc306:testIamPermissions [none]
+[debug] [2026-02-16T20:09:50.627Z] >>> [apiv2][(partial)header] POST https://cloudresourcemanager.googleapis.com/v1/projects/courtly-fc306:testIamPermissions  x-goog-user-project=courtly-fc306
+[debug] [2026-02-16T20:09:50.627Z] >>> [apiv2][body] POST https://cloudresourcemanager.googleapis.com/v1/projects/courtly-fc306:testIamPermissions {"permissions":["firebase.projects.get","firebasehosting.sites.update"]}
+[debug] [2026-02-16T20:09:51.583Z] <<< [apiv2][status] POST https://cloudresourcemanager.googleapis.com/v1/projects/courtly-fc306:testIamPermissions 200
+[debug] [2026-02-16T20:09:51.584Z] <<< [apiv2][body] POST https://cloudresourcemanager.googleapis.com/v1/projects/courtly-fc306:testIamPermissions {"permissions":["firebase.projects.get","firebasehosting.sites.update"]}
+[debug] [2026-02-16T20:09:51.584Z] Checked if tokens are valid: true, expires at: 1771275964581
+[debug] [2026-02-16T20:09:51.584Z] Checked if tokens are valid: true, expires at: 1771275964581
+[debug] [2026-02-16T20:09:51.585Z] >>> [apiv2][query] GET https://firebase.googleapis.com/v1beta1/projects/courtly-fc306 [none]
+[debug] [2026-02-16T20:09:52.087Z] <<< [apiv2][status] GET https://firebase.googleapis.com/v1beta1/projects/courtly-fc306 200
+[debug] [2026-02-16T20:09:52.087Z] <<< [apiv2][body] GET https://firebase.googleapis.com/v1beta1/projects/courtly-fc306 {"projectId":"courtly-fc306","projectNumber":"102383002552","displayName":"padel-court-booking","name":"projects/courtly-fc306","resources":{"hostingSite":"courtly-fc306"},"state":"ACTIVE","etag":"1_92c7229b-2269-4063-b97a-8ed0c1de4d56"}
+[debug] [2026-02-16T20:09:52.088Z] Checked if tokens are valid: true, expires at: 1771275964581
+[debug] [2026-02-16T20:09:52.088Z] Checked if tokens are valid: true, expires at: 1771275964581
+[debug] [2026-02-16T20:09:52.088Z] >>> [apiv2][query] GET https://firebasehosting.googleapis.com/v1beta1/projects/courtly-fc306/sites/courtly-fc306/channels/preview [none]
+[debug] [2026-02-16T20:09:53.141Z] <<< [apiv2][status] GET https://firebasehosting.googleapis.com/v1beta1/projects/courtly-fc306/sites/courtly-fc306/channels/preview 200
+[debug] [2026-02-16T20:09:53.141Z] <<< [apiv2][body] GET https://firebasehosting.googleapis.com/v1beta1/projects/courtly-fc306/sites/courtly-fc306/channels/preview {"name":"projects/courtly-fc306/sites/courtly-fc306/channels/preview","url":"https://courtly-fc306--preview-b83rsptr.web.app","createTime":"2026-02-16T17:46:36.645698388Z","updateTime":"2026-02-16T20:06:07.773778890Z","retainedReleaseCount":10,"expireTime":"2026-02-23T20:06:07.773778890Z"}
+[debug] [2026-02-16T20:09:53.141Z] [hosting] found existing channel for site courtly-fc306 {"name":"projects/courtly-fc306/sites/courtly-fc306/channels/preview","url":"https://courtly-fc306--preview-b83rsptr.web.app","createTime":"2026-02-16T17:46:36.645698388Z","updateTime":"2026-02-16T20:06:07.773778890Z","retainedReleaseCount":10,"expireTime":"2026-02-23T20:06:07.773778890Z"}
+[debug] [2026-02-16T20:09:53.141Z] Checked if tokens are valid: true, expires at: 1771275964581
+[debug] [2026-02-16T20:09:53.141Z] Checked if tokens are valid: true, expires at: 1771275964581
+[debug] [2026-02-16T20:09:53.141Z] >>> [apiv2][query] PATCH https://firebasehosting.googleapis.com/v1beta1/projects/courtly-fc306/sites/courtly-fc306/channels/preview updateMask=ttl
+[debug] [2026-02-16T20:09:53.141Z] >>> [apiv2][body] PATCH https://firebasehosting.googleapis.com/v1beta1/projects/courtly-fc306/sites/courtly-fc306/channels/preview {"ttl":"604800s"}
+[debug] [2026-02-16T20:09:53.600Z] <<< [apiv2][status] PATCH https://firebasehosting.googleapis.com/v1beta1/projects/courtly-fc306/sites/courtly-fc306/channels/preview 200
+[debug] [2026-02-16T20:09:53.600Z] <<< [apiv2][body] PATCH https://firebasehosting.googleapis.com/v1beta1/projects/courtly-fc306/sites/courtly-fc306/channels/preview {"name":"projects/courtly-fc306/sites/courtly-fc306/channels/preview","url":"https://courtly-fc306--preview-b83rsptr.web.app","createTime":"2026-02-16T17:46:36.645698388Z","updateTime":"2026-02-16T20:09:53.401396584Z","retainedReleaseCount":10,"expireTime":"2026-02-23T20:09:53.401396584Z"}
+[debug] [2026-02-16T20:09:53.600Z] [hosting] updated TTL for existing channel for site courtly-fc306 {"name":"projects/courtly-fc306/sites/courtly-fc306/channels/preview","url":"https://courtly-fc306--preview-b83rsptr.web.app","createTime":"2026-02-16T17:46:36.645698388Z","updateTime":"2026-02-16T20:09:53.401396584Z","retainedReleaseCount":10,"expireTime":"2026-02-23T20:09:53.401396584Z"}
+[debug] [2026-02-16T20:09:55.919Z] defaultcredentials: writing to file /Users/santisanchez/.config/firebase/santiagonicsanchez_gmail_com_application_default_credentials.json
+[debug] [2026-02-16T20:09:55.921Z] Checked if tokens are valid: true, expires at: 1771275964581
+[debug] [2026-02-16T20:09:55.922Z] Checked if tokens are valid: true, expires at: 1771275964581
+[debug] [2026-02-16T20:09:55.922Z] >>> [apiv2][query] GET https://firebasehosting.googleapis.com/v1beta1/projects/courtly-fc306/sites pageToken=&pageSize=10
+[debug] [2026-02-16T20:09:56.507Z] <<< [apiv2][status] GET https://firebasehosting.googleapis.com/v1beta1/projects/courtly-fc306/sites 200
+[debug] [2026-02-16T20:09:56.507Z] <<< [apiv2][body] GET https://firebasehosting.googleapis.com/v1beta1/projects/courtly-fc306/sites {"sites":[{"name":"projects/courtly-fc306/sites/courtly-fc306","defaultUrl":"https://courtly-fc306.web.app","type":"DEFAULT_SITE"}]}
+[debug] [2026-02-16T20:09:56.508Z] Checked if tokens are valid: true, expires at: 1771275964581
+[debug] [2026-02-16T20:09:56.508Z] Checked if tokens are valid: true, expires at: 1771275964581
+[debug] [2026-02-16T20:09:56.508Z] >>> [apiv2][query] GET https://firebasehosting.googleapis.com/v1beta1/projects/courtly-fc306/sites 
+[debug] [2026-02-16T20:09:57.106Z] <<< [apiv2][status] GET https://firebasehosting.googleapis.com/v1beta1/projects/courtly-fc306/sites 200
+[debug] [2026-02-16T20:09:57.107Z] <<< [apiv2][body] GET https://firebasehosting.googleapis.com/v1beta1/projects/courtly-fc306/sites {"sites":[{"name":"projects/courtly-fc306/sites/courtly-fc306","defaultUrl":"https://courtly-fc306.web.app","type":"DEFAULT_SITE"}]}
+[debug] [2026-02-16T20:09:57.109Z] Checked if tokens are valid: true, expires at: 1771275964581
+[debug] [2026-02-16T20:09:57.109Z] Checked if tokens are valid: true, expires at: 1771275964581
+[debug] [2026-02-16T20:09:57.110Z] >>> [apiv2][query] GET https://firebase.googleapis.com/v1beta1/projects/courtly-fc306/webApps/-/config [none]
+[debug] [2026-02-16T20:09:58.160Z] <<< [apiv2][status] GET https://firebase.googleapis.com/v1beta1/projects/courtly-fc306/webApps/-/config 200
+[debug] [2026-02-16T20:09:58.161Z] <<< [apiv2][body] GET https://firebase.googleapis.com/v1beta1/projects/courtly-fc306/webApps/-/config {"projectId":"courtly-fc306","appId":"1:102383002552:web:c8ae459de7705cf4a1a54d","storageBucket":"courtly-fc306.firebasestorage.app","apiKey":"AIzaSyAX-LFgpH_qDPEHmDPQgKURgEyz2MuIWME","authDomain":"courtly-fc306.firebaseapp.com","messagingSenderId":"102383002552","measurementId":"G-WFTBFF256C","projectNumber":"102383002552","version":"2"}
