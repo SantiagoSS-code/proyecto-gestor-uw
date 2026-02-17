@@ -1,6 +1,6 @@
 'use client';
 
-import { Suspense, useEffect, useState } from 'react';
+import { useEffect, useState } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { createUserWithEmailAndPassword, sendEmailVerification, signInWithPopup, GoogleAuthProvider } from 'firebase/auth';
 import { doc, setDoc } from 'firebase/firestore';
@@ -14,26 +14,6 @@ import { Sparkles, Eye, EyeOff } from 'lucide-react';
 import Link from 'next/link';
 
 export default function PlayerSignupPage() {
-  return (
-    <Suspense
-      fallback={
-        <div className="min-h-screen bg-gradient-to-br from-blue-50 via-white to-blue-100 flex items-center justify-center p-4">
-          <div className="w-full max-w-md">
-            <Card className="shadow-xl border-0 text-gray-900">
-              <CardContent className="py-10">
-                <p className="text-center text-gray-700">Cargando…</p>
-              </CardContent>
-            </Card>
-          </div>
-        </div>
-      }
-    >
-      <PlayerSignupInner />
-    </Suspense>
-  );
-}
-
-function PlayerSignupInner() {
   const [formData, setFormData] = useState({
     name: '',
     email: '',
