@@ -13,9 +13,9 @@ interface CourtsLayoutProps {
 }
 
 const navItems = [
-  { href: "/dashboard-centros", label: "Panel", icon: LayoutDashboard },
-  { href: "/dashboard-centros/courts", label: "Canchas", icon: Grid2X2 },
-  { href: "/dashboard-centros/settings", label: "Configuración", icon: Settings },
+  { href: "/clubos/dashboard", label: "Panel", icon: LayoutDashboard },
+  { href: "/clubos/dashboard/courts", label: "Canchas", icon: Grid2X2 },
+  { href: "/clubos/dashboard/settings", label: "Configuración", icon: Settings },
 ]
 
 export function CourtsLayout({ title, description, children }: CourtsLayoutProps) {

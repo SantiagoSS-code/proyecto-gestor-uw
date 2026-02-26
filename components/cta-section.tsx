@@ -48,11 +48,14 @@ export function CtaSection() {
 
             <div className="flex flex-col sm:flex-row gap-4 justify-center mb-16">
               <Button
+                asChild
                 size="lg"
                 className="bg-white text-primary hover:bg-white/90 h-14 px-10 rounded-full text-base font-semibold shadow-lg shadow-black/20 transition-all hover:scale-105"
               >
-                Registrar mi Club
-                <ArrowRight className="ml-2 w-5 h-5" />
+                <Link href="/pricing#form-prueba">
+                  Registrar mi Club
+                  <ArrowRight className="ml-2 w-5 h-5" />
+                </Link>
               </Button>
               <Link href="/pricing">
                 <Button

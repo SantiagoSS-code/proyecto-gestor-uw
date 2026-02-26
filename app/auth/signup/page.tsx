@@ -162,7 +162,7 @@ export default function SignupPage() {
         createdAt: new Date(),
       });
 
-      router.push('/dashboard-centros');
+      router.push('/clubos/dashboard');
     } catch (err: any) {
       setError(err.message);
     } finally {
@@ -338,7 +338,7 @@ export default function SignupPage() {
 
             <div className="text-center">
               <Link
-                href="/auth/login"
+                href="/clubos/login"
                 className="text-sm text-blue-600 hover:text-blue-500 dark:text-blue-400 dark:hover:text-blue-300"
               >
                 Already have an account? Sign in

@@ -163,7 +163,7 @@ export function ClubsList() {
                         </span>
                       </div>
 
-                      <div className="mt-6">
+                      <div className="mt-6 flex justify-center">
                         <span
                           className={`inline-flex items-center justify-center rounded-full px-8 py-2 text-sm font-medium ${
                             href

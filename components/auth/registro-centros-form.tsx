@@ -470,7 +470,7 @@ export function RegistroCentrosForm({ initialGoogleEmail, initialGoogleName }: R
           return
         }
 
-        router.push("/dashboard-centros")
+        router.push("/clubos/dashboard")
         return
       }
 
@@ -538,13 +538,13 @@ export function RegistroCentrosForm({ initialGoogleEmail, initialGoogleName }: R
           `Cuenta creada pero no se pudo iniciar sesión automáticamente: ${signInError?.message || "Error"}. Por favor inicia sesión manualmente.`
         )
         setTimeout(() => {
-          router.push("/login-centros?registered=true")
+          router.push("/clubos/login?registered=true")
         }, 3000)
         return
       }
 
       // Success! Redirect to dashboard
-      router.push("/dashboard-centros")
+      router.push("/clubos/dashboard")
     } catch (err) {
       console.log("[v0] Unexpected error:", err)
       setError("Ocurrió un error inesperado. Por favor intenta de nuevo.")
@@ -1156,7 +1156,7 @@ export function RegistroCentrosForm({ initialGoogleEmail, initialGoogleName }: R
 
         <p className="text-center text-sm text-muted-foreground mt-6">
           ¿Ya tienes una cuenta?{" "}
-          <Link href="/login-centros" className="font-medium text-primary hover:underline">
+          <Link href="/clubos/login" className="font-medium text-primary hover:underline">
             Inicia sesión
           </Link>
         </p>

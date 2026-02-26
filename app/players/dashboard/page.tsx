@@ -120,7 +120,7 @@ export default function PlayerDashboardPage() {
         </section>
 
         {/* Upcoming booking */}
-        <section className="rounded-3xl border border-slate-200/70 bg-white p-6 shadow-sm sm:p-8">
+        <section id="mis-reservas" className="rounded-3xl border border-slate-200/70 bg-white p-6 shadow-sm sm:p-8 scroll-mt-24">
           <div className="flex items-center justify-between">
             <h2 className="text-lg font-semibold text-slate-900">Próxima reserva</h2>
             <Button variant="outline" asChild className="rounded-full">

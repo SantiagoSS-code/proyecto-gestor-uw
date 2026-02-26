@@ -442,20 +442,26 @@ export function ClubDetail({ slug }: { slug: string }) {
   const handleReservar = async () => {
     if (!selectedSlot || !selectedCourt || !centerId || !center) return
 
+    const user = auth.currentUser
+    if (!user) {
+      const currentPath = `${window.location.pathname}${window.location.search}`
+      window.location.href = `/players/login?next=${encodeURIComponent(currentPath)}`
+      return
+    }
+
     setCheckoutLoading(true)
     setCheckoutError(null)
 
     try {
-      const user = auth.currentUser
       const payload = {
         centerId,
         courtId: selectedSlot.courtId,
         date: selectedDate,
         time: selectedSlot.time,
         durationMinutes: slotDuration,
-        customerName: user?.displayName || "Invitado",
-        customerEmail: user?.email || "guest@courtly.app",
-        userId: user?.uid || null,
+        customerName: user.displayName || "Jugador",
+        customerEmail: user.email || "",
+        userId: user.uid,
       }
 
       const res = await fetch("/api/mercadopago/create-preference", {
@@ -616,71 +622,6 @@ export function ClubDetail({ slug }: { slug: string }) {
                   Choose a date to see available slots.
                 </p>
               </div>
-            </CardContent>
-          </Card>
-        </div>
-
-        {/* Location */}
-        <div className="mt-10 grid grid-cols-1 lg:grid-cols-2 gap-6">
-          <Card className="border border-border/50">
-            <CardHeader>
-              <CardTitle>Location</CardTitle>
-            </CardHeader>
-            <CardContent className="p-0">
-              <div className="rounded-2xl overflow-hidden border border-slate-200 bg-white shadow-sm">
-                {hasPlaceId && mapSrc ? (
-                  <div className="relative h-[260px]">
-                    <iframe
-                      title="map"
-                      src={mapSrc}
-                      className="absolute inset-0 h-full w-full"
-                      loading="lazy"
-                      referrerPolicy="no-referrer-when-downgrade"
-                      style={{ border: 0 }}
-                    />
-                    {mapLink ? (
-                      <a
-                        href={mapLink}
-                        target="_blank"
-                        rel="noreferrer"
-                        className="absolute inset-0"
-                        aria-label="Abrir ubicación en Google Maps"
-                      />
-                    ) : null}
-                  </div>
-                ) : (
-                  <div className="flex h-[260px] items-center justify-center bg-slate-50 px-4 text-sm text-slate-600">
-                    Ubicación sin Place ID. Configurá el Google Place ID en el perfil del club.
-                  </div>
-                )}
-                <div className="border-t border-slate-200 px-4 py-3">
-                  {locationAddress ? (
-                    mapLink ? (
-                      <a
-                        href={mapLink}
-                        target="_blank"
-                        rel="noreferrer"
-                        className="text-base font-semibold text-slate-900 hover:underline"
-                      >
-                        {locationAddress}
-                      </a>
-                    ) : (
-                      <div className="text-base font-semibold text-slate-900">{locationAddress}</div>
-                    )
-                  ) : (
-                    <div className="text-base font-semibold text-slate-900">Ubicación por definir</div>
-                  )}
-                </div>
-              </div>
-            </CardContent>
-          </Card>
-
-          <Card className="border border-border/50">
-            <CardHeader>
-              <CardTitle>About</CardTitle>
-            </CardHeader>
-            <CardContent className="text-slate-700 whitespace-pre-wrap">
-              {center.description || "No description yet."}
             </CardContent>
           </Card>
         </div>
@@ -871,6 +812,71 @@ export function ClubDetail({ slug }: { slug: string }) {
               ) : (
                 <div className="text-xs text-slate-500">Pagá de forma segura con Mercado Pago.</div>
               )}
+            </CardContent>
+          </Card>
+        </div>
+
+        {/* Location */}
+        <div className="mt-10 grid grid-cols-1 lg:grid-cols-2 gap-6">
+          <Card className="border border-border/50">
+            <CardHeader>
+              <CardTitle>Location</CardTitle>
+            </CardHeader>
+            <CardContent className="p-0">
+              <div className="rounded-2xl overflow-hidden border border-slate-200 bg-white shadow-sm">
+                {hasPlaceId && mapSrc ? (
+                  <div className="relative h-[260px]">
+                    <iframe
+                      title="map"
+                      src={mapSrc}
+                      className="absolute inset-0 h-full w-full"
+                      loading="lazy"
+                      referrerPolicy="no-referrer-when-downgrade"
+                      style={{ border: 0 }}
+                    />
+                    {mapLink ? (
+                      <a
+                        href={mapLink}
+                        target="_blank"
+                        rel="noreferrer"
+                        className="absolute inset-0"
+                        aria-label="Abrir ubicación en Google Maps"
+                      />
+                    ) : null}
+                  </div>
+                ) : (
+                  <div className="flex h-[260px] items-center justify-center bg-slate-50 px-4 text-sm text-slate-600">
+                    Ubicación sin Place ID. Configurá el Google Place ID en el perfil del club.
+                  </div>
+                )}
+                <div className="border-t border-slate-200 px-4 py-3">
+                  {locationAddress ? (
+                    mapLink ? (
+                      <a
+                        href={mapLink}
+                        target="_blank"
+                        rel="noreferrer"
+                        className="text-base font-semibold text-slate-900 hover:underline"
+                      >
+                        {locationAddress}
+                      </a>
+                    ) : (
+                      <div className="text-base font-semibold text-slate-900">{locationAddress}</div>
+                    )
+                  ) : (
+                    <div className="text-base font-semibold text-slate-900">Ubicación por definir</div>
+                  )}
+                </div>
+              </div>
+            </CardContent>
+          </Card>
+
+          <Card className="border border-border/50">
+            <CardHeader>
+              <CardTitle>About</CardTitle>
+            </CardHeader>
+            <CardContent className="text-slate-700 whitespace-pre-wrap">
+              {center.description || "No description yet."}
             </CardContent>
           </Card>
         </div>
