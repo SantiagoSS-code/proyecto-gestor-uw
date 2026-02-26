@@ -19,10 +19,11 @@ import { auth } from "@/lib/firebaseClient"
 
 export function Header() {
   const [isMenuOpen, setIsMenuOpen] = useState(false)
-  const { user, loading } = useAuth()
+  const { user } = useAuth()
   const router = useRouter()
   const pathname = usePathname()
   const searchParams = useSearchParams()
+  const playerBookingsHref = "/players/dashboard#mis-reservas"
 
   const playerLoginHref = useMemo(() => {
     const query = searchParams?.toString()
@@ -58,56 +59,53 @@ export function Header() {
 
           {/* Desktop Navigation */}
           <div className="hidden md:flex items-center gap-4">
-            <Link href="/clubs" className="text-sm text-muted-foreground hover:text-foreground transition-colors">
-              Clubs
-            </Link>
             {user ? (
-              <DropdownMenu>
-                <DropdownMenuTrigger asChild>
-                  <Button variant="ghost" className="relative h-8 w-8 rounded-full bg-blue-600 hover:bg-blue-700">
-                    <Avatar className="h-8 w-8">
-                      <AvatarFallback className="text-xs text-black font-semibold bg-white border border-gray-200">
-                        {getInitials(user.displayName || user.email || "U")}
-                      </AvatarFallback>
-                    </Avatar>
-                  </Button>
-                </DropdownMenuTrigger>
-                <DropdownMenuContent className="w-56" align="end" forceMount>
-                  <div className="flex items-center justify-start gap-2 p-2">
-                    <div className="flex flex-col space-y-1 leading-none">
-                      {user.displayName && (
-                        <p className="font-semibold text-black tracking-tight">{user.displayName}</p>
-                      )}
-                      <p className="w-[200px] truncate text-sm text-black font-medium">
-                        {user.displayName || user.email?.split('@')[0] || 'User'}
-                      </p>
-                    </div>
-                  </div>
-                  <DropdownMenuSeparator />
-                  <DropdownMenuItem asChild>
-                    <Link href="/players/dashboard" className="cursor-pointer text-black">
-                      <User className="mr-2 h-4 w-4" />
-                      <span>Mi perfil</span>
-                    </Link>
-                  </DropdownMenuItem>
-                  <DropdownMenuSeparator />
-                  <DropdownMenuItem onClick={handleSignOut} className="cursor-pointer text-black">
-                    <LogOut className="mr-2 h-4 w-4" />
-                    <span>Log out</span>
-                  </DropdownMenuItem>
-                </DropdownMenuContent>
-              </DropdownMenu>
-            ) : (
               <>
-                <Link href={playerLoginHref} className="text-sm text-muted-foreground hover:text-foreground transition-colors">
-                  Login Jugadores
+                <Link href={playerBookingsHref} className="text-sm text-muted-foreground hover:text-foreground transition-colors">
+                  Tus Reservas
                 </Link>
-                <Link href="/auth/login">
+                <DropdownMenu>
+                  <DropdownMenuTrigger asChild>
+                    <Button variant="ghost" className="relative h-8 w-8 rounded-full bg-blue-600 hover:bg-blue-700">
+                      <Avatar className="h-8 w-8">
+                        <AvatarFallback className="text-xs text-black font-semibold bg-white border border-gray-200">
+                          {getInitials(user.displayName || user.email || "U")}
+                        </AvatarFallback>
+                      </Avatar>
+                    </Button>
+                  </DropdownMenuTrigger>
+                  <DropdownMenuContent className="w-56" align="end" forceMount>
+                    <div className="flex items-center justify-start gap-2 p-2">
+                      <div className="flex flex-col space-y-1 leading-none">
+                        {user.displayName && (
+                          <p className="font-semibold text-black tracking-tight">{user.displayName}</p>
+                        )}
+                        <p className="w-[200px] truncate text-sm text-black font-medium">
+                          {user.displayName || user.email?.split('@')[0] || 'User'}
+                        </p>
+                      </div>
+                    </div>
+                    <DropdownMenuSeparator />
+                    <DropdownMenuItem asChild>
+                      <Link href="/players/dashboard" className="cursor-pointer text-black">
+                        <User className="mr-2 h-4 w-4" />
+                        <span>Mi perfil</span>
+                      </Link>
+                    </DropdownMenuItem>
+                    <DropdownMenuSeparator />
+                    <DropdownMenuItem onClick={handleSignOut} className="cursor-pointer text-black">
+                      <LogOut className="mr-2 h-4 w-4" />
+                      <span>Log out</span>
+                    </DropdownMenuItem>
+                  </DropdownMenuContent>
+                </DropdownMenu>
+              </>
+            ) : (
+                <Link href={playerLoginHref}>
                   <Button size="sm" className="bg-primary text-primary-foreground hover:bg-primary/90 rounded-full px-5">
-                    Login Centros
+                  Login Jugadores
                   </Button>
                 </Link>
-              </>
             )}
           </div>
 
@@ -127,11 +125,11 @@ export function Header() {
         <div className="md:hidden bg-background/95 backdrop-blur-xl border-t border-border/50">
           <div className="container mx-auto px-4 py-6">
             <nav className="flex flex-col gap-3">
-              <Link href="/clubs" className="text-sm text-foreground hover:text-primary py-2">
-                Clubs
-              </Link>
               {user ? (
                 <>
+                  <Link href={playerBookingsHref} className="text-sm text-foreground hover:text-primary py-2">
+                    Tus Reservas
+                  </Link>
                   <div className="flex items-center gap-3 p-3 border-b border-border">
                     <Avatar className="h-10 w-10">
                       <AvatarFallback className="text-sm text-black font-semibold bg-white border border-gray-200">
@@ -160,11 +158,8 @@ export function Header() {
                 </>
               ) : (
                 <>
-                  <Link href={playerLoginHref} className="text-sm text-foreground hover:text-primary py-2">
-                    Login Jugadores
-                  </Link>
-                  <Link href="/auth/login">
-                    <Button className="bg-primary text-primary-foreground w-full rounded-full">Login Centros</Button>
+                  <Link href={playerLoginHref}>
+                    <Button className="bg-primary text-primary-foreground w-full rounded-full">Login Jugadores</Button>
                   </Link>
                 </>
               )}

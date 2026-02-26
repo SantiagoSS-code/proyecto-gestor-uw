@@ -188,7 +188,7 @@ export function DashboardCentrosContent({ admin, center }: DashboardCentrosConte
 
         {/* Quick Actions */}
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6">
-          <Link href="/dashboard-centros/reservas">
+          <Link href="/clubos/dashboard/reservas">
             <Card className="cursor-pointer transition-all duration-200 hover:shadow-md hover:-translate-y-0.5 bg-white border border-slate-200/70 shadow-sm hover:border-blue-300">
               <CardContent className="p-6 flex flex-col items-center text-center">
                 <div className="w-12 h-12 rounded-full bg-blue-50 text-blue-600 flex items-center justify-center mb-3">
@@ -200,7 +200,7 @@ export function DashboardCentrosContent({ admin, center }: DashboardCentrosConte
             </Card>
           </Link>
 
-          <Link href="/dashboard-centros/courts">
+          <Link href="/clubos/dashboard/courts">
             <Card className="cursor-pointer transition-all duration-200 hover:shadow-md hover:-translate-y-0.5 bg-white border border-slate-200/70 shadow-sm hover:border-blue-300">
               <CardContent className="p-6 flex flex-col items-center text-center">
                 <div className="w-12 h-12 rounded-full bg-blue-50 text-blue-600 flex items-center justify-center mb-3">
@@ -232,7 +232,7 @@ export function DashboardCentrosContent({ admin, center }: DashboardCentrosConte
             </CardContent>
           </Card>
 
-          <Link href="/dashboard-centros/settings">
+          <Link href="/clubos/dashboard/settings">
             <Card className="cursor-pointer transition-all duration-200 hover:shadow-md hover:-translate-y-0.5 bg-white border border-slate-200/70 shadow-sm hover:border-blue-300">
               <CardContent className="p-6 flex flex-col items-center text-center">
                 <div className="w-12 h-12 rounded-full bg-blue-50 text-blue-600 flex items-center justify-center mb-3">

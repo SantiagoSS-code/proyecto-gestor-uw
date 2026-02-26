@@ -51,7 +51,7 @@ export function LoginCentrosForm() {
         throw new Error(text || "Failed to create session cookie")
       }
 
-      router.push("/dashboard-centros")
+      router.push("/clubos/dashboard")
       router.refresh()
     } catch (error: any) {
       console.log("[Firebase] Login error:", error.message, error.code)
@@ -99,7 +99,7 @@ export function LoginCentrosForm() {
         throw new Error(text || "Failed to create session cookie")
       }
 
-      router.push("/dashboard-centros")
+      router.push("/clubos/dashboard")
       router.refresh()
     } catch (error: any) {
       console.log("[Firebase] Google login error:", error.message, error.code)

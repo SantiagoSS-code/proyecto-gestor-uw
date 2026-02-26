@@ -76,13 +76,10 @@ export function LoginPlayersForm() {
         await createMinimalPlayerProfile(userCredential.user.uid, email)
       }
 
-      // If onboarding is done, land on dashboard; otherwise, continue onboarding.
-      const goToOnboarding = !status.exists || status.onboardingCompleted === false
-      const destination = goToOnboarding
-        ? "/players/onboarding/personal-details"
-        : nextDestination || "/players/dashboard"
+      // Keep user in the same activity/page they came from.
+      const destination = nextDestination || "/players/dashboard"
 
-      if (typeof window !== "undefined" && nextDestination && !goToOnboarding) {
+      if (typeof window !== "undefined" && nextDestination) {
         localStorage.removeItem("playerNext")
       }
 
@@ -118,13 +115,10 @@ export function LoginPlayersForm() {
       }
 
       const nextDestination = resolveNext()
-      // If onboarding is done, land on dashboard; otherwise, continue onboarding.
-      const goToOnboarding = !status.exists || status.onboardingCompleted === false
-      const destination = goToOnboarding
-        ? "/players/onboarding/personal-details"
-        : nextDestination || "/players/dashboard"
+      // Keep user in the same activity/page they came from.
+      const destination = nextDestination || "/players/dashboard"
 
-      if (typeof window !== "undefined" && nextDestination && !goToOnboarding) {
+      if (typeof window !== "undefined" && nextDestination) {
         localStorage.removeItem("playerNext")
       }
 

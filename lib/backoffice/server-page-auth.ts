@@ -11,7 +11,7 @@ function parseAllowlist(): string[] {
 
 export async function requirePlatformAdminPage() {
   const decoded = await getServerSessionUser()
-  if (!decoded) redirect("/auth/login")
+  if (!decoded) redirect("/clubos/login")
 
   const email = String(decoded.email || "").toLowerCase()
   const allowlist = parseAllowlist()
@@ -23,7 +23,7 @@ export async function requirePlatformAdminPage() {
   const isAllowlisted = !!email && allowlist.includes(email)
   const isPlatformAdmin = role === "platform_admin" || isAllowlisted
 
-  if (!isPlatformAdmin) redirect("/dashboard-centros")
+  if (!isPlatformAdmin) redirect("/clubos/dashboard")
 
   // Bootstrap doc + custom claim for allowlisted admins.
   if (isAllowlisted && role !== "platform_admin") {

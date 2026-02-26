@@ -7,7 +7,7 @@ import { cn } from "@/lib/utils"
 
 const plans = [
   {
-    name: "Starter",
+    name: "Estandar",
     description: "Ideal para clubes pequeños",
     courts: "1-3 Canchas",
     monthlyPrice: 30000,
@@ -15,33 +15,43 @@ const plans = [
     annualSavings: 60000,
     icon: Zap,
     features: [
-      "Reservas ilimitadas",
-      "Panel de administración",
-      "Notificaciones automáticas",
-      "Soporte por email",
-      "Reportes básicos",
+      "Reservas online 24/7",
+      "Bloqueo manual de horarios",
+      "Base de datos de clientes",
+      "Confirmaciones automáticas por email",
+      "Cobro online con Mercado Pago",
+      "Política básica de cancelación",
+      "Panel administrativo simple",
+      "Reporte básico de ingresos",
+      "Reporte de ocupación por cancha",
+      "Historial de reservas",
+      "1 usuario administrador",
+      "Soporte por email (48 hs)",
     ],
   },
   {
-    name: "Business",
+    name: "Profesional",
     description: "Para clubes en crecimiento",
-    courts: "3-5 Canchas",
+    courts: "4-6 Canchas",
     monthlyPrice: 45000,
     annualPrice: 37500,
     annualSavings: 90000,
     icon: Building2,
     popular: true,
     features: [
-      "Todo en Starter",
-      "IA para optimización de horarios",
-      "Analytics avanzado",
-      "Integraciones de pago",
-      "Soporte prioritario",
-      "App personalizada",
+      "Todo en Estandar",
+      "Cupones y descuentos",
+      "Reportes avanzados por cancha y franja",
+      "Métricas de retención de jugadores",
+      "Clases públicas grupales",
+      "Gestión básica de torneos",
+      "Multi-usuario (staff)",
+      "Roles y permisos",
+      "Soporte prioritario (24 hs)",
     ],
   },
   {
-    name: "Enterprise",
+    name: "Maestro",
     description: "Para grandes complejos",
     courts: "7+ Canchas",
     monthlyPrice: 60000,
@@ -49,13 +59,15 @@ const plans = [
     annualSavings: 120000,
     icon: Trophy,
     features: [
-      "Todo en Business",
+      "Todo en Profesional",
       "Multi-sede",
-      "API personalizada",
-      "Account manager dedicado",
-      "Onboarding premium",
-      "SLA garantizado",
-      "Facturación personalizada",
+      "Gestión de entrenadores",
+      "Cursos estructurados (programas 8–12 semanas)",
+      "Membresías avanzadas con beneficios dinámicos",
+      "Reporte financiero detallado",
+      "Proyección de ingresos",
+      "IA para sugerir horarios óptimos",
+      "Soporte prioritario (8 hs)",
     ],
   },
 ]
@@ -211,17 +223,17 @@ export function PricingSection() {
                 )}
               >
                 {plan.popular && (
-                  <div className="mb-4 -mt-1">
+                  <div className="mb-4 -mt-1 flex justify-center">
                     <span className="bg-white text-primary text-xs font-bold px-4 py-1.5 rounded-full shadow-sm inline-block">
                       Mas popular
                     </span>
                   </div>
                 )}
 
-                <div className={cn("mb-6", !plan.popular && "mt-0")}>
+                <div className={cn("mb-6 text-center", !plan.popular && "mt-0")}>
                   <div
                     className={cn(
-                      "w-12 h-12 rounded-2xl flex items-center justify-center mb-4",
+                      "w-12 h-12 rounded-2xl flex items-center justify-center mb-4 mx-auto",
                       plan.popular ? "bg-white/20" : "bg-primary/10",
                     )}
                   >
@@ -235,8 +247,8 @@ export function PricingSection() {
                   </p>
                 </div>
 
-                <div className="mb-6">
-                  <div className="flex items-baseline gap-1">
+                <div className="mb-6 text-center">
+                  <div className="flex items-baseline justify-center gap-1">
                     <span className={cn("text-4xl font-bold", plan.popular ? "text-white" : "text-foreground")}>
                       {formatPrice(price)}
                     </span>
@@ -255,6 +267,7 @@ export function PricingSection() {
                 </div>
 
                 <Button
+                  asChild
                   className={cn(
                     "w-full h-12 rounded-xl font-semibold mb-8 transition-all",
                     plan.popular
@@ -262,12 +275,12 @@ export function PricingSection() {
                       : "bg-primary text-white hover:bg-primary/90",
                   )}
                 >
-                  Empezar prueba gratis
+                  <a href="#form-prueba">Empezar prueba gratis</a>
                 </Button>
 
-                <ul className="space-y-3">
+                <ul className="mx-auto w-full max-w-[320px] space-y-3">
                   {plan.features.map((feature) => (
-                    <li key={feature} className="flex items-start gap-3">
+                    <li key={feature} className="grid grid-cols-[20px_1fr] items-start gap-3 text-left">
                       <div
                         className={cn(
                           "w-5 h-5 rounded-full flex items-center justify-center flex-shrink-0 mt-0.5",
@@ -276,7 +289,7 @@ export function PricingSection() {
                       >
                         <Check className={cn("w-3 h-3", plan.popular ? "text-white" : "text-primary")} />
                       </div>
-                      <span className={cn("text-sm", plan.popular ? "text-white/90" : "text-muted-foreground")}>
+                      <span className={cn("text-sm leading-relaxed", plan.popular ? "text-white/90" : "text-muted-foreground")}>
                         {feature}
                       </span>
                     </li>
@@ -290,8 +303,10 @@ export function PricingSection() {
         {/* Bottom CTA */}
         <div className="text-center mt-16">
           <p className="text-muted-foreground mb-4">¿Tenés un complejo más grande o necesidades especiales?</p>
-          <Button variant="outline" className="rounded-full px-8 bg-transparent">
-            Contactar a ventas
+          <Button asChild variant="outline" className="rounded-full px-8 bg-transparent">
+            <a href="https://calendly.com/santiagonsanchez/30min" target="_blank" rel="noreferrer">
+              Contactar a ventas
+            </a>
           </Button>
         </div>
       </div>

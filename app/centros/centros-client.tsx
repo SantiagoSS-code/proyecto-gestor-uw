@@ -5,10 +5,9 @@ import { useSearchParams } from "next/navigation"
 import Link from "next/link"
 import { collection, getDocs, query as firestoreQuery, where } from "firebase/firestore"
 import { db } from "@/lib/firebaseClient"
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
-import { Button } from "@/components/ui/button"
+import { Card } from "@/components/ui/card"
 import { Input } from "@/components/ui/input"
-import { MapPin, Building2 } from "lucide-react"
+import { MapPin } from "lucide-react"
 import { FIRESTORE_COLLECTIONS } from "@/lib/firestorePaths"
 
 interface Center {
@@ -18,6 +17,12 @@ interface Center {
   address?: string
   city?: string
   country?: string
+  coverImageUrl?: string | null
+  galleryImageUrls?: string[]
+}
+
+function getCover(center: Center) {
+  return center.coverImageUrl || center.galleryImageUrls?.[0] || null
 }
 
 export default function CentersClient() {
@@ -75,35 +80,46 @@ export default function CentersClient() {
         ) : filtered.length === 0 ? (
           <div className="text-muted-foreground">No se encontraron centros.</div>
         ) : (
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
             {filtered.map((center) => (
-              <Card key={center.id} className="border-0 shadow-md">
-                <CardHeader>
-                  <CardTitle className="text-xl text-foreground">{center.name}</CardTitle>
-                </CardHeader>
-                <CardContent className="space-y-3">
-                  <div className="flex items-center gap-2 text-muted-foreground text-sm">
-                    <MapPin className="w-4 h-4" />
-                    <span>{center.address || "Dirección no disponible"}</span>
+              <Link
+                key={center.id}
+                href={`/clubs/${center.slug || center.id}`}
+                className="block focus:outline-none focus-visible:ring-2 focus-visible:ring-blue-600/60 rounded-2xl"
+                aria-label={`Ir al club ${center.name}`}
+              >
+                <Card className="group relative bg-card rounded-2xl border border-border/30 overflow-hidden hover:border-primary/30 transition-all duration-300">
+                  <div className="relative h-48 overflow-hidden bg-muted">
+                    {getCover(center) ? (
+                      // eslint-disable-next-line @next/next/no-img-element
+                      <img
+                        src={getCover(center) as string}
+                        alt={center.name}
+                        className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500"
+                      />
+                    ) : (
+                      <div className="w-full h-full bg-gradient-to-br from-slate-200 to-slate-100" />
+                    )}
+                    <div className="absolute inset-0 bg-gradient-to-t from-card via-transparent to-transparent" />
                   </div>
-                  <div className="flex items-center gap-2 text-muted-foreground text-sm">
-                    <Building2 className="w-4 h-4" />
-                    <span>
-                      {center.city || "Ciudad"}, {center.country || "País"}
-                    </span>
+
+                  <div className="p-5">
+                    <h3 className="text-lg font-semibold text-foreground mb-1">{center.name}</h3>
+                    <div className="flex items-start gap-2 text-muted-foreground">
+                      <MapPin className="w-4 h-4 mt-0.5" />
+                      <span className="text-xs leading-relaxed">
+                        {center.address || [center.city, center.country].filter(Boolean).join(", ") || "Dirección no disponible"}
+                      </span>
+                    </div>
+
+                    <div className="mt-5 flex justify-center">
+                      <span className="inline-flex items-center justify-center rounded-full px-8 py-2 text-sm font-medium bg-blue-600 text-white group-hover:bg-blue-700">
+                        Reservar
+                      </span>
+                    </div>
                   </div>
-                  <div className="flex gap-2">
-                    <Link href={`/clubs/${center.slug || center.id}`} className="w-full">
-                      <Button variant="outline" className="w-full text-black">
-                        Ver canchas
-                      </Button>
-                    </Link>
-                    <Link href={`/clubs/${center.slug || center.id}`} className="w-full">
-                      <Button className="w-full">Reservar</Button>
-                    </Link>
-                  </div>
-                </CardContent>
-              </Card>
+                </Card>
+              </Link>
             ))}
           </div>
         )}

@@ -145,7 +145,7 @@ export default function VerifyEmailPage() {
       
       // Redirect after short delay
       setTimeout(() => {
-        router.push('/dashboard-centros');
+        router.push('/clubos/dashboard');
       }, 1500);
 
     } catch (err: any) {

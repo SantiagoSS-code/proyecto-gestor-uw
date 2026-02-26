@@ -1,6 +1,7 @@
 import { PricingSection } from "@/components/pricing-section"
 import { FeaturesB2BSection } from "@/components/features-b2b-section"
 import { TestimonialsB2BSection } from "@/components/testimonials-b2b-section"
+import { PricingTrialFormSection } from "@/components/pricing-trial-form-section"
 import { Header } from "@/components/header"
 import { Footer } from "@/components/footer"
 
@@ -12,6 +13,7 @@ export default function PricingPage() {
       <PricingSection />
       <FeaturesB2BSection />
       <TestimonialsB2BSection />
+      <PricingTrialFormSection />
       <Footer />
     </main>
   )
