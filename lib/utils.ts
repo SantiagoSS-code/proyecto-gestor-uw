@@ -27,3 +27,24 @@ export function minutesToTime(minutes: number) {
   const m = minutes % 60
   return `${h.toString().padStart(2, "0")}:${m.toString().padStart(2, "0")}`
 }
+
+// Recibe duración en horas decimales (ej: 1.5) y devuelve "1:30 hs"
+export function formatDurationHours(durationHours: number) {
+  if (!Number.isFinite(durationHours) || durationHours < 0) return "-"
+  const totalMinutes = Math.round(durationHours * 60)
+  const hours = Math.floor(totalMinutes / 60)
+  const minutes = totalMinutes % 60
+  const minutesStr = minutes.toString().padStart(2, "0")
+  return `${hours}:${minutesStr} hs`
+}
+
+// Formatea montos en ARS con separador de miles y 2 decimales
+export function formatCurrencyARS(value: number | null | undefined) {
+  if (value == null || !Number.isFinite(value as number)) return "$0,00"
+  return new Intl.NumberFormat("es-AR", {
+    style: "currency",
+    currency: "ARS",
+    minimumFractionDigits: 2,
+    maximumFractionDigits: 2,
+  }).format(value as number)
+}

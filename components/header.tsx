@@ -1,8 +1,8 @@
 "use client"
 
-import { useMemo, useState } from "react"
+import { useState, useEffect } from "react"
 import Link from "next/link"
-import { usePathname, useRouter, useSearchParams } from "next/navigation"
+import { usePathname, useRouter } from "next/navigation"
 import { Button } from "@/components/ui/button"
 import {
   DropdownMenu,
@@ -19,17 +19,20 @@ import { auth } from "@/lib/firebaseClient"
 
 export function Header() {
   const [isMenuOpen, setIsMenuOpen] = useState(false)
+  const [playerLoginHref, setPlayerLoginHref] = useState("/players/login")
+  const [mounted, setMounted] = useState(false)
   const { user } = useAuth()
   const router = useRouter()
   const pathname = usePathname()
-  const searchParams = useSearchParams()
   const playerBookingsHref = "/players/dashboard#mis-reservas"
 
-  const playerLoginHref = useMemo(() => {
-    const query = searchParams?.toString()
-    const current = query ? `${pathname}?${query}` : pathname
-    return `/players/login?next=${encodeURIComponent(current)}`
-  }, [pathname, searchParams])
+  useEffect(() => {
+    setMounted(true)
+    // Use window.location to safely get search params
+    const query = window.location.search
+    const current = query ? `${pathname}${query}` : pathname
+    setPlayerLoginHref(`/players/login?next=${encodeURIComponent(current)}`)
+  }, [pathname])
 
   const handleSignOut = async () => {
     await signOut(auth)
@@ -51,10 +54,7 @@ export function Header() {
         <div className="flex items-center justify-between h-16">
           {/* Logo */}
           <Link href="/" className="flex items-center gap-2">
-            <div className="w-8 h-8 rounded-lg bg-primary flex items-center justify-center">
-              <Sparkles className="w-4 h-4 text-primary-foreground" />
-            </div>
-            <span className="font-semibold text-xl tracking-tight text-foreground">courtly</span>
+            <img src="/voyd-logo.png" alt="VOYD Logo" className="h-20 w-auto object-contain transform scale-110 origin-left" />
           </Link>
 
           {/* Desktop Navigation */}

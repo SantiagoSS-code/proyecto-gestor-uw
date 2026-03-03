@@ -35,6 +35,8 @@ export function LoginCentrosForm() {
       console.log("[Firebase] Login successful:", userCredential.user.uid)
 
       const idToken = await userCredential.user.getIdToken()
+      console.log("[Login] Got ID token, sending to session endpoint")
+      
       const sessionRes = await fetch("/api/auth/session", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
@@ -42,16 +44,26 @@ export function LoginCentrosForm() {
         body: JSON.stringify({ idToken }),
       })
 
+      console.log("[Login] Session response status:", sessionRes.status)
+      const sessionData = await sessionRes.json().catch(() => null)
+      console.log("[Login] Session response:", sessionData)
+
       if (!sessionRes.ok) {
-        const data = await sessionRes.json().catch(() => null)
-        if (data?.error) {
-          throw new Error(data.error)
-        }
-        const text = await sessionRes.text().catch(() => "")
-        throw new Error(text || "Failed to create session cookie")
+        const errorMsg = sessionData?.error || "Failed to create session"
+        throw new Error(errorMsg)
       }
 
+      console.log("[Login] Session created successfully")
+      console.log("[Login] Session response data:", sessionData)
+      
+      // Esperar un poco para asegurar que la cookie se ha establecido
+      await new Promise(resolve => setTimeout(resolve, 500))
+      
+      console.log("[Login] Redirecting to dashboard")
       router.push("/clubos/dashboard")
+      
+      // Refresca la página para asegurar que el middleware se ejecute
+      await new Promise(resolve => setTimeout(resolve, 300))
       router.refresh()
     } catch (error: any) {
       console.log("[Firebase] Login error:", error.message, error.code)
@@ -66,7 +78,7 @@ export function LoginCentrosForm() {
       } else if (error.code === "auth/too-many-requests") {
         setError("Demasiados intentos fallidos. Inténtalo más tarde.")
       } else {
-        setError("Ocurrió un error al iniciar sesión. Por favor intenta de nuevo.")
+        setError(error.message || "Ocurrió un error al iniciar sesión. Por favor intenta de nuevo.")
       }
     } finally {
       setIsLoading(false)
@@ -83,6 +95,8 @@ export function LoginCentrosForm() {
       console.log("[Firebase] Google login successful:", result.user.uid)
 
       const idToken = await result.user.getIdToken()
+      console.log("[Login] Got ID token, sending to session endpoint")
+      
       const sessionRes = await fetch("/api/auth/session", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
@@ -90,16 +104,26 @@ export function LoginCentrosForm() {
         body: JSON.stringify({ idToken }),
       })
 
+      console.log("[Login] Session response status:", sessionRes.status)
+      const sessionData = await sessionRes.json().catch(() => null)
+      console.log("[Login] Session response:", sessionData)
+
       if (!sessionRes.ok) {
-        const data = await sessionRes.json().catch(() => null)
-        if (data?.error) {
-          throw new Error(data.error)
-        }
-        const text = await sessionRes.text().catch(() => "")
-        throw new Error(text || "Failed to create session cookie")
+        const errorMsg = sessionData?.error || "Failed to create session"
+        throw new Error(errorMsg)
       }
 
+      console.log("[Login] Session created successfully")
+      console.log("[Login] Session response data:", sessionData)
+      
+      // Esperar un poco para asegurar que la cookie se ha establecido
+      await new Promise(resolve => setTimeout(resolve, 500))
+      
+      console.log("[Login] Redirecting to dashboard")
       router.push("/clubos/dashboard")
+      
+      // Refresca la página para asegurar que el middleware se ejecute
+      await new Promise(resolve => setTimeout(resolve, 300))
       router.refresh()
     } catch (error: any) {
       console.log("[Firebase] Google login error:", error.message, error.code)
@@ -108,7 +132,7 @@ export function LoginCentrosForm() {
       } else if (error.code === "auth/popup-blocked") {
         setError("Popup bloqueado por el navegador. Permite popups para este sitio.")
       } else {
-        setError("Ocurrió un error con Google. Por favor intenta de nuevo.")
+        setError(error.message || "Ocurrió un error con Google. Por favor intenta de nuevo.")
       }
     } finally {
       setIsGoogleLoading(false)
@@ -124,12 +148,6 @@ export function LoginCentrosForm() {
           </div>
           <span className="font-semibold text-2xl tracking-tight text-foreground">courtly</span>
         </Link>
-        <div>
-          <CardTitle className="text-2xl font-bold text-foreground">Bienvenido</CardTitle>
-          <CardDescription className="text-muted-foreground mt-1">
-            Inicia sesión en tu cuenta de centro deportivo
-          </CardDescription>
-        </div>
       </CardHeader>
       <CardContent className="space-y-6">
         {error && (
@@ -158,7 +176,12 @@ export function LoginCentrosForm() {
           </div>
 
           <div className="space-y-2">
-            <Label htmlFor="password">Contraseña</Label>
+            <div className="flex items-center justify-between">
+              <Label htmlFor="password">Contraseña</Label>
+              <Link href="/auth/forgot-password" className="text-sm text-primary hover:underline">
+                ¿Olvidaste tu contraseña?
+              </Link>
+            </div>
             <div className="relative">
               <Lock className="absolute left-3 top-3 h-4 w-4 text-muted-foreground" />
               <Input

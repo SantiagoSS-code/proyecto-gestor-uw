@@ -2,13 +2,18 @@
 
 import { useSearchParams } from "next/navigation"
 import Link from "next/link"
+import { useEffect, useState } from "react"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { Clock } from "lucide-react"
 
 export default function BookingPendingClient() {
   const searchParams = useSearchParams()
-  const bookingId = searchParams.get("booking_id")
+  const [bookingId, setBookingId] = useState<string | null>(null)
+
+  useEffect(() => {
+    setBookingId(searchParams?.get("booking_id") || null)
+  }, [searchParams])
 
   return (
     <main className="min-h-screen bg-background flex items-center justify-center p-6">

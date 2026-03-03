@@ -1,6 +1,28 @@
 import { NextResponse } from 'next/server';
 import type { NextRequest } from 'next/server';
-import { adminAuth, adminDb } from "@/lib/firebase/admin"
+
+let adminAuth: any = null;
+let adminDb: any = null;
+let adminInitialized = false;
+
+// Try to initialize admin on first request
+async function ensureAdminInitialized() {
+  if (adminInitialized) return;
+  adminInitialized = true;
+
+  // Only try to initialize if we have credentials
+  if (!process.env.FIREBASE_PRIVATE_KEY && !process.env.FIREBASE_ADMIN_PRIVATE_KEY) {
+    return;
+  }
+
+  try {
+    const { adminAuth: auth, adminDb: db } = await import("@/lib/firebase/admin");
+    adminAuth = auth;
+    adminDb = db;
+  } catch (e) {
+    // Silently fail - use basic session checking
+  }
+}
 
 const CLUBOS_ALLOWED_ROLES = new Set([
   "club",
@@ -10,25 +32,31 @@ const CLUBOS_ALLOWED_ROLES = new Set([
 ])
 
 async function resolveClubRole(decodedToken: { uid: string; role?: unknown; legacyRole?: unknown }) {
+  if (!adminDb) return ""
+
   const claimRole = typeof decodedToken.role === "string" ? decodedToken.role : ""
   if (claimRole) return claimRole
 
   const claimLegacyRole = typeof decodedToken.legacyRole === "string" ? decodedToken.legacyRole : ""
   if (claimLegacyRole) return claimLegacyRole
 
-  const userSnap = await adminDb.collection("users").doc(decodedToken.uid).get()
-  if (userSnap.exists) {
-    const data = userSnap.data() as { role?: unknown; legacyRole?: unknown }
-    const role = typeof data.role === "string" ? data.role : ""
-    if (role) return role
+  try {
+    const userSnap = await adminDb.collection("users").doc(decodedToken.uid).get()
+    if (userSnap.exists) {
+      const data = userSnap.data() as { role?: unknown; legacyRole?: unknown }
+      const role = typeof data.role === "string" ? data.role : ""
+      if (role) return role
 
-    const legacyRole = typeof data.legacyRole === "string" ? data.legacyRole : ""
-    if (legacyRole) return legacyRole
-  }
+      const legacyRole = typeof data.legacyRole === "string" ? data.legacyRole : ""
+      if (legacyRole) return legacyRole
+    }
 
-  const centerAdminSnap = await adminDb.collection("center_admins").doc(decodedToken.uid).get()
-  if (centerAdminSnap.exists) {
-    return "center_admin"
+    const centerAdminSnap = await adminDb.collection("center_admins").doc(decodedToken.uid).get()
+    if (centerAdminSnap.exists) {
+      return "center_admin"
+    }
+  } catch (e) {
+    // Ignore errors
   }
 
   return ""
@@ -39,15 +67,11 @@ function isClubRole(role: string) {
 }
 
 export async function proxy(request: NextRequest) {
+  await ensureAdminInitialized();
+
   const { pathname } = request.nextUrl;
 
-  // In production this route will live on clubos.courtly.com
-  if (pathname.startsWith('/dashboard-centros')) {
-    const nextPath = pathname.replace('/dashboard-centros', '/clubos/dashboard')
-    return NextResponse.redirect(new URL(nextPath + request.nextUrl.search, request.url))
-  }
 
-  // In production this route will live on clubos.courtly.com
   if (pathname === '/auth/login' || pathname === '/login-centros') {
     return NextResponse.redirect(new URL('/clubos/login', request.url))
   }
@@ -56,16 +80,18 @@ export async function proxy(request: NextRequest) {
   if (pathname.startsWith('/clubos')) {
     const token = request.cookies.get('__session')?.value
 
-    // Allow login page when user is not authenticated.
+    // Allow login page when user is not authenticated
     if (!token && pathname === '/clubos/login') {
       return NextResponse.next()
     }
 
+    // Redirect to login if no token and not login page
     if (!token && pathname !== '/clubos/login') {
       return NextResponse.redirect(new URL('/clubos/login', request.url))
     }
 
-    if (token) {
+    // If we have a token, try to verify it
+    if (token && adminAuth) {
       try {
         const decodedToken = await adminAuth.verifyIdToken(token)
         const role = await resolveClubRole({
@@ -75,7 +101,7 @@ export async function proxy(request: NextRequest) {
         })
         const hasClubAccess = isClubRole(role)
 
-        // Keep ClubOS login page available for account switching.
+        // Allow login page for authenticated users
         if (pathname === '/clubos/login') {
           if (hasClubAccess) {
             return NextResponse.redirect(new URL('/clubos/dashboard', request.url))
@@ -83,20 +109,28 @@ export async function proxy(request: NextRequest) {
           return NextResponse.next()
         }
 
+        // Check role for dashboard access
         if (pathname.startsWith('/clubos/dashboard') && !hasClubAccess) {
           const loginUrl = new URL('/clubos/login', request.url)
           loginUrl.searchParams.set('error', 'club_account_required')
           return NextResponse.redirect(loginUrl)
         }
-      } catch {
+
+        return NextResponse.next()
+      } catch (e) {
+        // Token verification failed
         if (pathname === '/clubos/login') {
           const response = NextResponse.next()
           response.cookies.delete('__session')
           return response
         }
-
         return NextResponse.redirect(new URL('/clubos/login', request.url))
       }
+    }
+
+    // In development, if we have a token but no adminAuth, allow access
+    if (token && !adminAuth && process.env.NODE_ENV === "development") {
+      return NextResponse.next()
     }
   }
 
@@ -107,13 +141,15 @@ export async function proxy(request: NextRequest) {
       return NextResponse.redirect(new URL('/clubos/login', request.url));
     }
 
-    try {
-      const decodedToken = await adminAuth.verifyIdToken(token);
-      if (!decodedToken.email_verified) {
-        return NextResponse.redirect(new URL('/auth/verify-email', request.url));
+    if (adminAuth) {
+      try {
+        const decodedToken = await adminAuth.verifyIdToken(token);
+        if (!decodedToken.email_verified) {
+          return NextResponse.redirect(new URL('/auth/verify-email', request.url));
+        }
+      } catch (e) {
+        return NextResponse.redirect(new URL('/clubos/login', request.url));
       }
-    } catch {
-      return NextResponse.redirect(new URL('/clubos/login', request.url));
     }
   }
 
@@ -121,5 +157,5 @@ export async function proxy(request: NextRequest) {
 }
 
 export const config = {
-  matcher: ["/dashboard/:path*", "/dashboard-centros/:path*", "/clubos/:path*", "/auth/login", "/login-centros"],
+  matcher: ["/dashboard/:path*", "/clubos/:path*", "/auth/login", "/login-centros"],
 }

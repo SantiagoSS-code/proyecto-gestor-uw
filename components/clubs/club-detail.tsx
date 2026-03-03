@@ -437,7 +437,15 @@ export function ClubDetail({ slug }: { slug: string }) {
   const selectedCourt = selectedSlot ? courts.find((c) => c.id === selectedSlot.courtId) : null
   const selectedPrice = selectedCourt?.data.pricePerHour
   const selectedCurrency = selectedCourt?.data.currency || "ARS"
-  const totalPrice = typeof selectedPrice === "number" ? Number(((selectedPrice * slotDuration) / 60).toFixed(2)) : null
+  const totalPrice = typeof selectedPrice === "number" ? (selectedPrice * slotDuration) / 60 : null
+
+  const formatPriceNumber = (value: number | null | undefined) => {
+    if (value == null || !Number.isFinite(value)) return "—"
+    return new Intl.NumberFormat("es-AR", {
+      minimumFractionDigits: 2,
+      maximumFractionDigits: 2,
+    }).format(value)
+  }
 
   const handleReservar = async () => {
     if (!selectedSlot || !selectedCourt || !centerId || !center) return
@@ -787,13 +795,13 @@ export function ClubDetail({ slug }: { slug: string }) {
                 <div className="flex items-center justify-between text-sm">
                   <span className="text-slate-600">Precio por hora</span>
                   <span className="text-slate-900">
-                    {typeof selectedPrice === "number" ? `${selectedCurrency} ${selectedPrice}` : "Consultar"}
+                    {typeof selectedPrice === "number" ? `${selectedCurrency} ${formatPriceNumber(selectedPrice)}` : "Consultar"}
                   </span>
                 </div>
                 <div className="flex items-center justify-between text-sm">
                   <span className="text-slate-600">Total</span>
                   <span className="text-slate-900">
-                    {typeof totalPrice === "number" ? `${selectedCurrency} ${totalPrice}` : "—"}
+                    {typeof totalPrice === "number" ? `${selectedCurrency} ${formatPriceNumber(totalPrice)}` : "—"}
                   </span>
                 </div>
               </div>

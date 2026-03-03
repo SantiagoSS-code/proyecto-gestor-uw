@@ -27,9 +27,13 @@ function getCover(center: Center) {
 
 export default function CentersClient() {
   const searchParams = useSearchParams()
-  const [query, setQuery] = useState(searchParams.get("query") || "")
+  const [query, setQuery] = useState("")
   const [centers, setCenters] = useState<Center[]>([])
   const [loading, setLoading] = useState(true)
+
+  useEffect(() => {
+    setQuery(searchParams?.get("query") || "")
+  }, [searchParams])
 
   useEffect(() => {
     const fetchCenters = async () => {

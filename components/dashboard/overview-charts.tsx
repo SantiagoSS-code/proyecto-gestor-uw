@@ -2,6 +2,7 @@
 
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { ResponsiveContainer, AreaChart, Area, XAxis, YAxis, Tooltip, CartesianGrid, BarChart, Bar } from "recharts"
+import { formatCurrencyARS } from "@/lib/utils"
 
 const revenueData = [
   { name: "Lun", total: 1500 },
@@ -56,7 +57,7 @@ export function OverviewCharts() {
                       fontSize={12} 
                       tickLine={false} 
                       axisLine={false} 
-                      tickFormatter={(value) => `$${value}`}
+                      tickFormatter={(value) => formatCurrencyARS(Number(value) || 0)}
                     />
                     <Tooltip 
                         contentStyle={{ borderRadius: "8px", border: "none", boxShadow: "0 4px 12px rgba(0,0,0,0.1)" }}

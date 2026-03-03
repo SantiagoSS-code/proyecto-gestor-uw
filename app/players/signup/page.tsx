@@ -13,6 +13,8 @@ import { Alert, AlertDescription } from '@/components/ui/alert';
 import { Sparkles, Eye, EyeOff } from 'lucide-react';
 import Link from 'next/link';
 
+export const dynamic = 'force-dynamic'
+
 export default function PlayerSignupPage() {
   const [formData, setFormData] = useState({
     name: '',
@@ -23,9 +25,18 @@ export default function PlayerSignupPage() {
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
   const [googleLoading, setGoogleLoading] = useState(false);
+  const [nextParam, setNextParam] = useState<string | null>(null);
+  const [mounted, setMounted] = useState(false);
   const router = useRouter();
-  const searchParams = useSearchParams();
-  const nextParam = searchParams?.get('next');
+
+  useEffect(() => {
+    setMounted(true);
+    // Only access searchParams in client
+    if (typeof window !== 'undefined') {
+      const params = new URLSearchParams(window.location.search);
+      setNextParam(params.get('next') || null);
+    }
+  }, [])
 
   const getSafeNext = (value: string | null) => {
     if (!value) return null;

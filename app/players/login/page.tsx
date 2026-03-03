@@ -1,9 +1,22 @@
-import { LoginPlayersForm } from "@/components/auth/login-players-form"
+"use client"
 
-export const metadata = {
-  title: "Login Jugadores - Courtly",
-  description: "Inicia sesión para reservar, encontrar partidos y jugar más",
-}
+import dynamic from "next/dynamic"
+
+const LoginPlayersForm = dynamic(() => import("@/components/auth/login-players-form").then(mod => ({ default: mod.LoginPlayersForm })), {
+  ssr: false,
+  loading: () => (
+    <div className="w-full max-w-md">
+      <div className="bg-white rounded-lg shadow-lg p-8 animate-pulse">
+        <div className="h-10 bg-gray-200 rounded mb-4"></div>
+        <div className="space-y-4">
+          <div className="h-10 bg-gray-200 rounded"></div>
+          <div className="h-10 bg-gray-200 rounded"></div>
+          <div className="h-10 bg-gray-200 rounded"></div>
+        </div>
+      </div>
+    </div>
+  )
+})
 
 export default function PlayerLoginPage() {
   return (

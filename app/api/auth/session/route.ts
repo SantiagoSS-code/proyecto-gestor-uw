@@ -1,5 +1,4 @@
 import { NextResponse } from "next/server"
-import { adminAuth } from "@/lib/firebase/admin"
 
 const SESSION_COOKIE_NAME = "__session"
 
@@ -26,18 +25,22 @@ export async function POST(request: Request) {
     const payload = decodeJwtPayload(idToken)
 
     if (process.env.NODE_ENV === "development") {
-      const adminProjectId = adminAuth.app?.options?.projectId || "unknown"
       console.log(
-        `[AuthSession] adminProjectId=${adminProjectId} token.aud=${payload?.aud || "unknown"} token.uid=${payload?.sub || ""} token.email=${payload?.email || ""}`
+        `[AuthSession] token.uid=${payload?.sub || ""} token.email=${payload?.email || ""}`
       )
     }
 
     // Verify first so we don't set junk tokens.
     let verificationError: any = null
-    try {
-      await adminAuth.verifyIdToken(idToken)
-    } catch (err) {
-      verificationError = err
+    
+    // Skip verification in development if admin credentials not available
+    if (process.env.NODE_ENV !== "development") {
+      try {
+        const { adminAuth } = await import("@/lib/firebase/admin")
+        await adminAuth.verifyIdToken(idToken)
+      } catch (err) {
+        verificationError = err
+      }
     }
 
     const allowUnverifiedInDev = process.env.NODE_ENV === "development"
@@ -50,6 +53,10 @@ export async function POST(request: Request) {
       )
     }
 
+    if (process.env.NODE_ENV === "development") {
+      console.log("[AuthSession] Token verification passed or skipped in development")
+    }
+
     // Keep it simple for MVP: store the ID token itself.
     // (If you want long-lived sessions later, swap to createSessionCookie.)
     const res = NextResponse.json({
@@ -57,16 +64,30 @@ export async function POST(request: Request) {
       verified: !verificationError,
       warning: verificationError ? "Token verification skipped in development." : undefined,
     })
-    res.cookies.set({
+    
+    // Set the session cookie
+    const cookieOptions = {
       name: SESSION_COOKIE_NAME,
       value: idToken,
       httpOnly: true,
-      sameSite: "lax",
+      sameSite: "lax" as const,
       secure: process.env.NODE_ENV === "production",
       path: "/",
-    })
+      maxAge: 60 * 60 * 24 * 7, // 7 days
+    }
+    
+    res.cookies.set(cookieOptions)
+    
+    if (process.env.NODE_ENV === "development") {
+      console.log("[AuthSession] Cookie set with options:", {
+        ...cookieOptions,
+        value: "[REDACTED]",
+      })
+    }
+    
     return res
   } catch (e: any) {
+    console.error("[AuthSession] Error:", e?.message || e)
     return NextResponse.json(
       {
         error: e?.message || "Failed to create session",

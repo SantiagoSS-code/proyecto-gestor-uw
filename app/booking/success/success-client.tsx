@@ -8,10 +8,15 @@ import { Button } from "@/components/ui/button"
 
 export default function BookingSuccessClient() {
   const searchParams = useSearchParams()
-  const sessionId = searchParams.get("session_id")
-  const bookingId = searchParams.get("booking_id")
+  const [sessionId, setSessionId] = useState<string | null>(null)
+  const [bookingId, setBookingId] = useState<string | null>(null)
   const [booking, setBooking] = useState<any | null>(null)
   const [error, setError] = useState<string | null>(null)
+
+  useEffect(() => {
+    setSessionId(searchParams?.get("session_id") || null)
+    setBookingId(searchParams?.get("booking_id") || null)
+  }, [searchParams])
 
   useEffect(() => {
     const fetchBooking = async () => {

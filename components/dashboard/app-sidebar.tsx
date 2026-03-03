@@ -59,6 +59,11 @@ export function AppSidebar() {
     }
   }
 
+  const isActiveRoute = (href: string) => {
+    if (pathname === href) return true;
+    return false;
+  }
+
   return (
     <div className="flex flex-col h-screen w-64 border-r bg-card/50 hidden md:flex sticky top-0">
       <div className="p-6">
@@ -76,7 +81,7 @@ export function AppSidebar() {
       
       <div className="flex-1 overflow-y-auto py-2 px-3 space-y-1">
         {sidebarItems.map((item) => {
-          const isActive = pathname === item.href
+          const isActive = isActiveRoute(item.href)
           return (
             <Link
               key={item.href}
@@ -84,7 +89,7 @@ export function AppSidebar() {
               className={cn(
                 "flex items-center gap-3 px-3 py-2 text-sm font-medium rounded-md transition-colors text-black",
                 isActive 
-                  ? "bg-primary/10" 
+                  ? "bg-primary/10 text-primary" 
                   : "hover:bg-muted"
               )}
             >
@@ -143,6 +148,11 @@ export function MobileSidebar() {
       }
     }
 
+    const isActiveRoute = (href: string) => {
+      if (pathname === href) return true;
+      return false;
+    }
+
     return (
             <div className="md:hidden flex items-center justify-between p-4 border-b bg-background sticky top-0 z-50">
                <Link href="/clubos/dashboard" className="flex items-center gap-2 font-bold text-lg text-black" aria-label="Ir al dashboard de ClubOS">
@@ -167,8 +177,8 @@ export function MobileSidebar() {
                                 onClick={() => setOpen(false)}
                                 className={cn(
                                   "flex items-center gap-3 px-3 py-2 text-sm font-medium rounded-md text-black",
-                                  pathname === item.href
-                                  ? "bg-primary/10"
+                                  isActiveRoute(item.href)
+                                  ? "bg-primary/10 text-primary"
                                   : "hover:bg-muted"
                                 )}
                              >

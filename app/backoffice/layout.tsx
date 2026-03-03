@@ -5,6 +5,9 @@ import { usePathname, useRouter } from "next/navigation"
 import { BackofficeShell } from "@/components/backoffice/backoffice-shell"
 import { BackofficeAuthProvider, useBackofficeAuth } from "@/lib/backoffice/auth-context"
 
+// Mark all backoffice routes as dynamic to prevent prerendering
+export const dynamic = 'force-dynamic'
+
 function BackofficeGuard({ children }: { children: React.ReactNode }) {
   const { user, loading } = useBackofficeAuth()
   const pathname = usePathname()

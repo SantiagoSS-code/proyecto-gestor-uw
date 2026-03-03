@@ -9,6 +9,11 @@ const nextConfig = {
   env: {
     NEXT_PUBLIC_USE_FIREBASE_EMULATOR: process.env.USE_FIREBASE_EMULATOR,
   },
+  skipTrailingSlashRedirect: true,
+  onDemandEntries: {
+    maxInactiveAge: 60 * 1000,
+    pagesBufferLength: 5,
+  }
 }
 
 export default nextConfig

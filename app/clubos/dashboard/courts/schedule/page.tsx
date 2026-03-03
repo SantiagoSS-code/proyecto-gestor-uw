@@ -1,1 +1,5 @@
-export { default } from "@/app/dashboard-centros/courts/schedule/page"
+import { redirect } from "next/navigation"
+
+export default function CourtsScheduleLegacyPage() {
+	redirect("/clubos/dashboard/courts?tab=schedule")
+}

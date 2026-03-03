@@ -2,7 +2,7 @@
 
 import type React from "react"
 
-import { useState } from "react"
+import { useState, useEffect } from "react"
 import Link from "next/link"
 import { useRouter, useSearchParams } from "next/navigation"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
@@ -21,9 +21,13 @@ export function LoginPlayersForm() {
   const [isSubmitting, setIsSubmitting] = useState(false)
   const [isGoogleLoading, setIsGoogleLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
+  const [nextParam, setNextParam] = useState<string | null>(null)
+
+  useEffect(() => {
+    setNextParam(searchParams?.get("next") || null)
+  }, [searchParams])
 
   const isValid = identifier.trim().length > 0 && password.trim().length > 0
-  const nextParam = searchParams?.get("next")
 
   const getSafeNext = (value: string | null) => {
     if (!value) return null
