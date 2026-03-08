@@ -187,7 +187,13 @@ export default function CheckoutTestClient() {
     setError(null)
     try {
       await confirmBooking(bookingId)
-      router.push(`/booking/success?bookingId=${bookingId}&source=test`)
+      // Fire-and-forget emails (don't block redirect on email failure)
+      fetch("/api/booking/notify", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ bookingId }),
+      }).catch(() => {}) // silent fail — booking is already confirmed
+      router.push(`/booking/success?bookingId=${encodeURIComponent(bookingId)}&source=test`)
     } catch {
       setError("No se pudo confirmar el pago. Intentá de nuevo.")
       setActionLoading(null)

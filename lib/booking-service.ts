@@ -20,8 +20,27 @@ import {
   where,
 } from "firebase/firestore"
 import { db } from "./firebaseClient"
-import { FIRESTORE_COLLECTIONS } from "./firestorePaths"
+import { FIRESTORE_COLLECTIONS, CENTER_SUBCOLLECTIONS } from "./firestorePaths"
 import type { PlayerBookingDoc } from "./types"
+
+// ─── Path helpers ─────────────────────────────────────────────────────────────
+// Bookings live at centers/{clubId}/bookings/{docId}
+// The checkout URL uses a compound ID "clubId__docId" so we can find the doc
+// without storing anything in a separate top-level collection.
+function bookingsCol(clubId: string) {
+  return collection(db, FIRESTORE_COLLECTIONS.centers, clubId, CENTER_SUBCOLLECTIONS.bookings)
+}
+function bookingDocRef(clubId: string, docId: string) {
+  return doc(db, FIRESTORE_COLLECTIONS.centers, clubId, CENTER_SUBCOLLECTIONS.bookings, docId)
+}
+export function encodeBookingId(clubId: string, docId: string) {
+  return `${clubId}__${docId}`
+}
+export function decodeBookingId(bookingId: string): { clubId: string; docId: string } | null {
+  const idx = bookingId.indexOf("__")
+  if (idx === -1) return null
+  return { clubId: bookingId.slice(0, idx), docId: bookingId.slice(idx + 2) }
+}
 
 // How long a pending_payment booking holds the slot before it auto-expires
 export const PENDING_TTL_MINUTES = 10
@@ -78,27 +97,26 @@ export async function createPendingBooking(params: {
     source: "test_checkout",
   }
 
-  const ref = await addDoc(
-    collection(db, FIRESTORE_COLLECTIONS.bookings),
-    docData,
-  )
-  return ref.id
+  const ref = await addDoc(bookingsCol(params.clubId), docData)
+  return encodeBookingId(params.clubId, ref.id)
 }
 
 // ─── Read ─────────────────────────────────────────────────────────────────────
 export async function getBookingById(
   bookingId: string,
 ): Promise<(PlayerBookingDoc & { id: string }) | null> {
-  const ref = doc(db, FIRESTORE_COLLECTIONS.bookings, bookingId)
-  const snap = await getDoc(ref)
+  const decoded = decodeBookingId(bookingId)
+  if (!decoded) return null
+  const snap = await getDoc(bookingDocRef(decoded.clubId, decoded.docId))
   if (!snap.exists()) return null
-  return { id: snap.id, ...(snap.data() as PlayerBookingDoc) }
+  return { id: bookingId, ...(snap.data() as PlayerBookingDoc) }
 }
 
 // ─── State transitions ────────────────────────────────────────────────────────
 export async function confirmBooking(bookingId: string): Promise<void> {
-  const ref = doc(db, FIRESTORE_COLLECTIONS.bookings, bookingId)
-  await updateDoc(ref, {
+  const decoded = decodeBookingId(bookingId)
+  if (!decoded) throw new Error("Invalid bookingId")
+  await updateDoc(bookingDocRef(decoded.clubId, decoded.docId), {
     bookingStatus: "confirmed",
     paymentStatus: "approved",
     updatedAt: serverTimestamp(),
@@ -106,8 +124,9 @@ export async function confirmBooking(bookingId: string): Promise<void> {
 }
 
 export async function failBooking(bookingId: string): Promise<void> {
-  const ref = doc(db, FIRESTORE_COLLECTIONS.bookings, bookingId)
-  await updateDoc(ref, {
+  const decoded = decodeBookingId(bookingId)
+  if (!decoded) throw new Error("Invalid bookingId")
+  await updateDoc(bookingDocRef(decoded.clubId, decoded.docId), {
     bookingStatus: "cancelled",
     paymentStatus: "failed",
     updatedAt: serverTimestamp(),
@@ -115,8 +134,9 @@ export async function failBooking(bookingId: string): Promise<void> {
 }
 
 export async function expireBooking(bookingId: string): Promise<void> {
-  const ref = doc(db, FIRESTORE_COLLECTIONS.bookings, bookingId)
-  await updateDoc(ref, {
+  const decoded = decodeBookingId(bookingId)
+  if (!decoded) throw new Error("Invalid bookingId")
+  await updateDoc(bookingDocRef(decoded.clubId, decoded.docId), {
     bookingStatus: "expired",
     paymentStatus: "pending",
     updatedAt: serverTimestamp(),
@@ -135,8 +155,7 @@ export async function loadActiveBookingsForDate(
   date: string,
 ): Promise<BookingSlotInfo[]> {
   const q = query(
-    collection(db, FIRESTORE_COLLECTIONS.bookings),
-    where("clubId", "==", clubId),
+    bookingsCol(clubId),
     where("date", "==", date),
   )
   const snap = await getDocs(q)
