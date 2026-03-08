@@ -181,6 +181,34 @@ export interface HolidayEntry {
   closeTime?: string;
 }
 
+// ─── Player-facing booking types ────────────────────────────────────────────
+export type PlayerBookingStatus = "pending_payment" | "confirmed" | "cancelled" | "expired"
+export type PaymentStatus = "pending" | "approved" | "failed"
+
+export interface PlayerBookingDoc {
+  clubId: string
+  clubName: string
+  courtId: string
+  courtName: string
+  sport: string
+  userId: string
+  userName: string
+  userEmail: string
+  date: string        // "YYYY-MM-DD"
+  startTime: string   // "HH:MM"
+  endTime: string     // "HH:MM"
+  durationMinutes: number
+  price: number | null
+  currency: string
+  bookingStatus: PlayerBookingStatus
+  paymentStatus: PaymentStatus
+  createdAt: any
+  expiresAt: any
+  updatedAt?: any
+  source: "test_checkout" | "mercadopago"
+}
+
+// ─── Legacy center-subcollection booking ─────────────────────────────────────
 export type BookingStatus = "pending" | "confirmed" | "cancelled";
 
 export interface BookingDoc {

@@ -26,19 +26,15 @@ import {
 import { FIRESTORE_COLLECTIONS, CENTER_SETTINGS_DOCS, CENTER_SUBCOLLECTIONS, LEGACY_AVAILABILITY_DOCS } from "@/lib/firestorePaths"
 import type { AmenityKey, BookingSettings, CenterProfile, CourtDoc, SportKey, ClassDoc, ClassScheduleSlot } from "@/lib/types"
 import { minutesToTime, timeToMinutes } from "@/lib/utils"
+import {
+  createPendingBooking,
+  loadActiveBookingsForDate,
+  type BookingSlotInfo,
+} from "@/lib/booking-service"
 
 type CenterResult = { id: string; data: CenterProfile }
 
 type CourtResult = { id: string; data: CourtDoc }
-
-type BookingRow = {
-  id: string
-  courtId?: string
-  startAt?: any
-  endAt?: any
-  status?: string
-  type?: string
-}
 
 function BarIcon({ className }: { className?: string }) {
   return (
@@ -168,34 +164,10 @@ async function loadLegacyAvailability(centerId: string): Promise<BookingSettings
   } as BookingSettings
 }
 
-async function loadBookingsForDate(centerId: string, dateKey: string): Promise<BookingRow[]> {
-  const user = auth.currentUser
-  if (!user || user.uid !== centerId) return []
-  const start = new Date(`${dateKey}T00:00:00`)
-  const end = new Date(`${dateKey}T23:59:59`)
-
-  const ref = collection(db, FIRESTORE_COLLECTIONS.centers, centerId, CENTER_SUBCOLLECTIONS.bookings)
-  const q = query(ref, where("startAt", ">=", start), where("startAt", "<=", end))
-  const snap = await getDocs(q)
-  return snap.docs.map((d) => ({ id: d.id, ...(d.data() as any) })) as BookingRow[]
-}
-
 async function loadClasses(centerId: string): Promise<ClassDoc[]> {
   const ref = collection(db, FIRESTORE_COLLECTIONS.centers, centerId, CENTER_SUBCOLLECTIONS.classes)
   const snap = await getDocs(ref)
   return snap.docs.map((d) => d.data() as ClassDoc).filter((c) => c.enabled !== false)
-}
-
-function toDate(value: any): Date | null {
-  if (!value) return null
-  if (value instanceof Date) return value
-  if (typeof value?.toDate === "function") return value.toDate()
-  const parsed = new Date(value)
-  return Number.isNaN(parsed.getTime()) ? null : parsed
-}
-
-function slotDate(dateKey: string, time: string) {
-  return new Date(`${dateKey}T${time}:00`)
 }
 
 function formatSchedule(schedule: ClassScheduleSlot[]) {
@@ -250,11 +222,11 @@ export function ClubDetail({ slug }: { slug: string }) {
   )
   const [selectedSport, setSelectedSport] = useState<SportKey | "">("")
   const [selectedSlot, setSelectedSlot] = useState<{ courtId: string; time: string } | null>(null)
-  const [bookings, setBookings] = useState<BookingRow[]>([])
+  const [bookings, setBookings] = useState<BookingSlotInfo[]>([])
   const [bookingLoading, setBookingLoading] = useState(false)
   const [activeImageIndex, setActiveImageIndex] = useState(0)
-  
-  // Mercado Pago checkout state
+
+  // Checkout state
   const [checkoutLoading, setCheckoutLoading] = useState(false)
   const [checkoutError, setCheckoutError] = useState<string | null>(null)
 
@@ -321,7 +293,7 @@ export function ClubDetail({ slug }: { slug: string }) {
       if (!centerId || !selectedDate) return
       try {
         setBookingLoading(true)
-        const items = await loadBookingsForDate(centerId, selectedDate)
+        const items = await loadActiveBookingsForDate(centerId, selectedDate)
         setBookings(items)
       } catch (e) {
         console.error("Failed to load bookings:", e)
@@ -375,28 +347,25 @@ export function ClubDetail({ slug }: { slug: string }) {
     return courts.filter((c) => c.data.sport === selectedSport)
   }, [courts, selectedSport])
 
-  const bookingByCourt = useMemo(() => {
-    const map = new Map<string, BookingRow[]>()
-    bookings.forEach((b) => {
-      if (!b.courtId || b.status === "cancelled" || b.type === "class") return
-      const arr = map.get(b.courtId) || []
-      arr.push(b)
-      map.set(b.courtId, arr)
-    })
-    return map
-  }, [bookings])
+  /**
+   * Returns whether a slot is free, held pending payment, or fully booked.
+   * Uses string-based minute arithmetic — no Date objects needed.
+   */
+  const getSlotState = (courtId: string, slotTime: string): "free" | "pending" | "booked" => {
+    const slotStart = timeToMinutes(slotTime)
+    const slotEnd = slotStart + slotDuration
 
-  const isSlotBooked = (courtId: string, time: string) => {
-    const items = bookingByCourt.get(courtId) || []
-    if (!items.length) return false
-    const slotStart = slotDate(selectedDate, time)
-    const slotEnd = new Date(slotStart.getTime() + slotDuration * 60000)
-    return items.some((b) => {
-      const startAt = toDate(b.startAt)
-      const endAt = toDate(b.endAt)
-      if (!startAt || !endAt) return false
-      return startAt < slotEnd && endAt > slotStart
-    })
+    let state: "free" | "pending" | "booked" = "free"
+    for (const b of bookings) {
+      if (b.courtId !== courtId) continue
+      const bStart = timeToMinutes(b.startTime)
+      const bEnd = timeToMinutes(b.endTime)
+      if (bStart >= slotEnd || bEnd <= slotStart) continue // no overlap
+      // overlap found
+      if (b.bookingStatus === "confirmed") return "booked"
+      if (b.bookingStatus === "pending_payment") state = "pending"
+    }
+    return state
   }
 
   if (loading) {
@@ -457,48 +426,37 @@ export function ClubDetail({ slug }: { slug: string }) {
       return
     }
 
+    // Double-check slot is still free before creating the booking
+    const slotState = getSlotState(selectedSlot.courtId, selectedSlot.time)
+    if (slotState === "booked") {
+      setCheckoutError("Este horario ya fue reservado. Por favor elegí otro.")
+      return
+    }
+
     setCheckoutLoading(true)
     setCheckoutError(null)
 
     try {
-      const payload = {
-        centerId,
+      const bookingId = await createPendingBooking({
+        clubId: centerId,
+        clubName: center.name,
         courtId: selectedSlot.courtId,
-        date: selectedDate,
-        time: selectedSlot.time,
-        durationMinutes: slotDuration,
-        customerName: user.displayName || "Jugador",
-        customerEmail: user.email || "",
+        courtName: selectedCourt.data.name,
+        sport: selectedCourt.data.sport || selectedSport || "padel",
         userId: user.uid,
-      }
-
-      const res = await fetch("/api/mercadopago/create-preference", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(payload),
+        userName: user.displayName || "Jugador",
+        userEmail: user.email || "",
+        date: selectedDate,
+        startTime: selectedSlot.time,
+        durationMinutes: slotDuration,
+        price: totalPrice,
+        currency: selectedCurrency,
       })
 
-      const data = await res.json()
-
-      if (!res.ok) {
-        if (data.error === "Slot already booked") {
-          setCheckoutError("Este horario ya fue reservado. Por favor elegí otro.")
-        } else {
-          setCheckoutError(data.error || "Error al crear la reserva. Intentá de nuevo.")
-        }
-        return
-      }
-
-      if (!data.checkoutUrl) {
-        setCheckoutError("No se pudo obtener el link de pago. Intentá de nuevo.")
-        return
-      }
-
-      // Redirect to Mercado Pago Checkout
-      window.location.href = data.checkoutUrl
+      window.location.href = `/checkout/test/${bookingId}`
     } catch (err) {
-      console.error("Error creating checkout:", err)
-      setCheckoutError("Error de conexión. Verificá tu internet e intentá de nuevo.")
+      console.error("Error creating booking:", err)
+      setCheckoutError("Error al crear la reserva. Verificá tu conexión e intentá de nuevo.")
     } finally {
       setCheckoutLoading(false)
     }
@@ -621,15 +579,7 @@ export function ClubDetail({ slug }: { slug: string }) {
                 </div>
               ) : null}
 
-              <div className="rounded-xl border border-slate-200 bg-slate-50 p-4">
-                <div className="flex items-center gap-2 text-slate-900 font-medium">
-                  <Calendar className="w-4 h-4 text-blue-600" />
-                  Bookings (MVP)
-                </div>
-                <p className="text-sm text-slate-600 mt-1">
-                  Choose a date to see available slots.
-                </p>
-              </div>
+
             </CardContent>
           </Card>
         </div>
@@ -730,21 +680,30 @@ export function ClubDetail({ slug }: { slug: string }) {
                                 </div>
                               </div>
                               {slots.map((t) => {
-                                const booked = isSlotBooked(court.id, t)
+                                const slotState = getSlotState(court.id, t)
                                 const active = selectedSlot?.courtId === court.id && selectedSlot.time === t
+                                const isBlocked = slotState !== "free"
                                 return (
                                   <button
                                     key={`${court.id}-${t}`}
-                                    title={t}
+                                    title={
+                                      slotState === "booked"
+                                        ? `${t} — Ocupado`
+                                        : slotState === "pending"
+                                        ? `${t} — Reserva pendiente`
+                                        : t
+                                    }
                                     className={`border-b border-slate-100 px-2 py-2 text-xs text-center transition-all ${
-                                      booked
+                                      slotState === "booked"
                                         ? "bg-slate-200 text-slate-400 cursor-not-allowed"
+                                        : slotState === "pending"
+                                        ? "bg-amber-100 text-amber-600 cursor-not-allowed"
                                         : active
                                         ? "bg-emerald-500 text-white"
                                         : "bg-white hover:bg-emerald-50 text-slate-700"
                                     }`}
-                                    onClick={() => (!booked ? setSelectedSlot({ courtId: court.id, time: t }) : null)}
-                                    disabled={booked}
+                                    onClick={() => (!isBlocked ? setSelectedSlot({ courtId: court.id, time: t }) : null)}
+                                    disabled={isBlocked}
                                     aria-label={`Turno ${t} en ${court.data.name}`}
                                   />
                                 )
@@ -761,10 +720,13 @@ export function ClubDetail({ slug }: { slug: string }) {
                       <span className="inline-block h-3 w-3 rounded-sm border border-slate-200 bg-white" /> Disponible
                     </div>
                     <div className="flex items-center gap-2">
-                      <span className="inline-block h-3 w-3 rounded-sm border border-slate-200 bg-slate-200" /> No disponible
+                      <span className="inline-block h-3 w-3 rounded-sm border border-slate-200 bg-slate-200" /> Ocupado
                     </div>
                     <div className="flex items-center gap-2">
-                      <span className="inline-block h-3 w-3 rounded-sm border border-emerald-500 bg-emerald-500" /> Tu reserva
+                      <span className="inline-block h-3 w-3 rounded-sm border border-amber-300 bg-amber-100" /> Reserva pendiente
+                    </div>
+                    <div className="flex items-center gap-2">
+                      <span className="inline-block h-3 w-3 rounded-sm border border-emerald-500 bg-emerald-500" /> Tu selección
                     </div>
                     {bookingLoading ? <span>Actualizando disponibilidad…</span> : null}
                   </div>
@@ -811,14 +773,14 @@ export function ClubDetail({ slug }: { slug: string }) {
                 disabled={!selectedSlot || !selectedCourt || checkoutLoading}
                 onClick={handleReservar}
               >
-                {checkoutLoading ? "Redirigiendo a Mercado Pago…" : "Reservar"}
+                {checkoutLoading ? "Creando reserva…" : "Reservar"}
               </Button>
               {checkoutError ? (
                 <div className="text-xs text-red-600 bg-red-50 border border-red-200 rounded-lg p-2">
                   {checkoutError}
                 </div>
               ) : (
-                <div className="text-xs text-slate-500">Pagá de forma segura con Mercado Pago.</div>
+                <div className="text-xs text-slate-500">Checkout de prueba · Mercado Pago próximamente.</div>
               )}
             </CardContent>
           </Card>

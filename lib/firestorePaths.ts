@@ -1,6 +1,7 @@
 export const FIRESTORE_COLLECTIONS = {
   centers: "centers",
   legacyCenters: "padel_centers",
+  bookings: "bookings",   // top-level player bookings
 } as const
 
 export const CENTER_SUBCOLLECTIONS = {
