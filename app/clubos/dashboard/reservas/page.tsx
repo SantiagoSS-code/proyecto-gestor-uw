@@ -91,6 +91,34 @@ function addTime(time: string, durationHours: number): string {
 	return decimalToTime(timeToDecimal(time) + durationHours)
 }
 
+/**
+ * Normalizes both manual-booking docs and player-booking docs (from booking-service)
+ * to the single schema the dashboard expects.
+ */
+function normalizeBooking(raw: any): any {
+	// Player bookings use bookingStatus / startTime / courtId / userName / userEmail / durationMinutes
+	if (raw.bookingStatus) {
+		const statusMap: Record<string, string> = {
+			confirmed:       'confirmada',
+			pending_payment: 'pendiente',
+			cancelled:       'cancelada',
+			expired:         'cancelada',
+		}
+		return {
+			...raw,
+			customer:         raw.userName  || raw.customer || 'Jugador',
+			email:            raw.userEmail || raw.email    || '',
+			phone:            raw.phone     || '',
+			court:            raw.courtId   || raw.court    || '',
+			time:             raw.startTime || raw.time     || '',
+			duration:         raw.durationMinutes != null ? raw.durationMinutes / 60 : (raw.duration ?? 1),
+			status:           statusMap[raw.bookingStatus as string] ?? raw.status ?? 'pendiente',
+			_isPlayerBooking: true,
+		}
+	}
+	return raw
+}
+
 export default function ReservasPage() {
 	const { user, centerId } = useAuth()
 	const resolvedCenterId = centerId || user?.uid || null
@@ -261,7 +289,7 @@ export default function ReservasPage() {
 
 				const usingLegacyBookings = newBookings.length === 0 && legacyBookings.length > 0
 				setBookingsRootCollection(usingLegacyBookings ? FIRESTORE_COLLECTIONS.legacyCenters : FIRESTORE_COLLECTIONS.centers)
-				const bookingsData = usingLegacyBookings ? legacyBookings : newBookings
+				const bookingsData = (usingLegacyBookings ? legacyBookings : newBookings).map(normalizeBooking)
 				setBookings(bookingsData)
 				setBookingSettings(settingsSnap.exists() ? (settingsSnap.data() as BookingSettings) : null)
 				setOperationSettings(operationsSnap.exists() ? (operationsSnap.data() as OperationSettings) : null)
@@ -446,14 +474,19 @@ export default function ReservasPage() {
 				CENTER_SUBCOLLECTIONS.bookings,
 				reservationId
 			)
-			await updateDoc(bookingRef, { status: 'confirmada' })
+			const booking = bookings.find(b => b.id === reservationId)
+			if (booking?._isPlayerBooking) {
+				await updateDoc(bookingRef, { bookingStatus: 'confirmed', paymentStatus: 'approved', updatedAt: new Date() })
+			} else {
+				await updateDoc(bookingRef, { status: 'confirmada' })
+			}
 
 			setBookings(bookings.map(b =>
-				b.id === reservationId ? { ...b, status: 'confirmada' } : b
+				b.id === reservationId ? { ...b, status: 'confirmada', bookingStatus: 'confirmed' } : b
 			))
 
 			if (detailsModal?.id === reservationId) {
-				setDetailsModal({ ...detailsModal, status: 'confirmada' })
+				setDetailsModal({ ...detailsModal, status: 'confirmada', bookingStatus: 'confirmed' })
 			}
 
 			showToast('Reserva confirmada exitosamente.')
@@ -480,16 +513,24 @@ export default function ReservasPage() {
 				CENTER_SUBCOLLECTIONS.bookings,
 				deleteCandidateId
 			)
-			await deleteDoc(bookingRef)
-
-			setBookings(bookings.filter(b => b.id !== deleteCandidateId))
+			const booking = bookings.find(b => b.id === deleteCandidateId)
+			if (booking?._isPlayerBooking) {
+				// Cancel instead of delete so the player can see the cancellation in their dashboard
+				await updateDoc(bookingRef, { bookingStatus: 'cancelled', paymentStatus: 'failed', updatedAt: new Date() })
+				setBookings(bookings.map(b =>
+					b.id === deleteCandidateId ? { ...b, status: 'cancelada', bookingStatus: 'cancelled' } : b
+				))
+			} else {
+				await deleteDoc(bookingRef)
+				setBookings(bookings.filter(b => b.id !== deleteCandidateId))
+			}
 			setDetailsModal(null)
 			setDeleteCandidateId(null)
 
-			showToast('Reserva eliminada exitosamente.')
+			showToast(booking?._isPlayerBooking ? 'Reserva rechazada. El jugador será notificado.' : 'Reserva eliminada exitosamente.')
 		} catch (error) {
-			console.error('Error deleting reservation:', error)
-			showToast('Error al eliminar la reserva.', 'error')
+			console.error('Error cancelling reservation:', error)
+			showToast('Error al cancelar la reserva.', 'error')
 		} finally {
 			setIsDeletingReservation(false)
 		}
@@ -1208,7 +1249,7 @@ export default function ReservasPage() {
 										onClick={() => handleDeleteReservation(detailsModal.id)}
 									>
 										<X className="w-4 h-4 mr-2" />
-										Eliminar
+										{detailsModal._isPlayerBooking ? 'Rechazar' : 'Eliminar'}
 									</Button>
 								</>
 							)}
@@ -1219,7 +1260,7 @@ export default function ReservasPage() {
 									onClick={() => handleDeleteReservation(detailsModal.id)}
 								>
 									<X className="w-4 h-4 mr-2" />
-									Eliminar
+									{detailsModal._isPlayerBooking ? 'Cancelar reserva' : 'Eliminar'}
 								</Button>
 							)}
 						</DialogFooter>
@@ -1229,18 +1270,29 @@ export default function ReservasPage() {
 				<Dialog open={!!deleteCandidateId} onOpenChange={(open) => !open && setDeleteCandidateId(null)}>
 					<DialogContent className="sm:max-w-md">
 						<DialogHeader>
-							<DialogTitle>Eliminar reserva</DialogTitle>
+							<DialogTitle>{bookings.find(b => b.id === deleteCandidateId)?._isPlayerBooking ? 'Rechazar reserva' : 'Eliminar reserva'}</DialogTitle>
 						</DialogHeader>
 						<div className="space-y-2 text-sm text-slate-600">
-							<p>¿Estás seguro de que deseas eliminar esta reserva?</p>
-							<p>Esta acción no se puede deshacer.</p>
+							{bookings.find(b => b.id === deleteCandidateId)?._isPlayerBooking ? (
+								<p>¿Rechazar esta reserva del jugador? La reserva quedará cancelada y el jugador podrá verlo en su panel.</p>
+							) : (
+								<>
+									<p>¿Estás seguro de que deseas eliminar esta reserva?</p>
+									<p>Esta acción no se puede deshacer.</p>
+								</>
+							)}
 						</div>
 						<DialogFooter className="pt-4">
 							<Button variant="outline" onClick={() => setDeleteCandidateId(null)} disabled={isDeletingReservation}>
 								Cancelar
 							</Button>
 							<Button variant="destructive" onClick={confirmDeleteReservation} disabled={isDeletingReservation}>
-								{isDeletingReservation ? 'Eliminando...' : 'Sí, eliminar'}
+								{isDeletingReservation
+									? 'Procesando...'
+									: bookings.find(b => b.id === deleteCandidateId)?._isPlayerBooking
+										? 'Sí, rechazar'
+										: 'Sí, eliminar'
+								}
 							</Button>
 						</DialogFooter>
 					</DialogContent>

@@ -105,7 +105,7 @@ export function HeroSection() {
       <div className="relative z-10 flex-1 flex flex-col items-center justify-center px-4 py-12 md:py-20">
         <div className="inline-flex items-center gap-2 bg-secondary/90 backdrop-blur-sm border border-border/50 rounded-full px-4 py-2 mb-6 md:mb-8">
           <Sparkles className="w-4 h-4 text-primary" />
-          <span className="text-sm text-muted-foreground">Impulsado por IA</span>
+          <span className="text-sm text-foreground/80">Impulsado por IA</span>
         </div>
 
         <div className="text-center max-w-5xl mx-auto mb-8 md:mb-12">
@@ -191,7 +191,7 @@ export function HeroSection() {
               {/* Search Button */}
               <Button
                 type="submit"
-                className="bg-primary text-primary-foreground hover:bg-primary/90 h-12 px-6 rounded-xl flex items-center gap-2"
+                className="bg-primary text-primary-foreground hover:bg-primary/90 hover:text-primary-foreground h-12 px-6 rounded-xl flex items-center gap-2"
               >
                 <Search className="w-5 h-5" />
                 <span className="font-medium">Buscar</span>
