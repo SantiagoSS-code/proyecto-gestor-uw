@@ -4,8 +4,9 @@ import { useEffect, useMemo, useState } from "react"
 import Link from "next/link"
 import { useAuth } from "@/lib/auth-context"
 import { Button } from "@/components/ui/button"
-import { Sparkles, Calendar, Clock, Building2, CheckCircle2, XCircle, AlertTriangle, Loader2 } from "lucide-react"
+import { Calendar, Clock, Building2, CheckCircle2, XCircle, AlertTriangle, Loader2, Bell, CheckCheck, CalendarClock } from "lucide-react"
 import { auth } from "@/lib/firebaseClient"
+import { VoydLogo } from "@/components/ui/voyd-logo"
 
 interface PlayerOnboardingLocal {
   ageRange?: string
@@ -61,9 +62,9 @@ function formatCurrency(amount: number | null, currency: string) {
 }
 
 const defaultNotifications = [
-  { id: "1", title: "Tu reserva está confirmada", time: "Hace 2h" },
-  { id: "2", title: "Nuevo partido cercano disponible", time: "Ayer" },
-  { id: "3", title: "Actualiza tu perfil para mejores matches", time: "Hace 3 días" },
+  { id: "1", title: "Reservá tu próximo turno con tiempo", subtitle: "Los fines de semana se llenan rápido.", icon: "calendar", time: "Ahora" },
+  { id: "2", title: "Confirmá tus reservas pendientes", subtitle: "Tenés reservas sin confirmar pago.", icon: "check", time: "Hoy" },
+  { id: "3", title: "Recordatorio: revisá tu historial", subtitle: "Mirá tus partidos anteriores en Mis reservas.", icon: "clock", time: "Esta semana" },
 ]
 
 export default function PlayerDashboardPage() {
@@ -141,11 +142,8 @@ export default function PlayerDashboardPage() {
     <main className="min-h-screen bg-gradient-to-b from-white via-slate-50 to-white">
       <div className="mx-auto flex w-full max-w-5xl flex-col gap-8 px-4 pb-20 pt-10 sm:px-6 lg:px-8">
         <div className="flex items-center justify-center">
-          <Link href="/" className="flex items-center gap-2 text-black" aria-label="Ir a la landing">
-            <div className="w-8 h-8 rounded-lg bg-primary flex items-center justify-center">
-              <Sparkles className="w-4 h-4 text-primary-foreground" />
-            </div>
-            <span className="font-semibold text-xl tracking-tight">courtly</span>
+          <Link href="/" aria-label="Ir a la landing">
+            <VoydLogo className="h-10" />
           </Link>
         </div>
 
@@ -173,17 +171,16 @@ export default function PlayerDashboardPage() {
         </section>
 
         {/* Primary actions */}
-        <section className="grid gap-4 sm:grid-cols-3">
+        <section className="grid gap-4 sm:grid-cols-2">
           {[
-            { title: "Reservar cancha", href: "/clubs" },
-            { title: "Encontrar partido", href: "/players" },
-            { title: "Mis reservas", href: "#mis-reservas" },
+            { title: "Reservar cancha", desc: "Encontrá disponibilidad ahora", href: "/clubs" },
+            { title: "Mis reservas", desc: "Ver próximas y pasadas", href: "#mis-reservas" },
           ].map((action) => (
             <Link key={action.title} href={action.href}
               className="group rounded-2xl border border-slate-200/70 bg-white p-5 shadow-sm transition hover:-translate-y-0.5 hover:border-slate-300">
               <p className="text-sm text-black">Acción rápida</p>
               <h3 className="mt-2 text-lg font-semibold text-slate-900">{action.title}</h3>
-              <p className="mt-1 text-sm text-black">Empezar ahora</p>
+              <p className="mt-1 text-sm text-black">{action.desc}</p>
             </Link>
           ))}
         </section>
@@ -250,17 +247,26 @@ export default function PlayerDashboardPage() {
 
         {/* Notifications */}
         <section className="rounded-3xl border border-slate-200/70 bg-white p-6 shadow-sm sm:p-8">
-          <div className="flex items-center justify-between">
+          <div className="flex items-center gap-2 mb-4">
+            <Bell className="w-4 h-4 text-slate-400" />
             <h2 className="text-lg font-semibold text-slate-900">Notificaciones</h2>
-            <Link href="/players" className="text-sm font-medium text-black">Ver todo</Link>
           </div>
-          <div className="mt-4 space-y-3">
-            {defaultNotifications.map((note) => (
-              <div key={note.id} className="flex items-center justify-between rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3">
-                <p className="text-sm text-slate-700">{note.title}</p>
-                <span className="text-xs text-black">{note.time}</span>
-              </div>
-            ))}
+          <div className="space-y-3">
+            {defaultNotifications.map((note) => {
+              const Icon = note.icon === "calendar" ? CalendarClock : note.icon === "check" ? CheckCheck : Clock
+              return (
+                <div key={note.id} className="flex items-start gap-3 rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3">
+                  <div className="mt-0.5 flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-white border border-slate-200">
+                    <Icon className="w-3.5 h-3.5 text-slate-500" />
+                  </div>
+                  <div className="flex-1 min-w-0">
+                    <p className="text-sm font-medium text-slate-800">{note.title}</p>
+                    <p className="text-xs text-slate-500 mt-0.5">{note.subtitle}</p>
+                  </div>
+                  <span className="text-xs text-slate-400 shrink-0 pt-0.5">{note.time}</span>
+                </div>
+              )
+            })}
           </div>
         </section>
       </div>
