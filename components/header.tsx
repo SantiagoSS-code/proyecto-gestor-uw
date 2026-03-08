@@ -16,6 +16,7 @@ import { Menu, X, Sparkles, User, LogOut } from "lucide-react"
 import { useAuth } from "@/lib/auth-context"
 import { signOut } from "firebase/auth"
 import { auth } from "@/lib/firebaseClient"
+import { VoydLogo } from "@/components/ui/voyd-logo"
 
 export function Header() {
   const [isMenuOpen, setIsMenuOpen] = useState(false)
@@ -54,7 +55,7 @@ export function Header() {
         <div className="flex items-center justify-between h-16">
           {/* Logo */}
           <Link href="/" className="flex items-center gap-2">
-            <img src="/voyd-logo.png" alt="VOYD Logo" className="h-20 w-auto object-contain transform scale-110 origin-left" />
+            <VoydLogo className="h-[2.75rem]" />
           </Link>
 
           {/* Desktop Navigation */}
@@ -102,7 +103,7 @@ export function Header() {
               </>
             ) : (
                 <Link href={playerLoginHref}>
-                  <Button size="sm" className="bg-primary text-primary-foreground hover:bg-primary/90 rounded-full px-5">
+                  <Button size="sm" className="bg-primary text-primary-foreground hover:bg-primary/90 hover:text-primary-foreground rounded-full px-5">
                   Login Jugadores
                   </Button>
                 </Link>
@@ -159,7 +160,7 @@ export function Header() {
               ) : (
                 <>
                   <Link href={playerLoginHref}>
-                    <Button className="bg-primary text-primary-foreground w-full rounded-full">Login Jugadores</Button>
+                    <Button className="bg-primary text-primary-foreground hover:bg-primary/90 hover:text-primary-foreground w-full rounded-full">Login Jugadores</Button>
                   </Link>
                 </>
               )}

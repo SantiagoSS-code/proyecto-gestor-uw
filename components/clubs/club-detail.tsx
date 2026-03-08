@@ -24,21 +24,17 @@ import {
   Info,
 } from "lucide-react"
 import { FIRESTORE_COLLECTIONS, CENTER_SETTINGS_DOCS, CENTER_SUBCOLLECTIONS, LEGACY_AVAILABILITY_DOCS } from "@/lib/firestorePaths"
-import type { AmenityKey, BookingSettings, CenterProfile, CourtDoc, SportKey, ClassDoc, ClassScheduleSlot, OperationSettings } from "@/lib/types"
+import type { AmenityKey, BookingSettings, CenterProfile, CourtDoc, SportKey, ClassDoc, ClassScheduleSlot } from "@/lib/types"
 import { minutesToTime, timeToMinutes } from "@/lib/utils"
+import {
+  createPendingBooking,
+  loadActiveBookingsForDate,
+  type BookingSlotInfo,
+} from "@/lib/booking-service"
 
 type CenterResult = { id: string; data: CenterProfile }
 
 type CourtResult = { id: string; data: CourtDoc }
-
-type BookingRow = {
-  id: string
-  courtId?: string
-  startAt?: any
-  endAt?: any
-  status?: string
-  type?: string
-}
 
 function BarIcon({ className }: { className?: string }) {
   return (
@@ -168,41 +164,10 @@ async function loadLegacyAvailability(centerId: string): Promise<BookingSettings
   } as BookingSettings
 }
 
-async function loadOperationSettings(centerId: string): Promise<OperationSettings | null> {
-  const ref = doc(db, FIRESTORE_COLLECTIONS.centers, centerId, CENTER_SUBCOLLECTIONS.settings, CENTER_SETTINGS_DOCS.operations)
-  const snap = await getDoc(ref)
-  if (snap.exists()) return snap.data() as OperationSettings
-  return null
-}
-
-async function loadBookingsForDate(centerId: string, dateKey: string): Promise<BookingRow[]> {
-  const user = auth.currentUser
-  if (!user || user.uid !== centerId) return []
-  const start = new Date(`${dateKey}T00:00:00`)
-  const end = new Date(`${dateKey}T23:59:59`)
-
-  const ref = collection(db, FIRESTORE_COLLECTIONS.centers, centerId, CENTER_SUBCOLLECTIONS.bookings)
-  const q = query(ref, where("startAt", ">=", start), where("startAt", "<=", end))
-  const snap = await getDocs(q)
-  return snap.docs.map((d) => ({ id: d.id, ...(d.data() as any) })) as BookingRow[]
-}
-
 async function loadClasses(centerId: string): Promise<ClassDoc[]> {
   const ref = collection(db, FIRESTORE_COLLECTIONS.centers, centerId, CENTER_SUBCOLLECTIONS.classes)
   const snap = await getDocs(ref)
   return snap.docs.map((d) => d.data() as ClassDoc).filter((c) => c.enabled !== false)
-}
-
-function toDate(value: any): Date | null {
-  if (!value) return null
-  if (value instanceof Date) return value
-  if (typeof value?.toDate === "function") return value.toDate()
-  const parsed = new Date(value)
-  return Number.isNaN(parsed.getTime()) ? null : parsed
-}
-
-function slotDate(dateKey: string, time: string) {
-  return new Date(`${dateKey}T${time}:00`)
 }
 
 function formatSchedule(schedule: ClassScheduleSlot[]) {
@@ -251,19 +216,17 @@ export function ClubDetail({ slug }: { slug: string }) {
   const [center, setCenter] = useState<CenterProfile | null>(null)
   const [courts, setCourts] = useState<CourtResult[]>([])
   const [settings, setSettings] = useState<BookingSettings | null>(null)
-  const [operations, setOperations] = useState<OperationSettings | null>(null)
-  const [selectedDuration, setSelectedDuration] = useState<number | null>(null)
   const [classes, setClasses] = useState<ClassDoc[]>([])
   const [selectedDate, setSelectedDate] = useState<string>(
     getDateKeyInTimeZone("America/Argentina/Buenos_Aires")
   )
   const [selectedSport, setSelectedSport] = useState<SportKey | "">("")
   const [selectedSlot, setSelectedSlot] = useState<{ courtId: string; time: string } | null>(null)
-  const [bookings, setBookings] = useState<BookingRow[]>([])
+  const [bookings, setBookings] = useState<BookingSlotInfo[]>([])
   const [bookingLoading, setBookingLoading] = useState(false)
   const [activeImageIndex, setActiveImageIndex] = useState(0)
-  
-  // Mercado Pago checkout state
+
+  // Checkout state
   const [checkoutLoading, setCheckoutLoading] = useState(false)
   const [checkoutError, setCheckoutError] = useState<string | null>(null)
 
@@ -280,20 +243,14 @@ export function ClubDetail({ slug }: { slug: string }) {
         setCenterId(found.id)
         setCenter(found.data)
 
-        const [courtsData, bookingSettings, classesData, opsSettings] = await Promise.all([
+        const [courtsData, bookingSettings, classesData] = await Promise.all([
           loadCourts(found.id),
           loadBookingSettings(found.id),
           loadClasses(found.id),
-          loadOperationSettings(found.id),
         ])
 
         setCourts(courtsData)
         setClasses(classesData)
-
-        if (opsSettings) {
-          setOperations(opsSettings)
-          setSelectedDuration(opsSettings.minSlotMinutes)
-        }
 
         if (bookingSettings) {
           setSettings(bookingSettings)
@@ -311,19 +268,6 @@ export function ClubDetail({ slug }: { slug: string }) {
 
     load()
   }, [slug])
-
-  const minBookableDate = useMemo(
-    () => getDateKeyInTimeZone(settings?.timezone || "America/Argentina/Buenos_Aires"),
-    [settings?.timezone]
-  )
-
-  const maxBookableDate = useMemo(() => {
-    const days = operations?.maxAdvanceDays
-    if (!days) return null
-    const date = new Date()
-    date.setDate(date.getDate() + days)
-    return date.toISOString().slice(0, 10)
-  }, [operations?.maxAdvanceDays])
 
   const gallery = useMemo(() => (center ? getGallery(center) : []), [center])
   const placeId = center?.placeId?.trim() || center?.googlePlaceId?.trim() || null
@@ -349,7 +293,7 @@ export function ClubDetail({ slug }: { slug: string }) {
       if (!centerId || !selectedDate) return
       try {
         setBookingLoading(true)
-        const items = await loadBookingsForDate(centerId, selectedDate)
+        const items = await loadActiveBookingsForDate(centerId, selectedDate)
         setBookings(items)
       } catch (e) {
         console.error("Failed to load bookings:", e)
@@ -363,66 +307,27 @@ export function ClubDetail({ slug }: { slug: string }) {
   }, [centerId, selectedDate])
 
   const dayIndex = useMemo(() => parseDateKey(selectedDate).getDay().toString(), [selectedDate])
-  const selectedHoliday = useMemo(
-    () => operations?.holidays?.find((holiday) => holiday.date === selectedDate) ?? null,
-    [operations?.holidays, selectedDate]
-  )
 
-  // Duration options from operations settings (or fallback to single fixed duration)
-  const durationOptions = useMemo(() => {
-    if (!operations) return [{ value: settings?.slotDurationMinutes || 60, label: `${settings?.slotDurationMinutes || 60} min` }]
-    const list: number[] = []
-    for (let d = operations.minSlotMinutes; d <= operations.maxSlotMinutes; d += operations.slotStepMinutes) {
-      list.push(d)
-    }
-    if (!list.includes(operations.maxSlotMinutes) && operations.maxSlotMinutes >= operations.minSlotMinutes) {
-      list.push(operations.maxSlotMinutes)
-    }
-    return list.map((m) => {
-      if (m < 60) return { value: m, label: `${m} min` }
-      const h = Math.floor(m / 60)
-      const r = m % 60
-      return { value: m, label: r ? `${h} h ${r} min` : `${h} hora${h > 1 ? "s" : ""}` }
-    })
-  }, [operations, settings?.slotDurationMinutes])
-
-  const slotDuration = selectedDuration ?? durationOptions[0]?.value ?? 60
-  const baseDayCfg = settings?.openingHours?.[dayIndex]
-  const dayCfg = useMemo(() => {
-    if (selectedHoliday) {
-      if (selectedHoliday.closed) return { open: "09:00", close: "23:00", closed: true }
-      return {
-        open: selectedHoliday.openTime || baseDayCfg?.open || "09:00",
-        close: selectedHoliday.closeTime || baseDayCfg?.close || "23:00",
-        closed: false,
-      }
-    }
-    return baseDayCfg
-  }, [baseDayCfg, selectedHoliday])
+  const slotDuration = settings?.slotDurationMinutes || 60
+  const dayCfg = settings?.openingHours?.[dayIndex]
 
   const slots = useMemo(() => {
     if (!dayCfg || dayCfg.closed) return [] as string[]
-    if (selectedDate < minBookableDate) return [] as string[]
-    if (maxBookableDate && selectedDate > maxBookableDate) return [] as string[]
     const start = timeToMinutes(dayCfg.open)
     const end = timeToMinutes(dayCfg.close)
     const result: string[] = []
     const timeZone = settings?.timezone || "America/Argentina/Buenos_Aires"
     const todayKey = getDateKeyInTimeZone(timeZone)
     const nowMinutes = getMinutesInTimeZone(timeZone)
-    const minAdvanceMinutes = (operations?.minAdvanceHours || 0) * 60
-    const effectiveNowMinutes = selectedDate === todayKey ? nowMinutes + minAdvanceMinutes : 0
 
-    // Grid increment: use the operations step or fall back to slotDuration
-    const gridStep = operations?.slotStepMinutes || slotDuration
-    for (let t = start; t + slotDuration <= end; t += gridStep) {
-      if (selectedDate === todayKey && t < effectiveNowMinutes) {
+    for (let t = start; t + slotDuration <= end; t += slotDuration) {
+      if (selectedDate === todayKey && t + slotDuration <= nowMinutes) {
         continue
       }
       result.push(minutesToTime(t))
     }
     return result
-  }, [dayCfg, slotDuration, selectedDate, settings?.timezone, operations?.slotStepMinutes, operations?.minAdvanceHours, minBookableDate, maxBookableDate])
+  }, [dayCfg, slotDuration, selectedDate, settings?.timezone])
 
   const availableSports = useMemo(() => {
     const fromProfile = (center?.sports || []).filter(Boolean) as SportKey[]
@@ -442,31 +347,25 @@ export function ClubDetail({ slug }: { slug: string }) {
     return courts.filter((c) => c.data.sport === selectedSport)
   }, [courts, selectedSport])
 
-  const bookingByCourt = useMemo(() => {
-    const map = new Map<string, BookingRow[]>()
-    bookings.forEach((b) => {
-      if (!b.courtId || b.status === "cancelled" || b.type === "class") return
-      const arr = map.get(b.courtId) || []
-      arr.push(b)
-      map.set(b.courtId, arr)
-    })
-    return map
-  }, [bookings])
+  /**
+   * Returns whether a slot is free, held pending payment, or fully booked.
+   * Uses string-based minute arithmetic — no Date objects needed.
+   */
+  const getSlotState = (courtId: string, slotTime: string): "free" | "pending" | "booked" => {
+    const slotStart = timeToMinutes(slotTime)
+    const slotEnd = slotStart + slotDuration
 
-  const isSlotBooked = (courtId: string, time: string) => {
-    const items = bookingByCourt.get(courtId) || []
-    if (!items.length) return false
-    const slotStart = slotDate(selectedDate, time)
-    const slotEnd = new Date(slotStart.getTime() + slotDuration * 60000)
-    const bufferMs = (operations?.bufferMinutes || 0) * 60000
-    return items.some((b) => {
-      const startAt = toDate(b.startAt)
-      const endAt = toDate(b.endAt)
-      if (!startAt || !endAt) return false
-      const blockedStart = new Date(startAt.getTime() - bufferMs)
-      const blockedEnd = new Date(endAt.getTime() + bufferMs)
-      return blockedStart < slotEnd && blockedEnd > slotStart
-    })
+    let state: "free" | "pending" | "booked" = "free"
+    for (const b of bookings) {
+      if (b.courtId !== courtId) continue
+      const bStart = timeToMinutes(b.startTime)
+      const bEnd = timeToMinutes(b.endTime)
+      if (bStart >= slotEnd || bEnd <= slotStart) continue // no overlap
+      // overlap found
+      if (b.bookingStatus === "confirmed") return "booked"
+      if (b.bookingStatus === "pending_payment") state = "pending"
+    }
+    return state
   }
 
   if (loading) {
@@ -527,48 +426,37 @@ export function ClubDetail({ slug }: { slug: string }) {
       return
     }
 
+    // Double-check slot is still free before creating the booking
+    const slotState = getSlotState(selectedSlot.courtId, selectedSlot.time)
+    if (slotState === "booked") {
+      setCheckoutError("Este horario ya fue reservado. Por favor elegí otro.")
+      return
+    }
+
     setCheckoutLoading(true)
     setCheckoutError(null)
 
     try {
-      const payload = {
-        centerId,
+      const bookingId = await createPendingBooking({
+        clubId: centerId,
+        clubName: center.name,
         courtId: selectedSlot.courtId,
-        date: selectedDate,
-        time: selectedSlot.time,
-        durationMinutes: slotDuration,
-        customerName: user.displayName || "Jugador",
-        customerEmail: user.email || "",
+        courtName: selectedCourt.data.name,
+        sport: selectedCourt.data.sport || selectedSport || "padel",
         userId: user.uid,
-      }
-
-      const res = await fetch("/api/mercadopago/create-preference", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(payload),
+        userName: user.displayName || "Jugador",
+        userEmail: user.email || "",
+        date: selectedDate,
+        startTime: selectedSlot.time,
+        durationMinutes: slotDuration,
+        price: totalPrice,
+        currency: selectedCurrency,
       })
 
-      const data = await res.json()
-
-      if (!res.ok) {
-        if (data.error === "Slot already booked") {
-          setCheckoutError("Este horario ya fue reservado. Por favor elegí otro.")
-        } else {
-          setCheckoutError(data.error || "Error al crear la reserva. Intentá de nuevo.")
-        }
-        return
-      }
-
-      if (!data.checkoutUrl) {
-        setCheckoutError("No se pudo obtener el link de pago. Intentá de nuevo.")
-        return
-      }
-
-      // Redirect to Mercado Pago Checkout
-      window.location.href = data.checkoutUrl
+      window.location.href = `/checkout/test/${bookingId}`
     } catch (err) {
-      console.error("Error creating checkout:", err)
-      setCheckoutError("Error de conexión. Verificá tu internet e intentá de nuevo.")
+      console.error("Error creating booking:", err)
+      setCheckoutError("Error al crear la reserva. Verificá tu conexión e intentá de nuevo.")
     } finally {
       setCheckoutLoading(false)
     }
@@ -691,15 +579,7 @@ export function ClubDetail({ slug }: { slug: string }) {
                 </div>
               ) : null}
 
-              <div className="rounded-xl border border-slate-200 bg-slate-50 p-4">
-                <div className="flex items-center gap-2 text-slate-900 font-medium">
-                  <Calendar className="w-4 h-4 text-blue-600" />
-                  Bookings (MVP)
-                </div>
-                <p className="text-sm text-slate-600 mt-1">
-                  Choose a date to see available slots.
-                </p>
-              </div>
+
             </CardContent>
           </Card>
         </div>
@@ -728,24 +608,9 @@ export function ClubDetail({ slug }: { slug: string }) {
                       </SelectContent>
                     </Select>
                   </div>
-                  {durationOptions.length > 1 && (
-                    <div className="min-w-[140px]">
-                      <Label>Duración</Label>
-                      <Select value={String(slotDuration)} onValueChange={(v) => { setSelectedDuration(Number(v)); setSelectedSlot(null) }}>
-                        <SelectTrigger>
-                          <SelectValue />
-                        </SelectTrigger>
-                        <SelectContent>
-                          {durationOptions.map((o) => (
-                            <SelectItem key={o.value} value={String(o.value)}>{o.label}</SelectItem>
-                          ))}
-                        </SelectContent>
-                      </Select>
-                    </div>
-                  )}
                   <div>
                     <Label>Fecha</Label>
-                    <Input type="date" value={selectedDate} min={minBookableDate} max={maxBookableDate || undefined} onChange={(e) => setSelectedDate(e.target.value)} />
+                    <Input type="date" value={selectedDate} onChange={(e) => setSelectedDate(e.target.value)} />
                   </div>
                 </div>
                 <div className="flex items-center gap-2 text-sm text-slate-600">
@@ -815,21 +680,30 @@ export function ClubDetail({ slug }: { slug: string }) {
                                 </div>
                               </div>
                               {slots.map((t) => {
-                                const booked = isSlotBooked(court.id, t)
+                                const slotState = getSlotState(court.id, t)
                                 const active = selectedSlot?.courtId === court.id && selectedSlot.time === t
+                                const isBlocked = slotState !== "free"
                                 return (
                                   <button
                                     key={`${court.id}-${t}`}
-                                    title={t}
+                                    title={
+                                      slotState === "booked"
+                                        ? `${t} — Ocupado`
+                                        : slotState === "pending"
+                                        ? `${t} — Reserva pendiente`
+                                        : t
+                                    }
                                     className={`border-b border-slate-100 px-2 py-2 text-xs text-center transition-all ${
-                                      booked
+                                      slotState === "booked"
                                         ? "bg-slate-200 text-slate-400 cursor-not-allowed"
+                                        : slotState === "pending"
+                                        ? "bg-amber-100 text-amber-600 cursor-not-allowed"
                                         : active
                                         ? "bg-emerald-500 text-white"
                                         : "bg-white hover:bg-emerald-50 text-slate-700"
                                     }`}
-                                    onClick={() => (!booked ? setSelectedSlot({ courtId: court.id, time: t }) : null)}
-                                    disabled={booked}
+                                    onClick={() => (!isBlocked ? setSelectedSlot({ courtId: court.id, time: t }) : null)}
+                                    disabled={isBlocked}
                                     aria-label={`Turno ${t} en ${court.data.name}`}
                                   />
                                 )
@@ -846,10 +720,13 @@ export function ClubDetail({ slug }: { slug: string }) {
                       <span className="inline-block h-3 w-3 rounded-sm border border-slate-200 bg-white" /> Disponible
                     </div>
                     <div className="flex items-center gap-2">
-                      <span className="inline-block h-3 w-3 rounded-sm border border-slate-200 bg-slate-200" /> No disponible
+                      <span className="inline-block h-3 w-3 rounded-sm border border-slate-200 bg-slate-200" /> Ocupado
                     </div>
                     <div className="flex items-center gap-2">
-                      <span className="inline-block h-3 w-3 rounded-sm border border-emerald-500 bg-emerald-500" /> Tu reserva
+                      <span className="inline-block h-3 w-3 rounded-sm border border-amber-300 bg-amber-100" /> Reserva pendiente
+                    </div>
+                    <div className="flex items-center gap-2">
+                      <span className="inline-block h-3 w-3 rounded-sm border border-emerald-500 bg-emerald-500" /> Tu selección
                     </div>
                     {bookingLoading ? <span>Actualizando disponibilidad…</span> : null}
                   </div>
@@ -896,14 +773,14 @@ export function ClubDetail({ slug }: { slug: string }) {
                 disabled={!selectedSlot || !selectedCourt || checkoutLoading}
                 onClick={handleReservar}
               >
-                {checkoutLoading ? "Redirigiendo a Mercado Pago…" : "Reservar"}
+                {checkoutLoading ? "Creando reserva…" : "Reservar"}
               </Button>
               {checkoutError ? (
                 <div className="text-xs text-red-600 bg-red-50 border border-red-200 rounded-lg p-2">
                   {checkoutError}
                 </div>
               ) : (
-                <div className="text-xs text-slate-500">Pagá de forma segura con Mercado Pago.</div>
+                <div className="text-xs text-slate-500">Checkout de prueba · Mercado Pago próximamente.</div>
               )}
             </CardContent>
           </Card>

@@ -10,26 +10,13 @@ const _playfair = Playfair_Display({ subsets: ["latin"] })
 const _geistMono = Geist_Mono({ subsets: ["latin"] })
 
 export const metadata: Metadata = {
-  title: "Courtly - The New Generation of Sports Booking",
+  title: "Voyd ",
   description:
     "AI-powered court booking that understands you. Intelligent scheduling, predictive matching, and seamless reservations for the modern player.",
   generator: "v0.app",
   icons: {
-    icon: [
-      {
-        url: "/icon-light-32x32.png",
-        media: "(prefers-color-scheme: light)",
-      },
-      {
-        url: "/icon-dark-32x32.png",
-        media: "(prefers-color-scheme: dark)",
-      },
-      {
-        url: "/icon.svg",
-        type: "image/svg+xml",
-      },
-    ],
-    apple: "/apple-icon.png",
+    icon: "/images/voyd-logo-new-cropped.png",
+    apple: "/images/voyd-logo-new-cropped.png",
   },
 }
 
