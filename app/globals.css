@@ -20,41 +20,62 @@
   animation: slow-zoom 10s ease-in-out infinite;
 }
 
-/* Fresh innovative dark theme with coral/warm accents - premium AI era aesthetic */
+/* Metallic Grays palette */
 :root {
-  --background: hsl(0 0% 100%);
-  --foreground: hsl(222.2 84% 4.9%);
-  --card: hsl(0 0% 100%);
-  --card-foreground: hsl(222.2 84% 4.9%);
-  --popover: hsl(0 0% 100%);
-  --popover-foreground: hsl(222.2 84% 4.9%);
-  --primary: hsl(221.2 83.2% 53.3%);
-  --primary-foreground: oklch(0.06 0.01 270);
-  --secondary: hsl(210 40% 96%);
-  --secondary-foreground: hsl(222.2 84% 4.9%);
-  --muted: hsl(210 40% 96%);
-  --muted-foreground: hsl(0 0% 0%);
-  --accent: hsl(210 40% 96%);
-  --accent-foreground: hsl(222.2 84% 4.9%);
+  --background: #F8F9FA; /* Smooth light background */
+  --foreground: #5B6168; /* Gunmetal */ 
+  --card: #FFFFFF; 
+  --card-foreground: #5B6168;
+  --popover: #FFFFFF;
+  --popover-foreground: #5B6168;
+  --primary: #5B6168; /* Gunmetal */
+  --primary-foreground: #FFFFFF;
+  --secondary: #CFD4DA; /* Aluminum */
+  --secondary-foreground: #5B6168;
+  --muted: #B8BEC5; /* Satin Silver */
+  --muted-foreground: #7A838F; /* Graphite */
+  --accent: #7A838F; /* Graphite */
+  --accent-foreground: #FFFFFF;
   --destructive: hsl(0 84.2% 60.2%);
   --destructive-foreground: oklch(0.99 0 0);
-  --border: hsl(214.3 31.8% 91.4%);
-  --input: hsl(214.3 31.8% 91.4%);
-  --ring: hsl(221.2 83.2% 53.3%);
+  --border: #CFD4DA;
+  --input: #CFD4DA;
+  --ring: #7A838F;
   --chart-1: hsl(221.2 83.2% 53.3%);
   --chart-2: hsl(212 95% 68%);
   --chart-3: hsl(216 92% 60%);
   --chart-4: hsl(210 98% 78%);
   --chart-5: hsl(212 97% 87%);
   --radius: 0.75rem;
-  --sidebar: hsl(0 0% 98%);
-  --sidebar-foreground: hsl(222.2 84% 4.9%);
-  --sidebar-primary: oklch(0.72 0.18 30);
-  --sidebar-primary-foreground: oklch(0.06 0.01 270);
-  --sidebar-accent: oklch(0.14 0.01 270);
-  --sidebar-accent-foreground: oklch(0.98 0 0);
-  --sidebar-border: oklch(0.2 0.01 270);
-  --sidebar-ring: oklch(0.72 0.18 30);
+  --sidebar: #FFFFFF;
+  --sidebar-foreground: #5B6168;
+  --sidebar-primary: #5B6168;
+  --sidebar-primary-foreground: #FFFFFF;
+  --sidebar-accent: #CFD4DA;
+  --sidebar-accent-foreground: #5B6168;
+  --sidebar-border: #CFD4DA;
+  --sidebar-ring: #7A838F;
+}
+
+/* Dark Titanium Theme for Landing Page Only */
+.titanium-theme {
+  --background: #FFFFFF; /* Pure white background */
+  --foreground: #111111; /* Ash for high contrast readability */ 
+  --card: #FFFFFF; 
+  --card-foreground: #111111;
+  --popover: #FFFFFF;
+  --popover-foreground: #111111;
+  --primary: #3032F6; /* Bront Blue */
+  --primary-foreground: #FFFFFF; /* White */
+  --secondary: #E4E5E8; /* Steel */
+  --secondary-foreground: #1A1A1C; /* Charcoal */
+  --muted: #E4E5E8; /* Steel */
+  --muted-foreground: #81858B; /* Platinum for muted text */
+  --accent: #E4E5E8; /* Steel */
+  --accent-foreground: #1A1A1C; /* Charcoal */
+  --border: #E4E5E8; /* Steel */
+  --input: #E4E5E8; /* Steel */
+  --ring: #3032F6; /* Bront Blue */
 }
 
 @theme inline {

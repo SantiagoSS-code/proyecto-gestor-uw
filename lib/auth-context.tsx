@@ -42,10 +42,15 @@ export const AuthProvider = ({ children }: AuthProviderProps) => {
         try {
           const userDoc = await getDoc(doc(db, 'users', user.uid));
           if (userDoc.exists()) {
-            setCenterId(userDoc.data()?.centerId || null);
+            setCenterId(userDoc.data()?.centerId || user.uid);
+          } else {
+            // If user document doesn't exist, use user.uid as centerId
+            setCenterId(user.uid);
           }
         } catch (error) {
           console.error('Error fetching user data:', error);
+          // Fallback to user.uid if document fetch fails
+          setCenterId(user.uid);
         }
       } else {
         setUser(null);

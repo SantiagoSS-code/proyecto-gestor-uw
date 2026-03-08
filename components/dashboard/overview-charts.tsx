@@ -4,28 +4,30 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { ResponsiveContainer, AreaChart, Area, XAxis, YAxis, Tooltip, CartesianGrid, BarChart, Bar } from "recharts"
 import { formatCurrencyARS } from "@/lib/utils"
 
-const revenueData = [
-  { name: "Lun", total: 1500 },
-  { name: "Mar", total: 2300 },
-  { name: "Mié", total: 3200 },
-  { name: "Jue", total: 2900 },
-  { name: "Vie", total: 4500 },
-  { name: "Sáb", total: 5800 },
-  { name: "Dom", total: 5100 },
-]
+interface OverviewChartsProps {
+  revenueData: Array<{ name: string; total: number }>
+  hourlyData: Array<{ time: string; bookings: number }>
+  loading?: boolean
+}
 
-const hourlyData = [
-  { time: "08:00", bookings: 2 },
-  { time: "10:00", bookings: 5 },
-  { time: "12:00", bookings: 3 },
-  { time: "14:00", bookings: 4 },
-  { time: "16:00", bookings: 8 },
-  { time: "18:00", bookings: 12 },
-  { time: "20:00", bookings: 10 },
-  { time: "22:00", bookings: 6 },
-]
+export function OverviewCharts({ revenueData, hourlyData, loading = false }: OverviewChartsProps) {
+  if (loading) {
+    return (
+      <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-7">
+        <Card className="col-span-4 border-none shadow-sm">
+          <CardContent className="p-6">
+            <div className="h-[240px] w-full rounded bg-slate-200 animate-pulse" />
+          </CardContent>
+        </Card>
+        <Card className="col-span-3 border-none shadow-sm">
+          <CardContent className="p-6">
+            <div className="h-[240px] w-full rounded bg-slate-200 animate-pulse" />
+          </CardContent>
+        </Card>
+      </div>
+    )
+  }
 
-export function OverviewCharts() {
   return (
     <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-7">
       <Card className="col-span-4 border-none shadow-sm">
@@ -37,6 +39,11 @@ export function OverviewCharts() {
         </CardHeader>
         <CardContent className="pl-2">
           <div className="h-[240px] w-full">
+            {revenueData.length === 0 ? (
+              <div className="h-full w-full flex items-center justify-center text-sm text-slate-500">
+                Sin datos de ingresos para el período seleccionado
+              </div>
+            ) : (
              <ResponsiveContainer width="100%" height="100%">
                 <AreaChart data={revenueData}>
                     <defs>
@@ -72,6 +79,7 @@ export function OverviewCharts() {
                     />
                 </AreaChart>
              </ResponsiveContainer>
+            )}
           </div>
         </CardContent>
       </Card>
@@ -84,6 +92,11 @@ export function OverviewCharts() {
         </CardHeader>
         <CardContent>
            <div className="h-[240px] w-full">
+            {hourlyData.length === 0 ? (
+              <div className="h-full w-full flex items-center justify-center text-sm text-slate-500">
+                Sin reservas por hora para mostrar
+              </div>
+            ) : (
             <ResponsiveContainer width="100%" height="100%">
                 <BarChart data={hourlyData}>
                 <XAxis 
@@ -106,6 +119,7 @@ export function OverviewCharts() {
                 />
                 </BarChart>
             </ResponsiveContainer>
+            )}
            </div>
         </CardContent>
       </Card>

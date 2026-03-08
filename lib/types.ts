@@ -145,6 +145,42 @@ export interface BookingSettings {
   updatedAt?: any;
 }
 
+export interface OperationSettings {
+  // Reglas de turnos
+  minSlotMinutes: number;       // e.g. 60
+  maxSlotMinutes: number;       // e.g. 120
+  slotStepMinutes: number;      // e.g. 30 (generates 60, 90, 120)
+  bufferMinutes: number;        // gap between consecutive bookings
+  minAdvanceHours: number;      // min anticipation to book
+  maxAdvanceDays: number;       // max days in advance to book
+
+  // Políticas de cancelación
+  cancellationEnabled: boolean;
+  freeCancelHours: number;      // free cancel if > N hours before start
+  lateCancelFeePercent: number; // 0-100 %  
+  noShowFeePercent: number;     // 0-100 %
+
+  // Reglas por cancha/deporte (court-level overrides stored separately)
+  peakHoursEnabled: boolean;
+  peakHoursStart: string;       // "18:00"
+  peakHoursEnd: string;         // "22:00"
+  peakPriceMultiplier: number;  // e.g. 1.5
+  weekendPriceMultiplier: number; // e.g. 1.25
+
+  // Feriados
+  holidays: HolidayEntry[];
+
+  updatedAt?: any;
+}
+
+export interface HolidayEntry {
+  date: string;   // "YYYY-MM-DD"
+  label: string;  // e.g. "Navidad"
+  closed: boolean; // true = cerrado, false = horario especial
+  openTime?: string;
+  closeTime?: string;
+}
+
 export type BookingStatus = "pending" | "confirmed" | "cancelled";
 
 export interface BookingDoc {

@@ -1,10 +1,13 @@
 "use client"
 
 import { useEffect, useState, useMemo } from "react"
+import { collection, getDocs } from "firebase/firestore"
+import { db } from "@/lib/firebaseClient"
+import { FIRESTORE_COLLECTIONS, CENTER_SUBCOLLECTIONS } from "@/lib/firestorePaths"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
-import { Users, Mail, Phone, Calendar, DollarSign, Search, Copy, Check, TrendingUp, AlertCircle, Clock, MapPin, BarChart3, Zap, ArrowLeft } from "lucide-react"
+import { Users, Mail, Phone, Calendar, DollarSign, Search, Copy, Check, TrendingUp, AlertCircle, Clock, MapPin, BarChart3, Zap, ArrowLeft, Loader2, ChevronLeft, ChevronRight, Eye } from "lucide-react"
 import { useAuth } from "@/lib/auth-context"
 import { formatCurrencyARS, formatDurationHours } from "@/lib/utils"
 
@@ -44,7 +47,9 @@ interface CustomerDetail {
 type FilterType = 'all' | 'active30' | 'inactive60' | 'frequent' | 'highSpenders'
 
 export function CustomersList() {
-  const { centerId } = useAuth()
+  const ITEMS_PER_PAGE = 10
+  const { user, centerId } = useAuth()
+  const resolvedCenterId = centerId || user?.uid || null
   const [customers, setCustomers] = useState<Customer[]>([])
   const [loading, setLoading] = useState(true)
   const [searchTerm, setSearchTerm] = useState("")
@@ -54,19 +59,82 @@ export function CustomersList() {
   const [minSpent, setMinSpent] = useState<number>(0)
   const [selectedCustomer, setSelectedCustomer] = useState<CustomerDetail | null>(null)
   const [loadingCustomerDetail, setLoadingCustomerDetail] = useState(false)
+  const [currentPage, setCurrentPage] = useState(1)
 
   useEffect(() => {
-    if (!centerId) return
+    if (!resolvedCenterId) return
 
     const fetchCustomers = async () => {
       try {
         setLoading(true)
-        const response = await fetch(`/api/dashboard-customers?centerId=${centerId}`)
-        const data = await response.json()
-        
-        if (data.customers) {
-          setCustomers(data.customers)
+
+        // Load bookings directly from Firebase Client SDK
+        const loadBookingsFromCollection = async (rootCollection: string) => {
+          try {
+            const bookingsRef = collection(db, rootCollection, resolvedCenterId, CENTER_SUBCOLLECTIONS.bookings)
+            const snapshot = await getDocs(bookingsRef)
+            return snapshot.docs.map((docSnap) => ({
+              id: docSnap.id,
+              ...(docSnap.data() as any),
+            }))
+          } catch {
+            return []
+          }
         }
+
+        // Try new model first, then legacy
+        const [newBookings, legacyBookings] = await Promise.all([
+          loadBookingsFromCollection(FIRESTORE_COLLECTIONS.centers),
+          loadBookingsFromCollection(FIRESTORE_COLLECTIONS.legacyCenters),
+        ])
+
+        const allBookings = [...newBookings, ...legacyBookings]
+
+        // Aggregate customers from bookings
+        const customersMap = new Map<string, Customer>()
+
+        allBookings.forEach((booking: any) => {
+          const email = (booking.customerEmail || booking.email || "").toLowerCase()
+          if (!email) return
+
+          const existing = customersMap.get(email) || {
+            email,
+            name: booking.customerName || booking.customer || "Sin nombre",
+            phone: booking.customerPhone || booking.phone || undefined,
+            totalReservations: 0,
+            lastReservationDate: null,
+            totalSpent: 0,
+          }
+
+          existing.totalReservations += 1
+          existing.totalSpent += booking.price || 0
+
+          const dateValue = booking.date || booking.dateKey
+          if (dateValue) {
+            const dateObj = new Date(dateValue)
+            if (!existing.lastReservationDate || dateObj > new Date(existing.lastReservationDate)) {
+              existing.lastReservationDate = dateObj
+            }
+          }
+
+          // Update name/phone if we have better data
+          if (!existing.name || existing.name === "Sin nombre") {
+            existing.name = booking.customerName || booking.customer || existing.name
+          }
+          if (!existing.phone) {
+            existing.phone = booking.customerPhone || booking.phone || undefined
+          }
+
+          customersMap.set(email, existing)
+        })
+
+        const customersList = Array.from(customersMap.values()).sort(
+          (a, b) =>
+            (b.lastReservationDate ? new Date(b.lastReservationDate).getTime() : 0) -
+            (a.lastReservationDate ? new Date(a.lastReservationDate).getTime() : 0)
+        )
+
+        setCustomers(customersList)
       } catch (error) {
         console.error("Error fetching customers:", error)
       } finally {
@@ -75,7 +143,7 @@ export function CustomersList() {
     }
 
     fetchCustomers()
-  }, [centerId])
+  }, [resolvedCenterId])
 
   const handleCopyEmail = (email: string) => {
     navigator.clipboard.writeText(email)
@@ -84,17 +152,131 @@ export function CustomersList() {
   }
 
   const handleOpenCustomerDetail = async (customer: Customer) => {
-    if (!centerId) return
+    if (!resolvedCenterId) return
 
     try {
       setLoadingCustomerDetail(true)
-      const encodedEmail = encodeURIComponent(customer.email)
-      const response = await fetch(`/api/dashboard-customers/${encodedEmail}?centerId=${centerId}`)
-      const data = await response.json()
-      
-      if (data) {
-        setSelectedCustomer(data)
+
+      // Load bookings directly from Firebase Client SDK
+      const loadBookingsFromCollection = async (rootCollection: string) => {
+        try {
+          const bookingsRef = collection(db, rootCollection, resolvedCenterId, CENTER_SUBCOLLECTIONS.bookings)
+          const snapshot = await getDocs(bookingsRef)
+          return snapshot.docs.map((docSnap) => ({
+            id: docSnap.id,
+            ...(docSnap.data() as any),
+          }))
+        } catch {
+          return []
+        }
       }
+
+      const [newBookings, legacyBookings] = await Promise.all([
+        loadBookingsFromCollection(FIRESTORE_COLLECTIONS.centers),
+        loadBookingsFromCollection(FIRESTORE_COLLECTIONS.legacyCenters),
+      ])
+
+      const allBookings = [...newBookings, ...legacyBookings]
+
+      // Filter for this customer
+      const customerBookings = allBookings.filter(
+        (b: any) => (b.customerEmail || b.email || "").toLowerCase() === customer.email.toLowerCase()
+      )
+
+      if (customerBookings.length === 0) {
+        setSelectedCustomer({
+          email: customer.email,
+          name: customer.name,
+          phone: customer.phone || "",
+          totalReservations: 0,
+          totalSpent: 0,
+          totalIncome: 0,
+          averageFrequency: 0,
+          favoriteCourt: null,
+          mostUsedTime: null,
+          cancelledReservations: 0,
+          reservations: [],
+          internalNotes: "",
+        })
+        return
+      }
+
+      const totalReservations = customerBookings.length
+      const totalSpent = customerBookings.reduce((sum: number, b: any) => sum + (b.price || 0), 0)
+      const cancelledReservations = customerBookings.filter(
+        (b: any) => b.status === "cancelada" || b.status === "cancelled"
+      ).length
+
+      // Favorite court
+      const courtCounts = new Map<string, { name: string; count: number }>()
+      customerBookings.forEach((b: any) => {
+        const courtId = b.court || b.courtId || ""
+        if (courtId) {
+          const existing = courtCounts.get(courtId) || { name: b.courtName || courtId, count: 0 }
+          existing.count += 1
+          courtCounts.set(courtId, existing)
+        }
+      })
+      let favoriteCourt: CustomerDetail["favoriteCourt"] = null
+      courtCounts.forEach((val, id) => {
+        if (!favoriteCourt || val.count > favoriteCourt.bookingCount) {
+          favoriteCourt = { id, name: val.name, bookingCount: val.count }
+        }
+      })
+
+      // Most used time
+      const timeCounts = new Map<string, number>()
+      customerBookings.forEach((b: any) => {
+        if (b.time) timeCounts.set(b.time, (timeCounts.get(b.time) || 0) + 1)
+      })
+      let mostUsedTime: CustomerDetail["mostUsedTime"] = null
+      timeCounts.forEach((count, time) => {
+        if (!mostUsedTime || count > mostUsedTime.bookingCount) {
+          mostUsedTime = { time, bookingCount: count }
+        }
+      })
+
+      // Average frequency
+      const dates = customerBookings
+        .map((b: any) => new Date(b.date || b.dateKey || "").getTime())
+        .filter((t: number) => !isNaN(t))
+        .sort((a: number, b: number) => a - b)
+      let averageFrequency = 0
+      if (dates.length > 1) {
+        const intervals = []
+        for (let i = 1; i < dates.length; i++) {
+          intervals.push((dates[i] - dates[i - 1]) / (1000 * 60 * 60 * 24))
+        }
+        averageFrequency = Math.round((intervals.reduce((a, b) => a + b, 0) / intervals.length) * 10) / 10
+      }
+
+      const reservations = customerBookings
+        .map((b: any) => ({
+          id: b.id,
+          court: b.court || b.courtId || "",
+          courtName: b.courtName || "",
+          date: b.date || b.dateKey || "",
+          time: b.time || "",
+          duration: b.duration || b.durationMinutes || 60,
+          price: b.price || 0,
+          status: b.status || "pending",
+        }))
+        .sort((a: any, b: any) => new Date(b.date).getTime() - new Date(a.date).getTime())
+
+      setSelectedCustomer({
+        email: customer.email,
+        name: (customerBookings[0] as any).customerName || (customerBookings[0] as any).customer || customer.name,
+        phone: (customerBookings[0] as any).customerPhone || (customerBookings[0] as any).phone || customer.phone || "",
+        totalReservations,
+        totalSpent,
+        totalIncome: totalSpent,
+        averageFrequency,
+        favoriteCourt,
+        mostUsedTime,
+        cancelledReservations,
+        reservations,
+        internalNotes: "",
+      })
     } catch (error) {
       console.error("Error fetching customer details:", error)
     } finally {
@@ -144,9 +326,27 @@ export function CustomersList() {
     return filtered
   }, [customers, searchTerm, activeFilter, minReservations, minSpent])
 
+  const totalPages = Math.max(1, Math.ceil(filteredCustomers.length / ITEMS_PER_PAGE))
+
+  const paginatedCustomers = useMemo(() => {
+    const start = (currentPage - 1) * ITEMS_PER_PAGE
+    return filteredCustomers.slice(start, start + ITEMS_PER_PAGE)
+  }, [filteredCustomers, currentPage])
+
+  useEffect(() => {
+    setCurrentPage(1)
+  }, [searchTerm, activeFilter, minReservations, minSpent])
+
+  useEffect(() => {
+    if (currentPage > totalPages) {
+      setCurrentPage(totalPages)
+    }
+  }, [currentPage, totalPages])
+
   if (loading) {
     return (
-      <div className="flex items-center justify-center h-96">
+      <div className="flex flex-col items-center justify-center h-96">
+        <Loader2 className="w-8 h-8 animate-spin mb-4 text-blue-600" />
         <div className="text-slate-500">Cargando clientes...</div>
       </div>
     )
@@ -374,7 +574,9 @@ export function CustomersList() {
           <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
             <div>
               <CardTitle className="text-lg font-semibold text-slate-900">Listado de Clientes</CardTitle>
-              <p className="text-sm text-slate-500 mt-1">{filteredCustomers.length} clientes encontrados</p>
+              <p className="text-sm text-slate-500 mt-1">
+                {filteredCustomers.length} clientes encontrados · mostrando hasta {ITEMS_PER_PAGE} por página
+              </p>
             </div>
             
             {/* Buscador */}
@@ -401,12 +603,13 @@ export function CustomersList() {
                   <th className="text-left font-medium py-3 px-4 uppercase tracking-wider text-xs">Última Reserva</th>
                   <th className="text-right font-medium py-3 px-4 uppercase tracking-wider text-xs">Revenue Total</th>
                   <th className="text-left font-medium py-3 pl-4 pr-6 uppercase tracking-wider text-xs">Estado</th>
+                  <th className="text-right font-medium py-3 pl-4 pr-6 uppercase tracking-wider text-xs">Acción</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-slate-100">
-                {filteredCustomers.length === 0 ? (
+                {paginatedCustomers.length === 0 ? (
                   <tr>
-                    <td colSpan={7} className="py-12">
+                    <td colSpan={8} className="py-12">
                       <div className="flex flex-col items-center justify-center text-center">
                         <Users className="w-12 h-12 text-slate-300 mb-3" />
                         <p className="text-slate-500 font-medium">No hay clientes aún</p>
@@ -415,11 +618,10 @@ export function CustomersList() {
                     </td>
                   </tr>
                 ) : (
-                  filteredCustomers.map((customer) => (
+                  paginatedCustomers.map((customer) => (
                     <tr 
                       key={customer.email} 
-                      onClick={() => handleOpenCustomerDetail(customer)}
-                      className="hover:bg-slate-50/80 transition-colors cursor-pointer"
+                      className="hover:bg-slate-50/80 transition-colors"
                     >
                       {/* Customer Name */}
                       <td className="py-4 pl-6 pr-4 whitespace-nowrap">
@@ -520,12 +722,57 @@ export function CustomersList() {
                           }
                         })()}
                       </td>
+
+                      {/* Acción */}
+                      <td className="py-4 pl-4 pr-6 whitespace-nowrap text-right">
+                        <Button
+                          size="sm"
+                          variant="outline"
+                          onClick={() => handleOpenCustomerDetail(customer)}
+                          className="h-8 text-xs"
+                        >
+                          <Eye className="w-3.5 h-3.5 mr-1.5" />
+                          Ver ficha
+                        </Button>
+                      </td>
                     </tr>
                   ))
                 )}
               </tbody>
             </table>
           </div>
+
+          {filteredCustomers.length > 0 && (
+            <div className="flex items-center justify-between px-6 py-3 border-t border-slate-100 bg-slate-50/40">
+              <p className="text-xs text-slate-500">
+                Mostrando {Math.min((currentPage - 1) * ITEMS_PER_PAGE + 1, filteredCustomers.length)}-
+                {Math.min(currentPage * ITEMS_PER_PAGE, filteredCustomers.length)} de {filteredCustomers.length}
+              </p>
+              <div className="flex items-center gap-1.5">
+                <Button
+                  variant="outline"
+                  size="sm"
+                  className="h-8 px-2"
+                  disabled={currentPage === 1}
+                  onClick={() => setCurrentPage((p) => Math.max(1, p - 1))}
+                >
+                  <ChevronLeft className="w-4 h-4" />
+                </Button>
+                <span className="text-xs text-slate-600 px-2">
+                  Página {currentPage} de {totalPages}
+                </span>
+                <Button
+                  variant="outline"
+                  size="sm"
+                  className="h-8 px-2"
+                  disabled={currentPage === totalPages}
+                  onClick={() => setCurrentPage((p) => Math.min(totalPages, p + 1))}
+                >
+                  <ChevronRight className="w-4 h-4" />
+                </Button>
+              </div>
+            </div>
+          )}
         </CardContent>
       </Card>
     </div>

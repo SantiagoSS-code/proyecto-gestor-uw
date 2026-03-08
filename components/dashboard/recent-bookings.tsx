@@ -10,51 +10,33 @@ import {
 } from "@/components/ui/table"
 import { Badge } from "@/components/ui/badge"
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
+import { CalendarDays } from "lucide-react"
 
-const bookings = [
-  {
-    id: "INV001",
-    customer: "Martin Berasategui",
-    time: "18:00 - 19:30",
-    court: "Cancha 1",
-    amount: "$24.00",
-    status: "Confirmada",
-    statusVariant: "default",
-    type: "Padel",
-  },
-  {
-    id: "INV002",
-    customer: "Carolina Marin",
-    time: "19:00 - 20:00",
-    court: "Cancha 3",
-    amount: "$18.00",
-    status: "Pendiente",
-    statusVariant: "secondary",
-    type: "Tenis",
-  },
-  {
-    id: "INV003",
-    customer: "Rafa Nadal",
-    time: "20:00 - 21:30",
-    court: "Cancha 2",
-    amount: "$32.00",
-    status: "Confirmada",
-    statusVariant: "default",
-    type: "Padel",
-  },
-  {
-    id: "INV004",
-    customer: "Carlos Alcaraz",
-    time: "10:00 - 11:30",
-    court: "Cancha 1",
-    amount: "$24.00",
-    status: "Cancelada",
-    statusVariant: "destructive",
-    type: "Padel",
-  },
-]
+interface BookingRow {
+  id: string
+  customer: string
+  time: string
+  court: string
+  amount: string
+  status: string
+  statusVariant: "default" | "secondary" | "destructive" | "outline"
+}
 
-export function RecentBookings() {
+interface RecentBookingsProps {
+  bookings: BookingRow[]
+}
+
+export function RecentBookings({ bookings }: RecentBookingsProps) {
+  if (bookings.length === 0) {
+    return (
+      <div className="py-10 flex flex-col items-center justify-center text-center">
+        <CalendarDays className="w-8 h-8 text-slate-300 mb-2" />
+        <p className="text-sm font-medium text-slate-600">No hay próximas reservas</p>
+        <p className="text-xs text-slate-500 mt-1">Cuando se generen nuevas reservas aparecerán aquí.</p>
+      </div>
+    )
+  }
+
   return (
     <div className="space-y-4">
       <Table>
