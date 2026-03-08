@@ -11,6 +11,7 @@ import { Label } from "@/components/ui/label"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Alert, AlertDescription } from "@/components/ui/alert"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
+import { Switch } from "@/components/ui/switch"
 import { Loader2, CheckCircle, AlertCircle, Plus, Trash2, ChevronDown, MapPin, Building2, Eye } from "lucide-react"
 import { CENTER_SETTINGS_DOCS, CENTER_SUBCOLLECTIONS, FIRESTORE_COLLECTIONS } from "@/lib/firestorePaths"
 import { Country, State } from "country-state-city"
@@ -80,6 +81,7 @@ export default function SettingsPage() {
 		coverImageUrl: '',
 		logoUrl: '',
 		socialLinks: [] as { platform: string; url: string }[],
+		published: false,
 
 		// legacy kept for backward compatibility (hidden in UI)
 		lat: '',
@@ -186,45 +188,46 @@ export default function SettingsPage() {
 						coverImageUrl: (data as any).coverImageUrl || publicData.coverImageUrl || '',
 						logoUrl: (data as any).logoUrl || publicData.logoUrl || '',
 						socialLinks: Array.isArray((data as any).socialLinks) ? (data as any).socialLinks : Array.isArray(publicData.socialLinks) ? publicData.socialLinks : [],
-						lat: typeof location?.lat === 'number' ? String(location.lat) : '',
-						lng: typeof location?.lng === 'number' ? String(location.lng) : '',
-						centerContactName: centerContact?.name || data.name || '',
-						centerContactEmail: centerContact?.email || '',
-						centerContactPhone: centerContact?.phone || data.phone || '',
-						adminContactName: adminContact?.name || '',
-						adminContactEmail: adminContact?.email || data.email || '',
-						adminContactPhone: adminContact?.phone || '',
-					})
+					published: publicData.published === true,
+					lat: typeof location?.lat === 'number' ? String(location.lat) : '',
+					lng: typeof location?.lng === 'number' ? String(location.lng) : '',
+					centerContactName: centerContact?.name || data.name || '',
+					centerContactEmail: centerContact?.email || '',
+					centerContactPhone: centerContact?.phone || data.phone || '',
+					adminContactName: adminContact?.name || '',
+					adminContactEmail: adminContact?.email || data.email || '',
+					adminContactPhone: adminContact?.phone || '',
+				})
 
-					const bookingSettingsRef = doc(
-						db,
-						FIRESTORE_COLLECTIONS.centers,
-						user.uid,
-						CENTER_SUBCOLLECTIONS.settings,
-						CENTER_SETTINGS_DOCS.booking
-					)
-					const bookingSettingsSnap = await getDoc(bookingSettingsRef)
-					if (bookingSettingsSnap.exists()) {
-						const bookingSettings = bookingSettingsSnap.data() as any
-						const openingHours = bookingSettings?.openingHours || {}
-						const nextDays: Record<string, OpeningDay> = { ...DEFAULT_OPENING_DAYS }
-						for (const key of Object.keys(nextDays)) {
-							const dayData = openingHours?.[key]
-							if (!dayData) continue
-							nextDays[key] = {
-								enabled: dayData.closed !== true,
-								open: dayData.open || nextDays[key].open,
-								close: dayData.close || nextDays[key].close,
-							}
+				const bookingSettingsRef = doc(
+					db,
+					FIRESTORE_COLLECTIONS.centers,
+					user.uid,
+					CENTER_SUBCOLLECTIONS.settings,
+					CENTER_SETTINGS_DOCS.booking
+				)
+				const bookingSettingsSnap = await getDoc(bookingSettingsRef)
+				if (bookingSettingsSnap.exists()) {
+					const bookingSettings = bookingSettingsSnap.data() as any
+					const openingHours = bookingSettings?.openingHours || {}
+					const nextDays: Record<string, OpeningDay> = { ...DEFAULT_OPENING_DAYS }
+					for (const key of Object.keys(nextDays)) {
+						const dayData = openingHours?.[key]
+						if (!dayData) continue
+						nextDays[key] = {
+							enabled: dayData.closed !== true,
+							open: dayData.open || nextDays[key].open,
+							close: dayData.close || nextDays[key].close,
 						}
-						setOpeningDays(nextDays)
-					} else if ((data as any).openingTime && (data as any).closingTime) {
-						const fallbackDays: Record<string, OpeningDay> = { ...DEFAULT_OPENING_DAYS }
-						for (const key of Object.keys(fallbackDays)) {
-							fallbackDays[key] = {
-								enabled: key !== "0",
-								open: (data as any).openingTime,
-								close: (data as any).closingTime,
+					}
+					setOpeningDays(nextDays)
+				} else if ((data as any).openingTime && (data as any).closingTime) {
+					const fallbackDays: Record<string, OpeningDay> = { ...DEFAULT_OPENING_DAYS }
+					for (const key of Object.keys(fallbackDays)) {
+						fallbackDays[key] = {
+							enabled: key !== "0",
+							open: (data as any).openingTime,
+							close: (data as any).closingTime,
 							}
 						}
 						setOpeningDays(fallbackDays)
@@ -247,7 +250,7 @@ export default function SettingsPage() {
 		}
 	}, [user, authLoading])
 
-	const handleInputChange = (field: string, value: string) => {
+	const handleInputChange = (field: string, value: string | boolean) => {
 		setFormData(prev => ({ ...prev, [field]: value }))
 	}
 
@@ -382,6 +385,7 @@ export default function SettingsPage() {
 					coverImageUrl: formData.coverImageUrl || null,
 					logoUrl: formData.logoUrl || null,
 					socialLinks: sanitizedSocialLinks,
+					published: formData.published,
 					updatedAt: serverTimestamp(),
 				},
 				{ merge: true }
@@ -473,6 +477,17 @@ export default function SettingsPage() {
 									<Label htmlFor="phone">Teléfono</Label>
 									<Input id="phone" value={formData.phone} onChange={(e) => handleInputChange('phone', e.target.value)} className="h-11" />
 								</div>
+							</div>
+
+							<div className="flex items-center justify-between p-4 rounded-lg border border-slate-200 bg-slate-50">
+								<div>
+									<p className="text-sm font-medium text-slate-900">Publicar en catálogo</p>
+									<p className="text-xs text-slate-500 mt-0.5">Los jugadores podrán encontrar y reservar en tu centro.</p>
+								</div>
+								<Switch
+									checked={formData.published}
+									onCheckedChange={(checked) => handleInputChange('published', checked)}
+								/>
 							</div>
 
 							<div className="rounded-lg border border-slate-200 overflow-hidden">
