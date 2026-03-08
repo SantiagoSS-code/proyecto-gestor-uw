@@ -16,6 +16,31 @@ function addMinutes(date: Date, minutes: number) {
   return new Date(date.getTime() + minutes * 60000)
 }
 
+type CenterOperationSettings = {
+  depositEnabled?: boolean
+  depositPercent?: number
+}
+
+async function loadOperationSettings(centerId: string): Promise<CenterOperationSettings> {
+  const refs = [
+    adminDb.collection("centers").doc(centerId).collection("settings").doc("operations"),
+    adminDb.collection("padel_centers").doc(centerId).collection("settings").doc("operations"),
+  ]
+
+  for (const ref of refs) {
+    const snap = await ref.get()
+    if (snap.exists) {
+      const data = snap.data() as CenterOperationSettings
+      return {
+        depositEnabled: Boolean(data?.depositEnabled),
+        depositPercent: Number.isFinite(Number(data?.depositPercent)) ? Number(data?.depositPercent) : 0,
+      }
+    }
+  }
+
+  return { depositEnabled: false, depositPercent: 0 }
+}
+
 export async function POST(request: Request) {
   try {
     const body = await request.json()
@@ -60,9 +85,18 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: "Court price is not configured" }, { status: 400 })
     }
 
-    // Mercado Pago uses currency units (e.g. ARS), not cents.
-    const amount = Number(((court.pricePerHour * parsedDurationMinutes) / 60).toFixed(2))
+    const reservationTotal = Number(((court.pricePerHour * parsedDurationMinutes) / 60).toFixed(2))
     const currencyId = (court.currency || "ARS").toUpperCase()
+
+    const operationSettings = await loadOperationSettings(centerId)
+    const depositEnabled = Boolean(operationSettings.depositEnabled)
+    const depositPercentRaw = Number(operationSettings.depositPercent || 0)
+    const depositPercent = Math.max(0, Math.min(100, depositPercentRaw))
+
+    const reservationAmountToCharge = depositEnabled
+      ? Number(((reservationTotal * depositPercent) / 100).toFixed(2))
+      : reservationTotal
+    const totalToChargeNow = Number(reservationAmountToCharge.toFixed(2))
 
     const origin = request.headers.get("origin") || process.env.NEXT_PUBLIC_BASE_URL || "http://localhost:3000"
     const notificationUrl = `${origin}/api/mercadopago/webhook`
@@ -116,9 +150,9 @@ export async function POST(request: Request) {
       external_reference: bookingId,
       items: [
         {
-          title: `${court.name} - ${parsedDurationMinutes} min`,
+          title: depositEnabled ? `Seña de reserva - ${court.name}` : `${court.name} - ${parsedDurationMinutes} min`,
           quantity: 1,
-          unit_price: amount,
+          unit_price: reservationAmountToCharge,
           currency_id: currencyId,
         },
       ],
@@ -171,6 +205,14 @@ export async function POST(request: Request) {
       payment: {
         provider: "mercadopago",
         preferenceId: mpData.id,
+        pricing: {
+          reservationTotal,
+          depositEnabled,
+          depositPercent: depositEnabled ? depositPercent : 100,
+          reservationAmountCharged: reservationAmountToCharge,
+          totalChargedNow: totalToChargeNow,
+          currency: currencyId,
+        },
       },
       updatedAt: FieldValue.serverTimestamp(),
     })

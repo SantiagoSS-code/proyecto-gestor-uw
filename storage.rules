@@ -1,0 +1,21 @@
+rules_version = '2';
+service firebase.storage {
+  match /b/{bucket}/o {
+    // Centros: cada admin solo puede gestionar sus propios assets
+    match /centers/{centerId}/{allPaths=**} {
+      allow read: if true;
+      allow write: if request.auth != null && request.auth.uid == centerId;
+    }
+
+    // Backward-compat con flujo de registro antiguo
+    match /center-images/{allPaths=**} {
+      allow read: if true;
+      allow write: if request.auth != null;
+    }
+
+    // Denegar todo lo demás
+    match /{allPaths=**} {
+      allow read, write: if false;
+    }
+  }
+}

@@ -3,6 +3,7 @@ import "server-only"
 import { initializeApp, cert, getApps, getApp } from "firebase-admin/app"
 import { getAuth } from "firebase-admin/auth"
 import { getFirestore } from "firebase-admin/firestore"
+import { getStorage } from "firebase-admin/storage"
 
 let cachedApp: ReturnType<typeof getApp> | null = null
 
@@ -69,3 +70,12 @@ export const adminDb = new Proxy({} as ReturnType<typeof getFirestore>, {
     return typeof value === "function" ? value.bind(db) : value
   },
 })
+
+export function getAdminStorageBucket() {
+  const app = getAdminApp()
+  const configuredBucket =
+    process.env.FIREBASE_STORAGE_BUCKET ||
+    process.env.NEXT_PUBLIC_FIREBASE_STORAGE_BUCKET ||
+    undefined
+  return configuredBucket ? getStorage(app).bucket(configuredBucket) : getStorage(app).bucket()
+}

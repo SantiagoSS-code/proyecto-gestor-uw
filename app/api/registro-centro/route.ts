@@ -35,13 +35,12 @@ export async function POST(request: Request) {
     }
 
     const ensureUniqueSlug = async (name: string, centerId: string) => {
+      const code = centerId.slice(0, 6).toLowerCase()
       const base = slugify(name)
-      let candidate = base || `club-${centerId.slice(0, 6)}`
+      const candidate = `${base || "club"}-${code}`
       const existing = await adminDb.collection("centers").where("slug", "==", candidate).limit(1).get()
-      if (!existing.empty && existing.docs[0]?.id !== centerId) {
-        candidate = `${candidate}-${centerId.slice(0, 6)}`
-      }
-      return candidate
+      if (existing.empty || existing.docs[0]?.id === centerId) return candidate
+      return `${candidate}-${Date.now().toString().slice(-4)}`
     }
 
     if (isGoogleUser) {
@@ -85,6 +84,7 @@ export async function POST(request: Request) {
           coverImageUrl: resolvedImageUrl,
           galleryImageUrls: resolvedImageUrl ? [resolvedImageUrl] : [],
           slug,
+          centerCode: userId.slice(0, 6).toLowerCase(),
           published: true,
           featuredRank: null,
           topSearchedRank: null,
@@ -186,6 +186,7 @@ export async function POST(request: Request) {
           coverImageUrl: resolvedImageUrl,
           galleryImageUrls: resolvedImageUrl ? [resolvedImageUrl] : [],
           slug,
+          centerCode: userRecord.uid.slice(0, 6).toLowerCase(),
           published: true,
           featuredRank: null,
           topSearchedRank: null,

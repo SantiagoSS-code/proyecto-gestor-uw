@@ -31,6 +31,31 @@ function addMinutes(date: Date, minutes: number) {
   return new Date(date.getTime() + minutes * 60000)
 }
 
+type CenterOperationSettings = {
+  depositEnabled?: boolean
+  depositPercent?: number
+}
+
+async function loadOperationSettings(centerId: string): Promise<CenterOperationSettings> {
+  const refs = [
+    adminDb.collection("centers").doc(centerId).collection("settings").doc("operations"),
+    adminDb.collection("padel_centers").doc(centerId).collection("settings").doc("operations"),
+  ]
+
+  for (const ref of refs) {
+    const snap = await ref.get()
+    if (snap.exists) {
+      const data = snap.data() as CenterOperationSettings
+      return {
+        depositEnabled: Boolean(data?.depositEnabled),
+        depositPercent: Number.isFinite(Number(data?.depositPercent)) ? Number(data?.depositPercent) : 0,
+      }
+    }
+  }
+
+  return { depositEnabled: false, depositPercent: 0 }
+}
+
 export async function POST(request: Request) {
   try {
     const body = await request.json()
@@ -113,8 +138,18 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: "Court price is not configured" }, { status: 400 })
     }
 
-    const amount = Math.round((court.pricePerHour * parsedDurationMinutes) / 60 * 100)
+    const reservationTotal = (court.pricePerHour * parsedDurationMinutes) / 60
     const currency = (court.currency || "USD").toLowerCase()
+
+    const operationSettings = await loadOperationSettings(centerId)
+    const depositEnabled = Boolean(operationSettings.depositEnabled)
+    const depositPercentRaw = Number(operationSettings.depositPercent || 0)
+    const depositPercent = Math.max(0, Math.min(100, depositPercentRaw))
+
+    const reservationAmountToCharge = depositEnabled ? (reservationTotal * depositPercent) / 100 : reservationTotal
+
+    const reservationAmountCents = Math.round(reservationAmountToCharge * 100)
+    const totalChargedNowCents = reservationAmountCents
 
     const origin = request.headers.get("origin") || process.env.NEXT_PUBLIC_BASE_URL || "http://localhost:3000"
 
@@ -125,9 +160,9 @@ export async function POST(request: Request) {
         {
           price_data: {
             currency,
-            unit_amount: amount,
+            unit_amount: reservationAmountCents,
             product_data: {
-              name: `${court.name} - ${parsedDurationMinutes} min`,
+              name: depositEnabled ? `Seña de reserva - ${court.name}` : `${court.name} - ${parsedDurationMinutes} min`,
             },
           },
           quantity: 1,
@@ -142,6 +177,11 @@ export async function POST(request: Request) {
         bookingId,
         startAt: startAt.toISOString(),
         endAt: endAt.toISOString(),
+        reservationTotal: reservationTotal.toFixed(2),
+        depositEnabled: String(depositEnabled),
+        depositPercent: String(depositEnabled ? depositPercent : 100),
+        reservationAmountCharged: (reservationAmountCents / 100).toFixed(2),
+        totalChargedNow: (totalChargedNowCents / 100).toFixed(2),
       },
     })
 
@@ -153,6 +193,14 @@ export async function POST(request: Request) {
       payment: {
         provider: "stripe",
         sessionId: session.id,
+        pricing: {
+          reservationTotal: Number(reservationTotal.toFixed(2)),
+          depositEnabled,
+          depositPercent: depositEnabled ? depositPercent : 100,
+          reservationAmountCharged: Number((reservationAmountCents / 100).toFixed(2)),
+          totalChargedNow: Number((totalChargedNowCents / 100).toFixed(2)),
+          currency: currency.toUpperCase(),
+        },
       },
       updatedAt: FieldValue.serverTimestamp(),
     })

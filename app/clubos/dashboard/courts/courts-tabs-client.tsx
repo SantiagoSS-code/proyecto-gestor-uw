@@ -6,6 +6,7 @@ import { CourtsLayout } from "@/components/dashboard/courts-layout"
 import { cn } from "@/lib/utils"
 import { CourtsTab } from "@/components/dashboard/center/courts-tab"
 import { ScheduleTab } from "@/components/dashboard/center/schedule-tab"
+import { useOnboarding } from "@/lib/onboarding"
 
 const TABS = [
   { key: "courts", label: "Canchas" },
@@ -17,6 +18,7 @@ type TabKey = (typeof TABS)[number]["key"]
 export default function CourtsTabsClient() {
   const searchParams = useSearchParams()
   const router = useRouter()
+  const { isOnboarding, completeStep } = useOnboarding()
   const [justCreatedCourtId, setJustCreatedCourtId] = useState<string | null>(null)
   const [tab, setTabState] = useState<TabKey>("courts")
   const activeTab: TabKey = useMemo(() => (TABS.some((t) => t.key === tab) ? tab : "courts"), [tab])
@@ -33,9 +35,19 @@ export default function CourtsTabsClient() {
     router.push(url.pathname + url.search)
   }
 
-  const handleCourtCreated = (courtId: string, courtName: string) => {
+  const handleCourtCreated = async (courtId: string, courtName: string) => {
     setJustCreatedCourtId(courtId)
-    // Auto-switch a tab de horarios
+
+    if (isOnboarding) {
+      // Complete courts step and redirect to Centro for publish
+      const nextHref = await completeStep("courts")
+      if (nextHref) {
+        router.push(nextHref)
+        return
+      }
+    }
+
+    // Normal flow: auto-switch to schedule tab
     setTab("schedule")
   }
 
@@ -44,6 +56,14 @@ export default function CourtsTabsClient() {
       title="Canchas y Horarios"
       description="Administra todas las canchas de tu complejo y sus franjas horarias disponibles para reservas."
     >
+      {isOnboarding && (
+        <div className="mb-6 rounded-lg bg-blue-50 border border-blue-200 px-4 py-3 flex gap-3 text-sm text-blue-800">
+          <span className="text-lg leading-none">🎾</span>
+          <p>
+            <strong>Creá al menos una cancha</strong> para continuar. Una vez que la guardes, vas a poder enviar tu centro a verificación.
+          </p>
+        </div>
+      )}
       <div className="flex flex-wrap items-center justify-between gap-4 mb-6">
         <div className="inline-flex h-10 items-center justify-center rounded-md bg-muted p-1 text-muted-foreground w-full sm:w-auto">
           {TABS.map((t) => (

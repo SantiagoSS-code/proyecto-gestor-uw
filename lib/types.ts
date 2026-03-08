@@ -48,6 +48,14 @@ export interface PadelCenterClient {
     center?: ContactProfile;
     admin?: ContactProfile;
   };
+  shortDescription?: string;
+  coverImageUrl?: string | null;
+  logoUrl?: string | null;
+  amenities?: AmenityKey[];
+  slug?: string;
+  centerCode?: string;
+  published?: boolean;
+  publicationReady?: boolean;
   plan: string;
   status: string;
   createdAt: Date;
@@ -113,9 +121,12 @@ export interface CenterProfile {
   amenities?: AmenityKey[];
   sports?: SportKey[];
   coverImageUrl?: string | null;
+  logoUrl?: string | null;
   galleryImageUrls?: string[];
   slug?: string;
+  centerCode?: string;
   published?: boolean;
+  publicationReady?: boolean;
   classesEnabled?: boolean;
   featuredRank?: number | null;
   topSearchedRank?: number | null;
@@ -166,6 +177,11 @@ export interface OperationSettings {
   peakHoursEnd: string;         // "22:00"
   peakPriceMultiplier: number;  // e.g. 1.5
   weekendPriceMultiplier: number; // e.g. 1.25
+
+  // Seña de reserva
+  depositEnabled: boolean;
+  depositPercent: number;       // 0-100
+  remainingPaymentInstructions: string;
 
   // Feriados
   holidays: HolidayEntry[];

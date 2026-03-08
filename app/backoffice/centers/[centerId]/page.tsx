@@ -25,6 +25,8 @@ export default function BackofficeCenterDetailPage() {
     return v === null || typeof v === "undefined" ? "" : String(v)
   }, [data])
 
+  const centerCode = useMemo(() => (centerId ? String(centerId).slice(0, 6).toLowerCase() : ""), [centerId])
+
   const load = async () => {
     try {
       setError(null)
@@ -116,9 +118,39 @@ export default function BackofficeCenterDetailPage() {
             <CardContent className="space-y-2 text-sm">
               <div><span className="text-slate-600">Name:</span> {data.center.name || "—"}</div>
               <div><span className="text-slate-600">Email:</span> {data.center.email || "—"}</div>
+              <div><span className="text-slate-600">Center code:</span> <span className="font-mono text-xs">{centerCode || "—"}</span></div>
               <div><span className="text-slate-600">Slug:</span> <span className="font-mono text-xs">{data.center.slug || "—"}</span></div>
               <div><span className="text-slate-600">Published:</span> {data.center.published ? "Yes" : "No"}</div>
+              <div><span className="text-slate-600">Publication ready:</span> {data.center.publicationReady ? "Yes" : "No"}</div>
               <div><span className="text-slate-600">Status:</span> {data.center.status || "active"}</div>
+
+              <div>
+                <span className="text-slate-600">Amenities:</span>{" "}
+                {Array.isArray(data.center.amenities) && data.center.amenities.length
+                  ? data.center.amenities.join(", ")
+                  : "—"}
+              </div>
+
+              <div className="pt-2 grid grid-cols-1 sm:grid-cols-2 gap-3">
+                <div>
+                  <div className="text-slate-600 mb-1">Cover image</div>
+                  {data.center.coverImageUrl ? (
+                    // eslint-disable-next-line @next/next/no-img-element
+                    <img src={data.center.coverImageUrl} alt="cover" className="h-24 w-full rounded-md border border-slate-200 object-cover" />
+                  ) : (
+                    <div className="h-24 w-full rounded-md border border-dashed border-slate-200 text-slate-400 flex items-center justify-center text-xs">No image</div>
+                  )}
+                </div>
+                <div>
+                  <div className="text-slate-600 mb-1">Logo</div>
+                  {data.center.logoUrl ? (
+                    // eslint-disable-next-line @next/next/no-img-element
+                    <img src={data.center.logoUrl} alt="logo" className="h-24 w-24 rounded-md border border-slate-200 object-cover" />
+                  ) : (
+                    <div className="h-24 w-24 rounded-md border border-dashed border-slate-200 text-slate-400 flex items-center justify-center text-xs">No logo</div>
+                  )}
+                </div>
+              </div>
 
               <div className="pt-3 flex flex-wrap gap-2">
                 <Button className="bg-blue-600 hover:bg-blue-700" disabled={saving} onClick={togglePublished}>

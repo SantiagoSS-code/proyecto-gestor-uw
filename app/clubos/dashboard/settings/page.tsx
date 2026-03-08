@@ -3,8 +3,9 @@
 import { useState, useEffect, useMemo } from "react"
 import { useRouter } from "next/navigation"
 import { doc, getDoc, setDoc, serverTimestamp } from "firebase/firestore"
+import { getDownloadURL, ref, uploadBytesResumable } from "firebase/storage"
 import { useAuth } from "@/lib/auth-context"
-import { db } from "@/lib/firebaseClient"
+import { auth, db, storage } from "@/lib/firebaseClient"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
@@ -12,14 +13,27 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Alert, AlertDescription } from "@/components/ui/alert"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { Switch } from "@/components/ui/switch"
-import { Loader2, CheckCircle, AlertCircle, Plus, Trash2, ChevronDown, MapPin, Building2, Eye } from "lucide-react"
+import { Loader2, CheckCircle, AlertCircle, Plus, Trash2, ChevronDown, MapPin, Building2, Eye, Upload } from "lucide-react"
 import { CENTER_SETTINGS_DOCS, CENTER_SUBCOLLECTIONS, FIRESTORE_COLLECTIONS } from "@/lib/firestorePaths"
 import { Country, State } from "country-state-city"
 import { showSavePopupAndRefresh } from "@/lib/save-feedback"
+import { slugify } from "@/lib/utils"
+import { useOnboarding } from "@/lib/onboarding"
 
 import { PadelCenterClient } from "@/lib/types"
 
 const SPORT_OPTIONS = ["padel", "tennis", "futbol", "pickleball", "squash"]
+const AMENITY_OPTIONS = [
+	{ key: "bar", label: "Bar" },
+	{ key: "bathrooms", label: "Baños" },
+	{ key: "showers", label: "Duchas" },
+	{ key: "gym", label: "Gimnasio" },
+	{ key: "parking", label: "Estacionamiento" },
+	{ key: "lockers", label: "Lockers" },
+	{ key: "wifi", label: "Wifi" },
+	{ key: "shop", label: "Tienda" },
+	{ key: "cafeteria", label: "Cafetería" },
+] as const
 const SOCIAL_OPTIONS = [
 	{ value: "instagram", label: "Instagram" },
 	{ value: "facebook", label: "Facebook" },
@@ -59,6 +73,7 @@ const DEFAULT_OPENING_DAYS: Record<string, OpeningDay> = {
 
 export default function SettingsPage() {
 	const { user, loading: authLoading } = useAuth()
+	const { isOnboarding, completeStep } = useOnboarding()
 	const router = useRouter()
 	const [loading, setLoading] = useState(true)
 	const [saving, setSaving] = useState(false)
@@ -80,6 +95,7 @@ export default function SettingsPage() {
 		shortDescription: '',
 		coverImageUrl: '',
 		logoUrl: '',
+		amenities: [] as string[],
 		socialLinks: [] as { platform: string; url: string }[],
 		published: false,
 
@@ -95,11 +111,21 @@ export default function SettingsPage() {
 	})
 	const [openingDays, setOpeningDays] = useState<Record<string, OpeningDay>>({ ...DEFAULT_OPENING_DAYS })
 	const [message, setMessage] = useState<{ type: 'success' | 'error', text: string } | null>(null)
+	const [uploadingCover, setUploadingCover] = useState(false)
+	const [uploadingLogo, setUploadingLogo] = useState(false)
 	const [openSections, setOpenSections] = useState<Record<string, boolean>>({
 		direccion: false,
 		horarios: false,
 		perfil: false,
 	})
+
+	const centerCode = useMemo(() => (user?.uid ? user.uid.slice(0, 6).toLowerCase() : ""), [user?.uid])
+	const slugPreview = useMemo(() => {
+		const base = slugify(formData.name || "centro")
+		if (!base && !centerCode) return ""
+		if (!centerCode) return base
+		return `${base || "centro"}-${centerCode}`
+	}, [centerCode, formData.name])
 
 	const countryOptions = useMemo(
 		() => Country.getAllCountries().map((country) => ({ isoCode: country.isoCode, name: country.name })).sort((a, b) => a.name.localeCompare(b.name)),
@@ -118,6 +144,23 @@ export default function SettingsPage() {
 			.map((state) => ({ isoCode: state.isoCode, name: state.name }))
 			.sort((a, b) => a.name.localeCompare(b.name))
 	}, [selectedCountry])
+
+	const publicationChecklist = useMemo(
+		() => [
+			{ id: "name", label: "Nombre del centro", done: formData.name.trim().length > 2, optional: false },
+			{ id: "address", label: "Dirección completa", done: [formData.street, formData.streetNumber, formData.city, formData.country].every((v) => v.trim().length > 0), optional: false },
+			{ id: "sports", label: "Al menos 1 deporte", done: formData.sports.length > 0, optional: false },
+			{ id: "amenities", label: "Amenities seleccionados", done: formData.amenities.length > 0, optional: false },
+			{ id: "description", label: "Descripción del club", done: formData.shortDescription.trim().length >= 20, optional: false },
+			{ id: "cover", label: "Foto de portada", done: formData.coverImageUrl.trim().length > 0, optional: isOnboarding },
+		],
+		[formData, isOnboarding]
+	)
+
+	const readyForPublication = useMemo(
+		() => publicationChecklist.every((item) => item.optional || item.done),
+		[publicationChecklist]
+	)
 
 	const toggleSection = (section: string) => {
 		setOpenSections(prev => ({ ...prev, [section]: !prev[section] }))
@@ -142,6 +185,85 @@ export default function SettingsPage() {
 			locality: '',
 			postalCode: '',
 		}))
+	}
+
+	const toggleAmenity = (amenity: string) => {
+		setFormData((prev) => ({
+			...prev,
+			amenities: prev.amenities.includes(amenity)
+				? prev.amenities.filter((a) => a !== amenity)
+				: [...prev.amenities, amenity],
+		}))
+	}
+
+	const uploadCenterImage = async (file: File, type: "cover" | "logo") => {
+		if (!user) return null
+
+		const currentUser = auth?.currentUser
+		if (!currentUser) throw new Error("No authenticated user")
+		const token = await currentUser.getIdToken()
+
+		const body = new FormData()
+		body.append("centerId", user.uid)
+		body.append("kind", type)
+		body.append("file", file)
+
+		const controller = new AbortController()
+		const timeout = setTimeout(() => controller.abort(), 30000)
+
+		try {
+			const res = await fetch("/api/centers/upload-image", {
+				method: "POST",
+				headers: { Authorization: `Bearer ${token}` },
+				body,
+				signal: controller.signal,
+			})
+			const data = await res.json().catch(() => null)
+			if (!res.ok) {
+				throw new Error(data?.error || `Upload failed (${res.status})`)
+			}
+			return data?.imageUrl || null
+		} finally {
+			clearTimeout(timeout)
+		}
+	}
+
+	const handleCoverFileChange = async (event: React.ChangeEvent<HTMLInputElement>) => {
+		const file = event.target.files?.[0]
+		if (!file) return
+		try {
+			setUploadingCover(true)
+			const imageUrl = await uploadCenterImage(file, "cover")
+			if (imageUrl) setFormData((prev) => ({ ...prev, coverImageUrl: imageUrl }))
+		} catch (error: any) {
+			console.error("Error uploading cover image:", error)
+			const msg = error?.name === "AbortError"
+				? "La subida tardó demasiado. Intentá nuevamente."
+				: error?.message || "No se pudo subir la foto de portada."
+			showSavePopupAndRefresh(msg, "error")
+		} finally {
+			setUploadingCover(false)
+			event.target.value = ""
+		}
+	}
+
+	const handleLogoFileChange = async (event: React.ChangeEvent<HTMLInputElement>) => {
+		const file = event.target.files?.[0]
+		if (!file) return
+		try {
+			setUploadingLogo(true)
+			const imageUrl = await uploadCenterImage(file, "logo")
+			if (imageUrl) setFormData((prev) => ({ ...prev, logoUrl: imageUrl }))
+		} catch (error: any) {
+			console.error("Error uploading logo:", error)
+			const msg = error?.name === "AbortError"
+				? "La subida tardó demasiado. Intentá nuevamente."
+				: error?.message || "No se pudo subir el logo."
+			showSavePopupAndRefresh(msg, "error")
+		} finally {
+			setUploadingLogo(false)
+			event.target.value = ""
+		}
 	}
 
 	// Redirect if not authenticated
@@ -187,6 +309,7 @@ export default function SettingsPage() {
 						shortDescription: (data as any).shortDescription || publicData.shortDescription || publicData.description || '',
 						coverImageUrl: (data as any).coverImageUrl || publicData.coverImageUrl || '',
 						logoUrl: (data as any).logoUrl || publicData.logoUrl || '',
+						amenities: Array.isArray((data as any).amenities) ? (data as any).amenities : Array.isArray(publicData.amenities) ? publicData.amenities : [],
 						socialLinks: Array.isArray((data as any).socialLinks) ? (data as any).socialLinks : Array.isArray(publicData.socialLinks) ? publicData.socialLinks : [],
 					published: publicData.published === true,
 					lat: typeof location?.lat === 'number' ? String(location.lat) : '',
@@ -233,9 +356,8 @@ export default function SettingsPage() {
 						setOpeningDays(fallbackDays)
 					}
 				} else {
-					// Redirect to registration if center data doesn't exist
-					router.push('/registro-centros')
-					return
+					// No center doc yet (new account) — keep empty form, user will save it
+					setCenterData({} as PadelCenterClient)
 				}
 			} catch (error) {
 				console.error('Error fetching center data:', error)
@@ -303,16 +425,22 @@ export default function SettingsPage() {
 	}
 
 	const handleSave = async () => {
-		if (!user || !centerData) return
+		if (!user) return
 
 		setSaving(true)
 		setMessage(null)
 
 		try {
+			if (formData.published && !readyForPublication) {
+				showSavePopupAndRefresh("Completá el checklist antes de publicar el centro.", "error")
+				return
+			}
+
 			const streetLine = [formData.street.trim(), formData.streetNumber.trim()].filter(Boolean).join(" ")
 			const composedAddress = [streetLine, formData.locality.trim(), formData.city.trim(), formData.province.trim(), formData.postalCode.trim(), formData.country.trim()]
 				.filter(Boolean)
 				.join(", ")
+			const slug = slugPreview || `${slugify(formData.name || "centro")}-${centerCode}`
 			const sanitizedSocialLinks = formData.socialLinks
 				.map((link) => ({ platform: link.platform, url: link.url.trim() }))
 				.filter((link) => link.url.length > 0)
@@ -331,7 +459,7 @@ export default function SettingsPage() {
 			await setDoc(centerRef, {
 				name: formData.name,
 				phone: formData.phone,
-				address: composedAddress || centerData.address || '',
+				address: composedAddress || centerData?.address || '',
 				street: formData.street,
 				street_number: formData.streetNumber,
 				province: formData.province,
@@ -346,6 +474,9 @@ export default function SettingsPage() {
 				shortDescription: formData.shortDescription,
 				coverImageUrl: formData.coverImageUrl || null,
 				logoUrl: formData.logoUrl || null,
+				amenities: formData.amenities,
+				slug,
+				centerCode,
 				socialLinks: sanitizedSocialLinks,
 				contacts: {
 					center: {
@@ -368,7 +499,7 @@ export default function SettingsPage() {
 				{
 					name: formData.name,
 					phone: formData.phone,
-					address: composedAddress || centerData.address || '',
+					address: composedAddress || centerData?.address || '',
 					street: formData.street,
 					streetNumber: formData.streetNumber,
 					province: formData.province,
@@ -384,6 +515,10 @@ export default function SettingsPage() {
 					description: formData.shortDescription,
 					coverImageUrl: formData.coverImageUrl || null,
 					logoUrl: formData.logoUrl || null,
+					amenities: formData.amenities,
+					slug,
+					centerCode,
+					publicationReady: readyForPublication,
 					socialLinks: sanitizedSocialLinks,
 					published: formData.published,
 					updatedAt: serverTimestamp(),
@@ -407,11 +542,30 @@ export default function SettingsPage() {
 				{ merge: true }
 			)
 
-			showSavePopupAndRefresh("Cambios guardados correctamente.")
+			if (isOnboarding) {
+				// Complete "center" step first. If the user also toggled publish,
+				// complete "publish" afterwards using the href returned by center.
+				const afterCenterHref = await completeStep("center")
+				if (formData.published) {
+					// completeStep returns the next incomplete step's href
+					// "publish" may already be current now, so complete it too
+					await completeStep("publish")
+					// onboarding fully done → fall through to success message
+				} else if (afterCenterHref) {
+					router.push(afterCenterHref)
+					return
+				}
+			}
+
+			if (formData.published) {
+				showSavePopupAndRefresh("¡Centro enviado a verificación! Te notificaremos cuando esté aprobado.")
+			} else {
+				showSavePopupAndRefresh("Cambios guardados correctamente.")
+			}
 			return
 		} catch (error) {
 			console.error('Error updating center data:', error)
-			showSavePopupAndRefresh("No se pudieron guardar los cambios. La página se va a recargar.", "error")
+			showSavePopupAndRefresh("No se pudieron guardar los cambios. Revisá tu conexión e intentá de nuevo.", "error")
 			return
 		} finally {
 			setSaving(false)
@@ -449,7 +603,8 @@ export default function SettingsPage() {
 				</p>
 			</div>
 
-			<div className="max-w-4xl">
+			<div className="grid grid-cols-1 xl:grid-cols-[minmax(0,1fr)_320px] gap-6 items-start">
+				<div className="min-w-0">
 
 					{message && (
 						<Alert className={`mb-6 ${message.type === 'success' ? 'border-green-200 bg-green-50 dark:border-green-800 dark:bg-green-900/20' : 'border-red-200 bg-red-50 dark:border-red-800 dark:bg-red-900/20'}`}>
@@ -481,14 +636,33 @@ export default function SettingsPage() {
 
 							<div className="flex items-center justify-between p-4 rounded-lg border border-slate-200 bg-slate-50">
 								<div>
-									<p className="text-sm font-medium text-slate-900">Publicar en catálogo</p>
-									<p className="text-xs text-slate-500 mt-0.5">Los jugadores podrán encontrar y reservar en tu centro.</p>
+									<p className="text-sm font-medium text-slate-900">
+										{formData.published ? "Enviado a verificación" : "Enviar a verificación"}
+									</p>
+									<p className="text-xs text-slate-500 mt-0.5">
+										{formData.published
+											? "Tu centro fue enviado a revisión. Lo publicaremos una vez que lo validemos."
+											: "Cuando estés listo, enviá tu centro para que lo revisemos y lo publiquemos en la plataforma."}
+									</p>
 								</div>
 								<Switch
 									checked={formData.published}
+									disabled={!readyForPublication}
 									onCheckedChange={(checked) => handleInputChange('published', checked)}
 								/>
 							</div>
+
+							{formData.published && (
+								<div className="rounded-md bg-blue-50 border border-blue-200 p-3 text-sm text-blue-800 flex items-start gap-2">
+									<CheckCircle className="w-4 h-4 mt-0.5 shrink-0 text-blue-600" />
+									<div>
+										<p className="font-medium">Centro enviado a verificación</p>
+										<p className="text-xs text-blue-700 mt-1">
+											Nuestro equipo revisará tu información y, una vez aprobado, tu centro aparecerá en los buscadores de jugadores. Te notificaremos por email.
+										</p>
+									</div>
+								</div>
+							)}
 
 							<div className="rounded-lg border border-slate-200 overflow-hidden">
 								<button
@@ -614,7 +788,6 @@ export default function SettingsPage() {
 								<div className={`grid transition-all duration-200 ease-in-out ${openSections.perfil ? 'grid-rows-[1fr]' : 'grid-rows-[0fr]'}`}>
 									<div className="overflow-hidden">
 										<div className="px-4 pb-4 pt-0 space-y-5 border-t border-slate-100">
-
 											<div className="space-y-2 pt-4">
 												<Label>Tipo de club (deportes)</Label>
 												<div className="flex flex-wrap gap-2">
@@ -647,12 +820,45 @@ export default function SettingsPage() {
 
 											<div className="grid grid-cols-1 md:grid-cols-2 gap-4">
 												<div className="space-y-2">
-													<Label htmlFor="coverImageUrl">Foto de portada (URL)</Label>
-													<Input id="coverImageUrl" value={formData.coverImageUrl} onChange={(e) => handleInputChange('coverImageUrl', e.target.value)} className="h-11" placeholder="https://..." />
+													<Label htmlFor="coverImageFile">Foto de portada (archivo)</Label>
+													<Input id="coverImageFile" type="file" accept="image/*" onChange={handleCoverFileChange} className="h-11" />
+													{uploadingCover ? (
+														<div className="text-xs text-slate-500 flex items-center gap-2"><Upload className="w-3 h-3" /> Subiendo portada...</div>
+													) : null}
+													{formData.coverImageUrl ? (
+														// eslint-disable-next-line @next/next/no-img-element
+														<img src={formData.coverImageUrl} alt="Portada" className="h-20 w-full rounded-md border border-slate-200 object-cover" />
+													) : null}
 												</div>
 												<div className="space-y-2">
-													<Label htmlFor="logoUrl">Logo (URL)</Label>
-													<Input id="logoUrl" value={formData.logoUrl} onChange={(e) => handleInputChange('logoUrl', e.target.value)} className="h-11" placeholder="https://..." />
+													<Label htmlFor="logoFile">Logo (archivo)</Label>
+													<Input id="logoFile" type="file" accept="image/*" onChange={handleLogoFileChange} className="h-11" />
+													{uploadingLogo ? (
+														<div className="text-xs text-slate-500 flex items-center gap-2"><Upload className="w-3 h-3" /> Subiendo logo...</div>
+													) : null}
+													{formData.logoUrl ? (
+														// eslint-disable-next-line @next/next/no-img-element
+														<img src={formData.logoUrl} alt="Logo" className="h-20 w-20 rounded-md border border-slate-200 object-cover" />
+													) : null}
+												</div>
+											</div>
+
+											<div className="space-y-2">
+												<Label>Amenities del centro</Label>
+												<div className="flex flex-wrap gap-2">
+													{AMENITY_OPTIONS.map((amenity) => {
+														const selected = formData.amenities.includes(amenity.key)
+														return (
+															<button
+																type="button"
+																key={amenity.key}
+																onClick={() => toggleAmenity(amenity.key)}
+																className={`px-3 py-1.5 rounded-full text-sm border transition ${selected ? 'bg-emerald-50 text-emerald-700 border-emerald-200' : 'bg-white text-slate-700 border-slate-200 hover:bg-slate-50'}`}
+															>
+																{amenity.label}
+															</button>
+														)
+													})}
 												</div>
 											</div>
 
@@ -680,9 +886,7 @@ export default function SettingsPage() {
 																		))}
 																	</SelectContent>
 																</Select>
-
 																<Input value={link.url} onChange={(e) => updateSocialLink(index, { url: e.target.value })} placeholder="https://..." className="h-11" />
-
 																<Button type="button" variant="ghost" size="icon" onClick={() => removeSocialLink(index)} className="text-slate-400 hover:text-red-600">
 																	<Trash2 className="w-4 h-4" />
 																</Button>
@@ -691,7 +895,6 @@ export default function SettingsPage() {
 													</div>
 												)}
 											</div>
-
 										</div>
 									</div>
 								</div>
@@ -736,6 +939,9 @@ export default function SettingsPage() {
 														<Building2 className="w-4 h-4 text-blue-600 shrink-0" />
 														<span className="text-sm">— canchas publicadas</span>
 													</div>
+													<div className="text-xs text-slate-500">
+														Slug público: /clubs/{slugPreview || "centro-codigo"}
+													</div>
 												</div>
 
 												{formData.sports.length > 0 && (
@@ -747,6 +953,22 @@ export default function SettingsPage() {
 																	{sport.charAt(0).toUpperCase() + sport.slice(1)}
 																</span>
 															))}
+														</div>
+													</div>
+												)}
+
+												{formData.amenities.length > 0 && (
+													<div>
+														<p className="text-sm font-medium text-slate-900 mb-2">Amenities</p>
+														<div className="flex flex-wrap gap-2">
+															{formData.amenities.map((amenity) => {
+																const amenityLabel = AMENITY_OPTIONS.find((item) => item.key === amenity)?.label || amenity
+																return (
+																	<span key={amenity} className="inline-flex items-center rounded-full bg-emerald-50 text-emerald-700 px-3 py-1 text-xs font-medium">
+																		{amenityLabel}
+																	</span>
+																)
+															})}
 														</div>
 													</div>
 												)}
@@ -775,6 +997,40 @@ export default function SettingsPage() {
 						</CardContent>
 					</Card>
 				</div>
+
+				{!readyForPublication ? (
+				<div className="xl:sticky xl:top-6">
+					<Card className="shadow-sm border border-slate-200">
+						<CardHeader className="pb-3">
+							<div className="flex items-start justify-between gap-3">
+								<div>
+									<CardTitle className="text-lg text-slate-900">Checklist</CardTitle>
+									<CardDescription>Siempre visible mientras completás el centro.</CardDescription>
+								</div>
+								<span className={`text-xs font-medium px-2 py-1 rounded-full whitespace-nowrap ${readyForPublication ? "bg-green-100 text-green-700" : "bg-amber-100 text-amber-700"}`}>
+									{readyForPublication ? "Listo para publicar" : "Faltan datos"}
+								</span>
+							</div>
+						</CardHeader>
+						<CardContent className="space-y-3">
+							{publicationChecklist.map((item) => (
+								<div key={item.id} className="flex items-start gap-2 text-sm text-slate-700">
+									<CheckCircle className={`w-4 h-4 mt-0.5 shrink-0 ${item.done ? "text-green-600" : item.optional ? "text-amber-300" : "text-slate-300"}`} />
+									<span className="flex-1">{item.label}</span>
+									{item.optional && !item.done && (
+										<span className="text-[10px] font-medium text-amber-600 bg-amber-50 px-1.5 py-0.5 rounded-full whitespace-nowrap">opcional</span>
+									)}
+								</div>
+							))}
+							<div className="pt-2 border-t border-slate-100 space-y-2 text-xs text-slate-500">
+								<div>URL pública: /clubs/{slugPreview || "centro-codigo"}</div>
+								<div>Código único: <span className="font-mono text-slate-700">{centerCode || "------"}</span></div>
+							</div>
+						</CardContent>
+					</Card>
+				</div>
+				) : null}
+			</div>
 		</div>
 	)
 }

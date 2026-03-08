@@ -523,7 +523,12 @@ export function ClubProfileTab() {
         sports: (form.sports || []) as any,
         coverImageUrl,
         galleryImageUrls,
-        slug: form.slug ? slugify(form.slug) : slugify(form.name),
+        slug: (() => {
+          const code = centerId.slice(0, 6).toLowerCase()
+          const base = slugify(form.slug || form.name || "club")
+          const withCode = `${base || "club"}-${code}`
+          return withCode
+        })(),
         published: !!form.published,
         classesEnabled: !!form.classesEnabled,
         featuredRank: form.featuredRank ?? null,

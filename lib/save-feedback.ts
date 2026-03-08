@@ -8,12 +8,17 @@ export type SaveFeedbackDetail = {
   reload: boolean
 }
 
-export function showSavePopupAndRefresh(message: string, variant: SaveFeedbackVariant = "success") {
+export function showSavePopupAndRefresh(
+  message: string,
+  variant: SaveFeedbackVariant = "success",
+  reload?: boolean,
+) {
   if (typeof window === "undefined") return
   const detail: SaveFeedbackDetail = {
     message,
     variant,
-    reload: true,
+    // Errors never reload by default (would lose unsaved form data)
+    reload: reload ?? variant === "success",
   }
   window.dispatchEvent(new CustomEvent(SAVE_FEEDBACK_EVENT, { detail }))
 }
