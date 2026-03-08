@@ -48,26 +48,32 @@ export default function BackofficeBookingsPage() {
         <table className="w-full text-sm">
           <thead>
             <tr className="text-left text-slate-600 bg-slate-50">
-              <th className="py-2 px-3">ID</th>
-              <th className="py-2 px-3">Status</th>
-              <th className="py-2 px-3">Court</th>
-              <th className="py-2 px-3">User</th>
-              <th className="py-2 px-3">Path</th>
+              <th className="py-2 px-3">Club</th>
+              <th className="py-2 px-3">Cancha</th>
+              <th className="py-2 px-3">Jugador</th>
+              <th className="py-2 px-3">Fecha</th>
+              <th className="py-2 px-3">Horario</th>
+              <th className="py-2 px-3">Estado</th>
+              <th className="py-2 px-3">Pago</th>
+              <th className="py-2 px-3">Precio</th>
             </tr>
           </thead>
           <tbody>
             {items.map((b) => (
               <tr key={`${b.path}:${b.id}`} className="border-t border-slate-100">
-                <td className="py-2 px-3 font-mono text-xs text-slate-800">{b.id}</td>
-                <td className="py-2 px-3">{b.status || "—"}</td>
-                <td className="py-2 px-3 font-mono text-xs">{b.courtId || "—"}</td>
-                <td className="py-2 px-3 font-mono text-xs">{b.userId || "—"}</td>
-                <td className="py-2 px-3 font-mono text-xs text-slate-500">{b.path}</td>
+                <td className="py-2 px-3 text-sm">{b.clubName || "—"}</td>
+                <td className="py-2 px-3 text-xs font-mono">{b.courtName || b.courtId || "—"}</td>
+                <td className="py-2 px-3 text-xs">{b.userName || b.userId || "—"}</td>
+                <td className="py-2 px-3 text-xs font-mono">{b.date || "—"}</td>
+                <td className="py-2 px-3 text-xs">{b.startTime && b.endTime ? `${b.startTime}–${b.endTime}` : "—"}</td>
+                <td className="py-2 px-3 text-xs">{b.bookingStatus || b.status || "—"}</td>
+                <td className="py-2 px-3 text-xs">{b.paymentStatus || "—"}</td>
+                <td className="py-2 px-3 text-xs">{b.price != null ? `${b.currency ?? ""} ${b.price}` : "—"}</td>
               </tr>
             ))}
             {!loading && items.length === 0 ? (
               <tr>
-                <td className="py-6 px-3 text-slate-600" colSpan={5}>
+                <td className="py-6 px-3 text-slate-600" colSpan={8}>
                   No bookings found.
                 </td>
               </tr>
