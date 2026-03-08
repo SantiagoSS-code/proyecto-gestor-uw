@@ -14,7 +14,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "
 import { Loader2, CheckCircle, AlertCircle, Clock, Copy, Info } from "lucide-react"
 import type { SportKey } from "@/lib/types"
 import { CENTER_SUBCOLLECTIONS, FIRESTORE_COLLECTIONS } from "@/lib/firestorePaths"
-import { useRouter } from "next/navigation"
+import { showSavePopupAndRefresh } from "@/lib/save-feedback"
 
 const SLOT_OPTIONS = [30, 60, 90, 120]
 
@@ -84,8 +84,10 @@ type CourtSchedule = {
 }
 
 export function ScheduleTab({ autoSelectCourtId }: { autoSelectCourtId?: string | null }) {
-  const { user, loading: authLoading } = useAuth()
+  const { user, centerId, loading: authLoading } = useAuth()
+  const resolvedCenterId = centerId || user?.uid || null
   const [courts, setCourts] = useState<CourtsRow[]>([])
+  const [courtsRootCollection, setCourtsRootCollection] = useState<string>(FIRESTORE_COLLECTIONS.centers)
   const [loading, setLoading] = useState(true)
   const [saving, setSaving] = useState(false)
   const [message, setMessage] = useState<{ type: "success" | "error"; text: string } | null>(null)
@@ -100,16 +102,24 @@ export function ScheduleTab({ autoSelectCourtId }: { autoSelectCourtId?: string 
   const [quickPresets, setQuickPresets] = useState<QuickPreset[]>(DEFAULT_PRESETS)
   const [editPresetsModalOpen, setEditPresetsModalOpen] = useState(false)
   const [editingPresets, setEditingPresets] = useState<QuickPreset[]>(DEFAULT_PRESETS)
-  const router = useRouter()
 
   // Cargar canchas
   useEffect(() => {
     const fetchCourts = async () => {
-      if (!user) return
+      if (!resolvedCenterId) return
       try {
-        const courtsRef = collection(db, FIRESTORE_COLLECTIONS.centers, user.uid, CENTER_SUBCOLLECTIONS.courts)
-        const snapshot = await getDocs(courtsRef)
-        const data = snapshot.docs.map((docSnap) => ({
+        const centersRef = collection(db, FIRESTORE_COLLECTIONS.centers, resolvedCenterId, CENTER_SUBCOLLECTIONS.courts)
+        const centersSnapshot = await getDocs(centersRef)
+
+        const usingLegacy = centersSnapshot.empty
+        const legacyRef = collection(db, FIRESTORE_COLLECTIONS.legacyCenters, resolvedCenterId, CENTER_SUBCOLLECTIONS.courts)
+        const legacySnapshot = usingLegacy ? await getDocs(legacyRef) : null
+
+        const sourceSnapshot = usingLegacy ? legacySnapshot : centersSnapshot
+        const sourceRootCollection = usingLegacy ? FIRESTORE_COLLECTIONS.legacyCenters : FIRESTORE_COLLECTIONS.centers
+        setCourtsRootCollection(sourceRootCollection)
+
+        const data = (sourceSnapshot?.docs || []).map((docSnap) => ({
           id: docSnap.id,
           name: (docSnap.data() as any).name,
           sport: (docSnap.data() as any).sport,
@@ -130,22 +140,34 @@ export function ScheduleTab({ autoSelectCourtId }: { autoSelectCourtId?: string 
       }
     }
 
-    if (!authLoading && user) fetchCourts()
-  }, [authLoading, user, autoSelectCourtId])
+    if (!authLoading && resolvedCenterId) fetchCourts()
+  }, [authLoading, resolvedCenterId, autoSelectCourtId])
 
   // Cargar horarios del centro como valores por defecto
   useEffect(() => {
     const loadCenterHours = async () => {
-      if (!user) return
+      if (!resolvedCenterId) return
       try {
-        const bookingSettingsRef = doc(
+        // Try new model first
+        let bookingSettingsRef = doc(
           db,
           FIRESTORE_COLLECTIONS.centers,
-          user.uid,
+          resolvedCenterId,
           "settings",
           "booking"
         )
-        const snap = await getDoc(bookingSettingsRef)
+        let snap = await getDoc(bookingSettingsRef)
+        // Fallback to legacy collection
+        if (!snap.exists()) {
+          bookingSettingsRef = doc(
+            db,
+            FIRESTORE_COLLECTIONS.legacyCenters,
+            resolvedCenterId,
+            "settings",
+            "booking"
+          )
+          snap = await getDoc(bookingSettingsRef)
+        }
         if (snap.exists()) {
           const settings = snap.data() as any
           const openingHours = settings.openingHours
@@ -163,18 +185,18 @@ export function ScheduleTab({ autoSelectCourtId }: { autoSelectCourtId?: string 
       }
     }
 
-    if (!authLoading && user) loadCenterHours()
-  }, [authLoading, user])
+    if (!authLoading && resolvedCenterId) loadCenterHours()
+  }, [authLoading, resolvedCenterId])
 
   // Cargar horarios cuando se selecciona una cancha
   useEffect(() => {
     const loadSchedule = async () => {
-      if (!selectedCourtId || !user) return
+      if (!selectedCourtId || !resolvedCenterId) return
       try {
         const courtRef = doc(
           db,
-          FIRESTORE_COLLECTIONS.centers,
-          user.uid,
+          courtsRootCollection,
+          resolvedCenterId,
           CENTER_SUBCOLLECTIONS.courts,
           selectedCourtId
         )
@@ -230,7 +252,7 @@ export function ScheduleTab({ autoSelectCourtId }: { autoSelectCourtId?: string 
     }
 
     loadSchedule()
-  }, [selectedCourtId, user, courts, centerOpeningHours])
+  }, [selectedCourtId, resolvedCenterId, courts, centerOpeningHours, courtsRootCollection])
 
   const updateDaySchedule = (day: WeekDayKey, field: keyof DaySchedule, value: string | boolean) => {
     if (!schedule) return
@@ -250,7 +272,7 @@ export function ScheduleTab({ autoSelectCourtId }: { autoSelectCourtId?: string 
   }
 
   const handleSave = async (action: "draft" | "publish") => {
-    if (!schedule || !user || !selectedCourtId) return
+    if (!schedule || !resolvedCenterId || !selectedCourtId) return
     setSaving(true)
     setPublishAction(action)
     setMessage(null)
@@ -258,8 +280,8 @@ export function ScheduleTab({ autoSelectCourtId }: { autoSelectCourtId?: string 
     try {
       const courtRef = doc(
         db,
-        FIRESTORE_COLLECTIONS.centers,
-        user.uid,
+        courtsRootCollection,
+        resolvedCenterId!,
         CENTER_SUBCOLLECTIONS.courts,
         selectedCourtId
       )
@@ -282,18 +304,13 @@ export function ScheduleTab({ autoSelectCourtId }: { autoSelectCourtId?: string 
       )
       
       const actionText = action === "publish" ? "publicada" : "guardada como borrador"
-      setMessage({ type: "success", text: `Cancha ${actionText} correctamente.` })
-
-      // Show confirmation pop-up
-      alert(`La cancha ha sido ${actionText}.`)
-
-      // Redirect to "Canchas" section
-      router.push("/clubos/dashboard/courts")
-
       setPublishDialogOpen(false)
+      showSavePopupAndRefresh(`La cancha fue ${actionText} correctamente.`)
+      return
     } catch (error) {
       console.error("Error saving schedule:", error)
-      setMessage({ type: "error", text: "No se pudieron guardar los horarios." })
+      showSavePopupAndRefresh("No se pudieron guardar los horarios. La página se va a recargar.", "error")
+      return
     } finally {
       setSaving(false)
       setPublishAction(null)

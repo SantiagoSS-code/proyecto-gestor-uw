@@ -4,8 +4,11 @@ import { adminDb } from "@/lib/firebase/admin"
 type BookingRecord = {
   id: string
   customerEmail?: string
+  email?: string
   customerName?: string
+  customer?: string
   customerPhone?: string
+  phone?: string
   status?: string
   date?: string
   dateKey?: string
@@ -28,36 +31,36 @@ export async function GET(request: Request, { params }: { params: { email: strin
       return NextResponse.json({ error: "Missing centerId or email" }, { status: 400 })
     }
 
-    // Get all bookings for the center
-    const bookingsRef = adminDb
-      .collection("padel_centers")
-      .doc(centerId)
-      .collection("booking_requests")
+    const loadBookings = async (rootCollection: "centers" | "padel_centers", subCollection: string) => {
+      try {
+        const snapshot = await adminDb
+          .collection(rootCollection)
+          .doc(centerId)
+          .collection(subCollection)
+          .get()
 
-    const bookingsSnapshot = await bookingsRef.get()
-    const bookings: BookingRecord[] = bookingsSnapshot.docs.map((doc) => ({
-      id: doc.id,
-      ...doc.data(),
-    })) as BookingRecord[]
+        return snapshot.docs.map((doc) => ({
+          id: doc.id,
+          ...doc.data(),
+        })) as BookingRecord[]
+      } catch {
+        return [] as BookingRecord[]
+      }
+    }
 
-    // Also check for confirmed bookings in the "bookings" subcollection
-    const confirmedBookingsRef = adminDb
-      .collection("padel_centers")
-      .doc(centerId)
-      .collection("bookings")
-
-    const confirmedSnapshot = await confirmedBookingsRef.get()
-    const confirmedBookings: BookingRecord[] = confirmedSnapshot.docs.map((doc) => ({
-      id: doc.id,
-      ...doc.data(),
-    })) as BookingRecord[]
+    // New model + legacy model
+    const [newBookings, legacyBookingRequests, legacyBookings] = await Promise.all([
+      loadBookings("centers", "bookings"),
+      loadBookings("padel_centers", "booking_requests"),
+      loadBookings("padel_centers", "bookings"),
+    ])
 
     // Combine all bookings
-    const allBookings = [...bookings, ...confirmedBookings]
+    const allBookings = [...newBookings, ...legacyBookingRequests, ...legacyBookings]
 
     // Filter bookings for the specific customer email
     const customerBookings = allBookings.filter(
-      (booking) => booking.customerEmail?.toLowerCase() === email.toLowerCase()
+      (booking) => (booking.customerEmail || booking.email || "").toLowerCase() === email.toLowerCase()
     )
 
     if (customerBookings.length === 0) {
@@ -83,8 +86,8 @@ export async function GET(request: Request, { params }: { params: { email: strin
 
     // Get customer info from first booking
     const customerInfo = customerBookings[0]
-    const customerName = customerInfo.customerName || ""
-    const customerPhone = customerInfo.customerPhone || ""
+    const customerName = customerInfo.customerName || customerInfo.customer || ""
+    const customerPhone = customerInfo.customerPhone || customerInfo.phone || ""
 
     // Calculate cancelled reservations
     const cancelledReservations = customerBookings.filter(

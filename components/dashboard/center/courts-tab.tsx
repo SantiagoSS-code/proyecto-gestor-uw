@@ -12,9 +12,10 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Alert, AlertDescription } from "@/components/ui/alert"
 import { formatCurrencyARS } from "@/lib/utils"
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog"
-import { Loader2, Plus, Trash2, Pencil, CheckCircle, AlertCircle, ImagePlus, MapPin, Dumbbell, Layers } from "lucide-react"
+import { Loader2, Plus, Trash2, Pencil, CheckCircle, AlertCircle, ImagePlus, MapPin, Dumbbell, Layers, Lightbulb } from "lucide-react"
 import type { SportKey } from "@/lib/types"
 import { FIRESTORE_COLLECTIONS, CENTER_SUBCOLLECTIONS } from "@/lib/firestorePaths"
+import { showSavePopupAndRefresh } from "@/lib/save-feedback"
 
 const SURFACE_TYPES = ["Sintética", "Césped", "Arcilla", "Dura", "Otra"]
 const SPORTS: SportKey[] = ["padel", "tennis", "futbol", "pickleball", "squash"]
@@ -23,6 +24,7 @@ type CourtForm = {
   name: string
   sport: SportKey | ""
   indoor: "interior" | "exterior" | ""
+  lighting: "si" | "no" | ""
   surfaceType: string
   otherSurfaceType?: string
   pricePerHour: string
@@ -36,6 +38,7 @@ type CourtRow = {
   name: string
   sport?: SportKey
   indoor?: boolean
+  lighting?: boolean
   surfaceType?: string
   otherSurfaceType?: string
   pricePerHour?: number
@@ -49,6 +52,7 @@ const emptyForm: CourtForm = {
   name: "",
   sport: "",
   indoor: "",
+  lighting: "",
   surfaceType: "",
   otherSurfaceType: "",
   pricePerHour: "",
@@ -58,7 +62,8 @@ const emptyForm: CourtForm = {
 }
 
 export function CourtsTab({ onCourtCreated }: { onCourtCreated?: (courtId: string, courtName: string) => void }) {
-  const { user, loading: authLoading } = useAuth()
+  const { user, centerId, loading: authLoading } = useAuth()
+  const resolvedCenterId = centerId || user?.uid || null
   const [courts, setCourts] = useState<CourtRow[]>([])
   const [loading, setLoading] = useState(true)
   const [saving, setSaving] = useState(false)
@@ -71,6 +76,7 @@ export function CourtsTab({ onCourtCreated }: { onCourtCreated?: (courtId: strin
   const [validationError, setValidationError] = useState<string | null>(null)
   const [selectedSport, setSelectedSport] = useState<SportKey | "all">("all")
   const [editingCourtHasSchedule, setEditingCourtHasSchedule] = useState(false)
+  const [courtsRootCollection, setCourtsRootCollection] = useState<"centers" | "padel_centers">(FIRESTORE_COLLECTIONS.centers)
 
   const canSave = useMemo(() => form.name.trim().length > 0, [form.name])
 
@@ -99,6 +105,10 @@ export function CourtsTab({ onCourtCreated }: { onCourtCreated?: (courtId: strin
       setValidationError("Debes seleccionar una ubicación (interior o exterior).")
       return false
     }
+    if (!form.lighting) {
+      setValidationError("Debes indicar si la cancha tiene iluminación.")
+      return false
+    }
     if (!form.surfaceType) {
       setValidationError("Debes seleccionar una superficie.")
       return false
@@ -113,17 +123,26 @@ export function CourtsTab({ onCourtCreated }: { onCourtCreated?: (courtId: strin
 
   useEffect(() => {
     const fetchCourts = async () => {
-      if (!user) return
+      if (!resolvedCenterId) return
       try {
-        const courtsRef = collection(db, FIRESTORE_COLLECTIONS.centers, user.uid, CENTER_SUBCOLLECTIONS.courts)
-        const snapshot = await getDocs(courtsRef)
-        const data = snapshot.docs.map((docSnap) => ({ id: docSnap.id, ...(docSnap.data() as any) })) as CourtRow[]
+        const centersRef = collection(db, FIRESTORE_COLLECTIONS.centers, resolvedCenterId, CENTER_SUBCOLLECTIONS.courts)
+        const centersSnapshot = await getDocs(centersRef)
+
+        const usingLegacy = centersSnapshot.empty
+        const legacyRef = collection(db, FIRESTORE_COLLECTIONS.legacyCenters, resolvedCenterId, CENTER_SUBCOLLECTIONS.courts)
+        const legacySnapshot = usingLegacy ? await getDocs(legacyRef) : null
+
+        const sourceSnapshot = usingLegacy ? legacySnapshot : centersSnapshot
+        const sourceRootCollection = usingLegacy ? FIRESTORE_COLLECTIONS.legacyCenters : FIRESTORE_COLLECTIONS.centers
+        setCourtsRootCollection(sourceRootCollection)
+
+        const data = (sourceSnapshot?.docs || []).map((docSnap) => ({ id: docSnap.id, ...(docSnap.data() as any) })) as CourtRow[]
         
         // Verificar cuáles tienen schedule
         const courtsWithScheduleInfo = await Promise.all(
           data.map(async (court) => {
             try {
-              const courtRef = doc(db, FIRESTORE_COLLECTIONS.centers, user.uid, CENTER_SUBCOLLECTIONS.courts, court.id)
+              const courtRef = doc(db, sourceRootCollection, resolvedCenterId, CENTER_SUBCOLLECTIONS.courts, court.id)
               const courtSnap = await getDoc(courtRef)
               const hasSchedule = courtSnap.exists() && !!courtSnap.data()?.schedule
               return { ...court, hasSchedule }
@@ -142,8 +161,8 @@ export function CourtsTab({ onCourtCreated }: { onCourtCreated?: (courtId: strin
       }
     }
 
-    if (!authLoading && user) fetchCourts()
-  }, [authLoading, user])
+    if (!authLoading && resolvedCenterId) fetchCourts()
+  }, [authLoading, resolvedCenterId])
 
   const resetForm = () => {
     setEditingId(null)
@@ -177,6 +196,7 @@ export function CourtsTab({ onCourtCreated }: { onCourtCreated?: (courtId: strin
       name: court.name,
       sport: (court.sport || "") as SportKey | "",
       indoor: court.indoor ? "interior" : "exterior",
+      lighting: typeof court.lighting === "boolean" ? (court.lighting ? "si" : "no") : "",
       surfaceType: court.surfaceType || "",
       otherSurfaceType: court.otherSurfaceType || "",
       pricePerHour: typeof court.pricePerHour === "number" ? court.pricePerHour.toString() : "",
@@ -189,7 +209,7 @@ export function CourtsTab({ onCourtCreated }: { onCourtCreated?: (courtId: strin
   }
 
   const handleSave = async () => {
-    if (!user || !validateForm()) return
+    if (!resolvedCenterId || !validateForm()) return
     setSaving(true)
     setMessage(null)
 
@@ -200,6 +220,7 @@ export function CourtsTab({ onCourtCreated }: { onCourtCreated?: (courtId: strin
         name: form.name.trim(),
         sport: form.sport,
         indoor: form.indoor === "interior",
+        lighting: form.lighting === "si",
         surfaceType: surfaceType,
         pricePerHour: form.pricePerHour ? Number(form.pricePerHour) : null,
         currency: "ARS",
@@ -209,37 +230,40 @@ export function CourtsTab({ onCourtCreated }: { onCourtCreated?: (courtId: strin
       }
 
       if (editingId) {
-        const courtRef = doc(db, FIRESTORE_COLLECTIONS.centers, user.uid, CENTER_SUBCOLLECTIONS.courts, editingId)
+        const courtRef = doc(db, courtsRootCollection, resolvedCenterId, CENTER_SUBCOLLECTIONS.courts, editingId)
         await updateDoc(courtRef, payload)
         setCourts((prev) => prev.map((c) => (c.id === editingId ? ({ ...c, ...payload } as any) : c)))
-        setMessage({ type: "success", text: "Cancha actualizada correctamente." })
         resetForm()
         setIsModalOpen(false)
+        showSavePopupAndRefresh("Cancha guardada correctamente.")
+        return
       } else {
-        const courtsRef = collection(db, FIRESTORE_COLLECTIONS.centers, user.uid, CENTER_SUBCOLLECTIONS.courts)
+        const courtsRef = collection(db, courtsRootCollection, resolvedCenterId, CENTER_SUBCOLLECTIONS.courts)
         const newDoc = await addDoc(courtsRef, { ...payload, createdAt: serverTimestamp() })
         const newCourt = { id: newDoc.id, ...(payload as any) }
         setCourts((prev) => [...prev, newCourt])
-        setMessage({ type: "success", text: "Cancha creada. Ahora configura sus horarios." })
         resetForm()
         setIsModalOpen(false)
         // Notificar al componente padre
         onCourtCreated?.(newDoc.id, form.name)
+        showSavePopupAndRefresh("Cancha creada correctamente.")
+        return
       }
     } catch (error) {
       console.error("Error saving court:", error)
-      setMessage({ type: "error", text: "No se pudo guardar la cancha. Intenta de nuevo." })
+      showSavePopupAndRefresh("No se pudo guardar la cancha. La página se va a recargar.", "error")
+      return
     } finally {
       setSaving(false)
     }
   }
 
   const handleDelete = async (courtId: string) => {
-    if (!user) return
+    if (!resolvedCenterId) return
     if (!window.confirm("¿Eliminar esta cancha? Esta acción no se puede deshacer.")) return
 
     try {
-      await deleteDoc(doc(db, FIRESTORE_COLLECTIONS.centers, user.uid, CENTER_SUBCOLLECTIONS.courts, courtId))
+      await deleteDoc(doc(db, courtsRootCollection, resolvedCenterId, CENTER_SUBCOLLECTIONS.courts, courtId))
       setCourts((prev) => prev.filter((court) => court.id !== courtId))
     } catch (error) {
       console.error("Error deleting court:", error)
@@ -355,6 +379,12 @@ export function CourtsTab({ onCourtCreated }: { onCourtCreated?: (courtId: strin
                       <Layers className="w-3.5 h-3.5 text-slate-400" />
                       <span>{court.surfaceType || "No especificada"}</span>
                     </div>
+                    {court.lighting === true && (
+                      <div className="flex items-center gap-1.5">
+                        <Lightbulb className="w-3.5 h-3.5 text-slate-400" />
+                        <span>Iluminación</span>
+                      </div>
+                    )}
                     {typeof court.pricePerHour === "number" && (
                       <div className="flex items-center gap-1.5 font-medium text-slate-900">
                         <span>
@@ -474,6 +504,19 @@ export function CourtsTab({ onCourtCreated }: { onCourtCreated?: (courtId: strin
                     </SelectContent>
                   </Select>
                 </div>
+              </div>
+
+              <div className="space-y-2">
+                <Label className="text-sm font-medium text-slate-700">Iluminación *</Label>
+                <Select value={form.lighting} onValueChange={(value) => handleFormChange({ ...form, lighting: value as "si" | "no" | "" })}>
+                  <SelectTrigger className="h-11 shadow-sm focus:ring-blue-500">
+                    <SelectValue placeholder="¿Tiene iluminación?" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="si" className="cursor-pointer">Sí</SelectItem>
+                    <SelectItem value="no" className="cursor-pointer">No</SelectItem>
+                  </SelectContent>
+                </Select>
               </div>
 
               <div className="space-y-2">

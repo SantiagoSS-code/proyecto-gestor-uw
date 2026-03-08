@@ -1,13 +1,16 @@
 import { NextResponse } from "next/server"
 import { adminDb } from "@/lib/firebase/admin"
-import { getAuth } from "firebase-admin/auth"
 
 type BookingRecord = {
   id: string
   customerEmail?: string
+  email?: string
   customerName?: string
+  customer?: string
   customerPhone?: string
+  phone?: string
   date?: string | Date
+  dateKey?: string
   price?: number
 }
 
@@ -45,67 +48,53 @@ export async function GET(request: Request) {
       return NextResponse.json({ error: "Missing centerId" }, { status: 400 })
     }
 
-    // Get all bookings for the center
-    const bookingsRef = adminDb
-      .collection("padel_centers")
-      .doc(centerId)
-      .collection("booking_requests")
+    const loadBookings = async (rootCollection: "centers" | "padel_centers", subCollection: string) => {
+      try {
+        const snapshot = await adminDb
+          .collection(rootCollection)
+          .doc(centerId)
+          .collection(subCollection)
+          .get()
 
-    const bookingsSnapshot = await bookingsRef.get()
-    const bookings: BookingRecord[] = bookingsSnapshot.docs.map((doc) => ({
-      id: doc.id,
-      ...doc.data(),
-    })) as BookingRecord[]
+        return snapshot.docs.map((doc) => ({
+          id: doc.id,
+          ...doc.data(),
+        })) as BookingRecord[]
+      } catch {
+        return [] as BookingRecord[]
+      }
+    }
 
-    // Also check for confirmed bookings in the "bookings" subcollection
-    const confirmedBookingsRef = adminDb
-      .collection("padel_centers")
-      .doc(centerId)
-      .collection("bookings")
-
-    const confirmedSnapshot = await confirmedBookingsRef.get()
-    const confirmedBookings: BookingRecord[] = confirmedSnapshot.docs.map((doc) => ({
-      id: doc.id,
-      ...doc.data(),
-    })) as BookingRecord[]
+    // New model + legacy model
+    const [newBookings, legacyBookingRequests, legacyBookings] = await Promise.all([
+      loadBookings("centers", "bookings"),
+      loadBookings("padel_centers", "booking_requests"),
+      loadBookings("padel_centers", "bookings"),
+    ])
 
     // Aggregate customers from both collections
     const customersMap = new Map<string, CustomerAggregate>()
 
-    // Process booking requests
-    bookings.forEach((booking) => {
-      const email = booking.customerEmail?.toLowerCase() || ""
+    const allBookings = [...newBookings, ...legacyBookingRequests, ...legacyBookings]
+
+    allBookings.forEach((booking) => {
+      const email = (booking.customerEmail || booking.email || "").toLowerCase()
       if (!email) return
 
       const existingCustomer =
         customersMap.get(email) ||
-        createCustomerAggregate(email, booking.customerName || "Sin nombre", booking.customerPhone || undefined)
+        createCustomerAggregate(
+          email,
+          booking.customerName || booking.customer || "Sin nombre",
+          booking.customerPhone || booking.phone || undefined
+        )
 
       existingCustomer.totalReservations += 1
       existingCustomer.totalSpent += booking.price || 0
 
-      if (booking.date) {
-        const dateObj = booking.date instanceof Date ? booking.date : new Date(booking.date)
-        existingCustomer.reservationDates.push(dateObj)
-      }
-
-      customersMap.set(email, existingCustomer)
-    })
-
-    // Process confirmed bookings
-    confirmedBookings.forEach((booking) => {
-      const email = booking.customerEmail?.toLowerCase() || ""
-      if (!email) return
-
-      const existingCustomer =
-        customersMap.get(email) ||
-        createCustomerAggregate(email, booking.customerName || "Sin nombre", booking.customerPhone || undefined)
-
-      existingCustomer.totalReservations += 1
-      existingCustomer.totalSpent += booking.price || 0
-
-      if (booking.date) {
-        const dateObj = booking.date instanceof Date ? booking.date : new Date(booking.date)
+      const dateValue = booking.date || booking.dateKey
+      if (dateValue) {
+        const dateObj = dateValue instanceof Date ? dateValue : new Date(dateValue)
         existingCustomer.reservationDates.push(dateObj)
       }
 

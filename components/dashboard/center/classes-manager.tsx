@@ -13,6 +13,7 @@ import { Alert, AlertDescription } from "@/components/ui/alert"
 import { Loader2, Plus, Trash2, Pencil, CheckCircle, AlertCircle } from "lucide-react"
 import type { ClassDoc, ClassScheduleSlot, SportKey } from "@/lib/types"
 import { CENTER_SUBCOLLECTIONS, FIRESTORE_COLLECTIONS } from "@/lib/firestorePaths"
+import { showSavePopupAndRefresh } from "@/lib/save-feedback"
 
 const SPORTS: SportKey[] = ["padel", "tennis", "futbol", "pickleball", "squash"]
 const WEEK_DAYS = [
@@ -112,18 +113,19 @@ export function ClassesManager() {
         const ref = doc(db, FIRESTORE_COLLECTIONS.centers, user.uid, CENTER_SUBCOLLECTIONS.classes, editingId)
         await updateDoc(ref, payload as any)
         setItems((prev) => prev.map((c) => (c.id === editingId ? ({ ...c, ...payload } as any) : c)))
-        setMessage({ type: "success", text: "Clase actualizada." })
+        showSavePopupAndRefresh("Clase actualizada correctamente.")
+        return
       } else {
         const ref = collection(db, FIRESTORE_COLLECTIONS.centers, user.uid, CENTER_SUBCOLLECTIONS.classes)
         const newDoc = await addDoc(ref, { ...payload, createdAt: serverTimestamp() })
         setItems((prev) => [...prev, { id: newDoc.id, ...(payload as any) }])
-        setMessage({ type: "success", text: "Clase creada." })
+        showSavePopupAndRefresh("Clase creada correctamente.")
+        return
       }
-
-      resetForm()
     } catch (e) {
       console.error("Error saving class:", e)
-      setMessage({ type: "error", text: "No se pudo guardar la clase." })
+      showSavePopupAndRefresh("No se pudo guardar la clase. La página se va a recargar.", "error")
+      return
     } finally {
       setSaving(false)
     }

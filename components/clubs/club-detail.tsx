@@ -24,7 +24,7 @@ import {
   Info,
 } from "lucide-react"
 import { FIRESTORE_COLLECTIONS, CENTER_SETTINGS_DOCS, CENTER_SUBCOLLECTIONS, LEGACY_AVAILABILITY_DOCS } from "@/lib/firestorePaths"
-import type { AmenityKey, BookingSettings, CenterProfile, CourtDoc, SportKey, ClassDoc, ClassScheduleSlot } from "@/lib/types"
+import type { AmenityKey, BookingSettings, CenterProfile, CourtDoc, SportKey, ClassDoc, ClassScheduleSlot, OperationSettings } from "@/lib/types"
 import { minutesToTime, timeToMinutes } from "@/lib/utils"
 
 type CenterResult = { id: string; data: CenterProfile }
@@ -168,6 +168,13 @@ async function loadLegacyAvailability(centerId: string): Promise<BookingSettings
   } as BookingSettings
 }
 
+async function loadOperationSettings(centerId: string): Promise<OperationSettings | null> {
+  const ref = doc(db, FIRESTORE_COLLECTIONS.centers, centerId, CENTER_SUBCOLLECTIONS.settings, CENTER_SETTINGS_DOCS.operations)
+  const snap = await getDoc(ref)
+  if (snap.exists()) return snap.data() as OperationSettings
+  return null
+}
+
 async function loadBookingsForDate(centerId: string, dateKey: string): Promise<BookingRow[]> {
   const user = auth.currentUser
   if (!user || user.uid !== centerId) return []
@@ -244,6 +251,8 @@ export function ClubDetail({ slug }: { slug: string }) {
   const [center, setCenter] = useState<CenterProfile | null>(null)
   const [courts, setCourts] = useState<CourtResult[]>([])
   const [settings, setSettings] = useState<BookingSettings | null>(null)
+  const [operations, setOperations] = useState<OperationSettings | null>(null)
+  const [selectedDuration, setSelectedDuration] = useState<number | null>(null)
   const [classes, setClasses] = useState<ClassDoc[]>([])
   const [selectedDate, setSelectedDate] = useState<string>(
     getDateKeyInTimeZone("America/Argentina/Buenos_Aires")
@@ -271,14 +280,20 @@ export function ClubDetail({ slug }: { slug: string }) {
         setCenterId(found.id)
         setCenter(found.data)
 
-        const [courtsData, bookingSettings, classesData] = await Promise.all([
+        const [courtsData, bookingSettings, classesData, opsSettings] = await Promise.all([
           loadCourts(found.id),
           loadBookingSettings(found.id),
           loadClasses(found.id),
+          loadOperationSettings(found.id),
         ])
 
         setCourts(courtsData)
         setClasses(classesData)
+
+        if (opsSettings) {
+          setOperations(opsSettings)
+          setSelectedDuration(opsSettings.minSlotMinutes)
+        }
 
         if (bookingSettings) {
           setSettings(bookingSettings)
@@ -296,6 +311,19 @@ export function ClubDetail({ slug }: { slug: string }) {
 
     load()
   }, [slug])
+
+  const minBookableDate = useMemo(
+    () => getDateKeyInTimeZone(settings?.timezone || "America/Argentina/Buenos_Aires"),
+    [settings?.timezone]
+  )
+
+  const maxBookableDate = useMemo(() => {
+    const days = operations?.maxAdvanceDays
+    if (!days) return null
+    const date = new Date()
+    date.setDate(date.getDate() + days)
+    return date.toISOString().slice(0, 10)
+  }, [operations?.maxAdvanceDays])
 
   const gallery = useMemo(() => (center ? getGallery(center) : []), [center])
   const placeId = center?.placeId?.trim() || center?.googlePlaceId?.trim() || null
@@ -335,27 +363,66 @@ export function ClubDetail({ slug }: { slug: string }) {
   }, [centerId, selectedDate])
 
   const dayIndex = useMemo(() => parseDateKey(selectedDate).getDay().toString(), [selectedDate])
+  const selectedHoliday = useMemo(
+    () => operations?.holidays?.find((holiday) => holiday.date === selectedDate) ?? null,
+    [operations?.holidays, selectedDate]
+  )
 
-  const slotDuration = settings?.slotDurationMinutes || 60
-  const dayCfg = settings?.openingHours?.[dayIndex]
+  // Duration options from operations settings (or fallback to single fixed duration)
+  const durationOptions = useMemo(() => {
+    if (!operations) return [{ value: settings?.slotDurationMinutes || 60, label: `${settings?.slotDurationMinutes || 60} min` }]
+    const list: number[] = []
+    for (let d = operations.minSlotMinutes; d <= operations.maxSlotMinutes; d += operations.slotStepMinutes) {
+      list.push(d)
+    }
+    if (!list.includes(operations.maxSlotMinutes) && operations.maxSlotMinutes >= operations.minSlotMinutes) {
+      list.push(operations.maxSlotMinutes)
+    }
+    return list.map((m) => {
+      if (m < 60) return { value: m, label: `${m} min` }
+      const h = Math.floor(m / 60)
+      const r = m % 60
+      return { value: m, label: r ? `${h} h ${r} min` : `${h} hora${h > 1 ? "s" : ""}` }
+    })
+  }, [operations, settings?.slotDurationMinutes])
+
+  const slotDuration = selectedDuration ?? durationOptions[0]?.value ?? 60
+  const baseDayCfg = settings?.openingHours?.[dayIndex]
+  const dayCfg = useMemo(() => {
+    if (selectedHoliday) {
+      if (selectedHoliday.closed) return { open: "09:00", close: "23:00", closed: true }
+      return {
+        open: selectedHoliday.openTime || baseDayCfg?.open || "09:00",
+        close: selectedHoliday.closeTime || baseDayCfg?.close || "23:00",
+        closed: false,
+      }
+    }
+    return baseDayCfg
+  }, [baseDayCfg, selectedHoliday])
 
   const slots = useMemo(() => {
     if (!dayCfg || dayCfg.closed) return [] as string[]
+    if (selectedDate < minBookableDate) return [] as string[]
+    if (maxBookableDate && selectedDate > maxBookableDate) return [] as string[]
     const start = timeToMinutes(dayCfg.open)
     const end = timeToMinutes(dayCfg.close)
     const result: string[] = []
     const timeZone = settings?.timezone || "America/Argentina/Buenos_Aires"
     const todayKey = getDateKeyInTimeZone(timeZone)
     const nowMinutes = getMinutesInTimeZone(timeZone)
+    const minAdvanceMinutes = (operations?.minAdvanceHours || 0) * 60
+    const effectiveNowMinutes = selectedDate === todayKey ? nowMinutes + minAdvanceMinutes : 0
 
-    for (let t = start; t + slotDuration <= end; t += slotDuration) {
-      if (selectedDate === todayKey && t + slotDuration <= nowMinutes) {
+    // Grid increment: use the operations step or fall back to slotDuration
+    const gridStep = operations?.slotStepMinutes || slotDuration
+    for (let t = start; t + slotDuration <= end; t += gridStep) {
+      if (selectedDate === todayKey && t < effectiveNowMinutes) {
         continue
       }
       result.push(minutesToTime(t))
     }
     return result
-  }, [dayCfg, slotDuration, selectedDate, settings?.timezone])
+  }, [dayCfg, slotDuration, selectedDate, settings?.timezone, operations?.slotStepMinutes, operations?.minAdvanceHours, minBookableDate, maxBookableDate])
 
   const availableSports = useMemo(() => {
     const fromProfile = (center?.sports || []).filter(Boolean) as SportKey[]
@@ -391,11 +458,14 @@ export function ClubDetail({ slug }: { slug: string }) {
     if (!items.length) return false
     const slotStart = slotDate(selectedDate, time)
     const slotEnd = new Date(slotStart.getTime() + slotDuration * 60000)
+    const bufferMs = (operations?.bufferMinutes || 0) * 60000
     return items.some((b) => {
       const startAt = toDate(b.startAt)
       const endAt = toDate(b.endAt)
       if (!startAt || !endAt) return false
-      return startAt < slotEnd && endAt > slotStart
+      const blockedStart = new Date(startAt.getTime() - bufferMs)
+      const blockedEnd = new Date(endAt.getTime() + bufferMs)
+      return blockedStart < slotEnd && blockedEnd > slotStart
     })
   }
 
@@ -658,9 +728,24 @@ export function ClubDetail({ slug }: { slug: string }) {
                       </SelectContent>
                     </Select>
                   </div>
+                  {durationOptions.length > 1 && (
+                    <div className="min-w-[140px]">
+                      <Label>Duración</Label>
+                      <Select value={String(slotDuration)} onValueChange={(v) => { setSelectedDuration(Number(v)); setSelectedSlot(null) }}>
+                        <SelectTrigger>
+                          <SelectValue />
+                        </SelectTrigger>
+                        <SelectContent>
+                          {durationOptions.map((o) => (
+                            <SelectItem key={o.value} value={String(o.value)}>{o.label}</SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                    </div>
+                  )}
                   <div>
                     <Label>Fecha</Label>
-                    <Input type="date" value={selectedDate} onChange={(e) => setSelectedDate(e.target.value)} />
+                    <Input type="date" value={selectedDate} min={minBookableDate} max={maxBookableDate || undefined} onChange={(e) => setSelectedDate(e.target.value)} />
                   </div>
                 </div>
                 <div className="flex items-center gap-2 text-sm text-slate-600">

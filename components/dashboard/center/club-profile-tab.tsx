@@ -26,6 +26,7 @@ import { CENTER_SUBCOLLECTIONS, FIRESTORE_COLLECTIONS } from "@/lib/firestorePat
 import { slugify } from "@/lib/utils"
 import { ClassesManager } from "@/components/dashboard/center/classes-manager"
 import { fetchLocations, type LocationOption } from "@/lib/location-data"
+import { showSavePopupAndRefresh } from "@/lib/save-feedback"
 
 const AMENITIES: Array<{ key: AmenityKey; label: string }> = [
   { key: "bar", label: "Bar" },
@@ -534,10 +535,12 @@ export function ClubProfileTab() {
       await updateDoc(ref, payload as any)
 
       setForm((prev) => ({ ...prev, coverImageUrl, galleryImageUrls, slug: payload.slug }))
-      setMessage({ type: "success", text: "Perfil del club guardado." })
+      showSavePopupAndRefresh("Perfil del club guardado correctamente.")
+      return
     } catch (e) {
       console.error("Save club profile failed:", e)
-      setMessage({ type: "error", text: "No se pudo guardar el perfil del club." })
+      showSavePopupAndRefresh("No se pudo guardar el perfil del club. La página se va a recargar.", "error")
+      return
     } finally {
       setSaving(false)
     }

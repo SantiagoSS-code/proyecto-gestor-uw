@@ -16,6 +16,8 @@ type ClubCard = {
   address?: string
   city?: string
   country?: string
+  shortDescription?: string
+  sports?: string[]
   coverImageUrl?: string | null
   galleryImageUrls?: string[]
   featuredRank?: number | null
@@ -162,6 +164,20 @@ export function ClubsList() {
                           {club.address ? club.address : [club.city, club.country].filter(Boolean).join(", ")}
                         </span>
                       </div>
+
+                      {club.shortDescription && (
+                        <p className="text-sm text-muted-foreground mt-3 line-clamp-2">{club.shortDescription}</p>
+                      )}
+
+                      {Array.isArray(club.sports) && club.sports.length > 0 && (
+                        <div className="mt-3 flex flex-wrap gap-2">
+                          {club.sports.slice(0, 3).map((sport) => (
+                            <span key={sport} className="inline-flex items-center rounded-full bg-slate-100 text-slate-700 px-2.5 py-1 text-xs font-medium">
+                              {sport}
+                            </span>
+                          ))}
+                        </div>
+                      )}
 
                       <div className="mt-6 flex justify-center">
                         <span

@@ -14,6 +14,7 @@ export const CENTER_SUBCOLLECTIONS = {
 
 export const CENTER_SETTINGS_DOCS = {
   booking: "booking",
+  operations: "operations",
 } as const
 
 export const LEGACY_AVAILABILITY_DOCS = {
