@@ -164,32 +164,54 @@ export async function loadActiveBookingsForDate(
   const results: BookingSlotInfo[] = []
 
   for (const d of snap.docs) {
-    const data = d.data() as PlayerBookingDoc
+    const data = d.data()
 
-    if (data.bookingStatus === "confirmed") {
-      results.push({
-        courtId: data.courtId,
-        startTime: data.startTime,
-        endTime: data.endTime,
-        bookingStatus: "confirmed",
-      })
+    // ── Player bookings (created via booking-service) ───────────────────
+    if (data.bookingStatus) {
+      const pData = data as PlayerBookingDoc
+
+      if (pData.bookingStatus === "confirmed") {
+        results.push({
+          courtId: pData.courtId,
+          startTime: pData.startTime,
+          endTime: pData.endTime,
+          bookingStatus: "confirmed",
+        })
+        continue
+      }
+
+      if (pData.bookingStatus === "pending_payment") {
+        const expiryMs: number =
+          typeof pData.expiresAt?.toDate === "function"
+            ? pData.expiresAt.toDate().getTime()
+            : Infinity
+        if (expiryMs > now) {
+          results.push({
+            courtId: pData.courtId,
+            startTime: pData.startTime,
+            endTime: pData.endTime,
+            bookingStatus: "pending_payment",
+          })
+        }
+      }
       continue
     }
 
-    if (data.bookingStatus === "pending_payment") {
-      // Client-side expiry check (authoritative expiry happens on the checkout page)
-      const expiryMs: number =
-        typeof data.expiresAt?.toDate === "function"
-          ? data.expiresAt.toDate().getTime()
-          : Infinity
-      if (expiryMs > now) {
-        results.push({
-          courtId: data.courtId,
-          startTime: data.startTime,
-          endTime: data.endTime,
-          bookingStatus: "pending_payment",
-        })
-      }
+    // ── Manual bookings (created by the center from the dashboard) ──────
+    // They use: court, time, duration (hours), status ("confirmada"/"pendiente")
+    if (data.status && data.status !== "cancelada" && data.time && data.court) {
+      const startTime: string = data.time
+      const durationHours: number = Number(data.duration) || 1
+      const [h, m] = startTime.split(":").map(Number)
+      const endTotalMin = h * 60 + (m || 0) + Math.round(durationHours * 60)
+      const endTime = `${String(Math.floor(endTotalMin / 60)).padStart(2, "0")}:${String(endTotalMin % 60).padStart(2, "0")}`
+
+      results.push({
+        courtId: data.court,
+        startTime,
+        endTime,
+        bookingStatus: data.status === "confirmada" ? "confirmed" : "pending_payment",
+      })
     }
   }
 
