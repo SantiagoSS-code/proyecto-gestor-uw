@@ -1,12 +1,13 @@
 "use client"
 
 import { useEffect, useMemo, useState } from "react"
+import Link from "next/link"
 import { useRouter } from "next/navigation"
 import { useAuth } from "@/lib/auth-context"
 import { useOnboarding } from "@/lib/onboarding"
 import { auth, db } from "@/lib/firebaseClient"
 import { doc, getDoc, serverTimestamp, setDoc } from "firebase/firestore"
-import { updateEmail, updatePassword, updateProfile } from "firebase/auth"
+import { EmailAuthProvider, reauthenticateWithCredential, updateEmail, updatePassword, updateProfile } from "firebase/auth"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
@@ -20,6 +21,7 @@ type ProfileForm = {
   lastName: string
   email: string
   phone: string
+  currentPassword: string
   newPassword: string
   confirmPassword: string
 }
@@ -29,6 +31,7 @@ const EMPTY_FORM: ProfileForm = {
   lastName: "",
   email: "",
   phone: "",
+  currentPassword: "",
   newPassword: "",
   confirmPassword: "",
 }
@@ -142,9 +145,16 @@ export default function ProfilePage() {
 
   const validate = (): string | null => {
     const email = form.email.trim()
+    const wantsSensitiveUpdate =
+      hasPasswordChanges ||
+      (user && email && email !== (user.email || ""))
 
     if (!email) return "El email es obligatorio."
     if (!email.includes("@")) return "Ingresa un email válido."
+
+    if (wantsSensitiveUpdate && !form.currentPassword) {
+      return "Para cambiar email o contraseña, ingresa tu contraseña actual."
+    }
 
     if (form.newPassword || form.confirmPassword) {
       if (form.newPassword.length < 6) {
@@ -176,6 +186,18 @@ export default function ProfilePage() {
       const nextDisplayName = `${form.firstName.trim()} ${form.lastName.trim()}`.trim()
 
       if (currentUser) {
+        const wantsSensitiveUpdate =
+          !!form.newPassword ||
+          (!!nextEmail && nextEmail !== (currentUser.email || ""))
+
+        if (wantsSensitiveUpdate) {
+          if (!currentUser.email) {
+            throw new Error("No se pudo verificar la contraseña actual para este usuario.")
+          }
+          const credential = EmailAuthProvider.credential(currentUser.email, form.currentPassword)
+          await reauthenticateWithCredential(currentUser, credential)
+        }
+
         if (nextEmail && nextEmail !== currentUser.email) {
           await updateEmail(currentUser, nextEmail)
         }
@@ -209,6 +231,7 @@ export default function ProfilePage() {
       setForm((prev) => ({
         ...prev,
         ...nextProfile,
+        currentPassword: "",
         newPassword: "",
         confirmPassword: "",
       }))
@@ -227,7 +250,10 @@ export default function ProfilePage() {
       console.error("Error updating profile:", error)
 
       if (error?.code === "auth/requires-recent-login") {
-        showSavePopupAndRefresh("Para cambiar email o contraseña, volvé a iniciar sesión y reintentá. La página se va a recargar.", "error")
+        setMessage({ type: "error", text: "Tu sesión necesita validación reciente. Ingresa tu contraseña actual y vuelve a intentar." })
+        return
+      } else if (error?.code === "auth/wrong-password" || error?.code === "auth/invalid-credential") {
+        setMessage({ type: "error", text: "La contraseña actual es incorrecta." })
         return
       } else if (error?.code === "auth/email-already-in-use") {
         showSavePopupAndRefresh("Ese email ya está en uso por otra cuenta. La página se va a recargar.", "error")
@@ -342,6 +368,18 @@ export default function ProfilePage() {
                 </div>
 
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  <div className="space-y-2 md:col-span-2">
+                    <Label htmlFor="currentPassword">Contraseña actual</Label>
+                    <Input
+                      id="currentPassword"
+                      type="password"
+                      value={form.currentPassword}
+                      onChange={(e) => handleChange("currentPassword", e.target.value)}
+                      placeholder="Ingresa tu contraseña actual"
+                      className="h-11 bg-white"
+                    />
+                  </div>
+
                   <div className="space-y-2">
                     <Label htmlFor="newPassword">Contraseña</Label>
                     <Input
@@ -365,6 +403,18 @@ export default function ProfilePage() {
                       className="h-11 bg-white"
                     />
                   </div>
+                </div>
+
+                <div className="mt-3 pt-3 border-t border-slate-200">
+                  <p className="text-xs text-slate-500">
+                    ¿Olvidaste tu contraseña?{" "}
+                    <Link
+                      href="/auth/forgot-password"
+                      className="text-primary font-medium hover:underline"
+                    >
+                      Restablecerla aquí
+                    </Link>
+                  </p>
                 </div>
               </div>
 

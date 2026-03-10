@@ -5,7 +5,8 @@ import Link from "next/link"
 import { useRouter } from "next/navigation"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
-import { Sparkles, LogOut, Building2, Calendar, Users, Settings, BarChart3, TrendingUp, DollarSign, Clock, Star } from "lucide-react"
+import { LogOut, Building2, Calendar, Users, Settings, BarChart3, TrendingUp, DollarSign, Clock, Star } from "lucide-react"
+import { VoydLogo } from "@/components/ui/voyd-logo"
 import { useAuth } from "@/lib/auth-context"
 import { signOut } from "firebase/auth"
 import { auth } from "@/lib/firebaseClient"
@@ -42,11 +43,8 @@ export function DashboardCentrosContent({ admin, center }: DashboardCentrosConte
       {/* Header */}
       <header className="border-b border-slate-200/70 bg-white/80 backdrop-blur-xl">
         <div className="container mx-auto px-4 h-16 flex items-center justify-between">
-          <Link href="/" className="flex items-center gap-2">
-            <div className="w-8 h-8 rounded-lg bg-blue-600 flex items-center justify-center">
-              <Sparkles className="w-4 h-4 text-white" />
-            </div>
-            <span className="font-semibold text-xl tracking-tight text-slate-900">courtly</span>
+          <Link href="/" className="flex items-center">
+            <VoydLogo className="h-8" />
           </Link>
 
           <div className="flex items-center gap-4">

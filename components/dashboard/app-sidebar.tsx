@@ -20,7 +20,6 @@ import {
   ShieldCheck,
   LifeBuoy,
   Menu,
-  Sparkles,
   LogOut,
   ChevronDown,
   FolderKanban,
@@ -29,6 +28,7 @@ import {
   Circle,
 } from "lucide-react"
 import { Button } from "@/components/ui/button"
+import { VoydLogo } from "@/components/ui/voyd-logo"
 import { useEffect, useState } from "react"
 import { signOut } from "firebase/auth"
 import { auth } from "@/lib/firebaseClient"
@@ -210,13 +210,10 @@ export function AppSidebar() {
       <div className="p-6">
         <Link
           href="/clubos/dashboard"
-          className="text-xl font-bold tracking-tight flex items-center gap-2 text-black"
+          className="flex items-center"
           aria-label="Ir al dashboard de ClubOS"
         >
-          <div className="size-8 rounded-lg bg-primary/10 flex items-center justify-center">
-            <Sparkles className="size-5 text-primary" />
-          </div>
-          <span>courtly</span>
+          <VoydLogo className="h-8" />
         </Link>
       </div>
       
@@ -470,9 +467,8 @@ export function MobileSidebar() {
 
     return (
             <div className="md:hidden flex items-center justify-between p-4 border-b bg-background sticky top-0 z-50">
-               <Link href="/clubos/dashboard" className="flex items-center gap-2 font-bold text-lg text-black" aria-label="Ir al dashboard de ClubOS">
-                 <Sparkles className="size-5 text-primary" />
-                 courtly
+               <Link href="/clubos/dashboard" className="flex items-center" aria-label="Ir al dashboard de ClubOS">
+                 <VoydLogo className="h-7" />
                </Link>
              <Button variant="ghost" size="icon" onClick={() => setOpen(!open)}>
                  <Menu className="size-5" />

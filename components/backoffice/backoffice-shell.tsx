@@ -10,15 +10,16 @@ import { authBackoffice } from "@/lib/firebaseBackofficeClient"
 import { cn } from "@/lib/utils"
 import { Button } from "@/components/ui/button"
 import {
-  Sparkles,
   LayoutDashboard,
   Users,
+  UserPlus,
   Building2,
   Grid2X2,
   CalendarClock,
   CreditCard,
   LifeBuoy,
 } from "lucide-react"
+import { VoydLogo } from "@/components/ui/voyd-logo"
 
 // ─── Navigation structure ────────────────────────────────────────────────────
 // Groups are purely visual — all actual routes are preserved.
@@ -35,6 +36,7 @@ const NAV: NavEntry[] = [
 
   { kind: "group", label: "Entities" },
   { kind: "item", href: "/backoffice/players",  label: "Players",   icon: Users },
+  { kind: "item", href: "/backoffice/users",    label: "Users",     icon: UserPlus },
   {
     kind: "item",
     href: "/backoffice/centers",
@@ -141,14 +143,9 @@ export function BackofficeShell({ children }: { children: React.ReactNode }) {
           {/* ── Sidebar ── */}
           <aside className="lg:sticky lg:top-6 lg:self-start bg-white border border-slate-200/70 shadow-sm rounded-2xl p-4 h-fit">
             {/* Brand */}
-            <Link href="/backoffice" className="flex items-center gap-2 mb-5 px-1">
-              <div className="w-7 h-7 rounded-lg bg-blue-600 flex items-center justify-center shrink-0">
-                <Sparkles className="w-3.5 h-3.5 text-white" />
-              </div>
-              <div className="leading-tight">
-                <div className="font-semibold text-[15px] tracking-tight text-slate-900">courtly</div>
-                <div className="text-[10px] text-slate-400 font-medium uppercase tracking-wider">Admin Console</div>
-              </div>
+            <Link href="/backoffice" className="flex flex-col gap-1 mb-5 px-1">
+              <VoydLogo className="h-7" />
+              <div className="text-[10px] text-slate-400 font-medium uppercase tracking-wider">Admin Console</div>
             </Link>
 
             {/* Nav */}

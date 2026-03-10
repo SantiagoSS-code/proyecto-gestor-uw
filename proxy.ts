@@ -76,17 +76,23 @@ export async function proxy(request: NextRequest) {
     return NextResponse.redirect(new URL('/clubos/login', request.url))
   }
 
+  if (pathname === "/auth/signup" || pathname === "/registro-centros") {
+    return NextResponse.redirect(new URL('/clubos/login?invite_only=1', request.url))
+  }
+
   // Protect ClubOS routes
   if (pathname.startsWith('/clubos')) {
     const token = request.cookies.get('__session')?.value
+    const isClubOsPublicAuthPath =
+      pathname === '/clubos/login' || pathname === '/clubos/register' || pathname.startsWith('/clubos/register/')
 
     // Allow login page when user is not authenticated
-    if (!token && pathname === '/clubos/login') {
+    if (!token && isClubOsPublicAuthPath) {
       return NextResponse.next()
     }
 
     // Redirect to login if no token and not login page
-    if (!token && pathname !== '/clubos/login') {
+    if (!token && !isClubOsPublicAuthPath) {
       return NextResponse.redirect(new URL('/clubos/login', request.url))
     }
 
@@ -106,6 +112,11 @@ export async function proxy(request: NextRequest) {
           if (hasClubAccess) {
             return NextResponse.redirect(new URL('/clubos/dashboard', request.url))
           }
+          return NextResponse.next()
+        }
+
+        if (pathname === '/clubos/register' || pathname.startsWith('/clubos/register/')) {
+          // Always allow registration pages — one-time token links must be accessible
           return NextResponse.next()
         }
 
@@ -157,5 +168,5 @@ export async function proxy(request: NextRequest) {
 }
 
 export const config = {
-  matcher: ["/dashboard/:path*", "/clubos/:path*", "/auth/login", "/login-centros"],
+  matcher: ["/dashboard/:path*", "/clubos/:path*", "/auth/login", "/auth/signup", "/registro-centros", "/login-centros"],
 }

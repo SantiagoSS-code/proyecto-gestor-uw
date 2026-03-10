@@ -15,6 +15,13 @@ const dayNameToNumber: Record<string, number> = {
 
 export async function POST(request: Request) {
   try {
+    if (process.env.ALLOW_PUBLIC_CENTER_SIGNUP !== "true") {
+      return NextResponse.json(
+        { error: "El registro público está deshabilitado. Solicitá alta al equipo Voyd." },
+        { status: 403 }
+      )
+    }
+
     const body = await request.json()
     const { isGoogleUser, userId, email, password, adminData, centerData, centerHours, imageUrl, centerImageUrl } = body
 
