@@ -61,7 +61,13 @@ const emptyForm: CourtForm = {
   imageUrl: "",
 }
 
-export function CourtsTab({ onCourtCreated }: { onCourtCreated?: (courtId: string, courtName: string) => void }) {
+export function CourtsTab({
+  onCourtCreated,
+  onCourtsStatsChange,
+}: {
+  onCourtCreated?: (courtId: string, courtName: string) => void
+  onCourtsStatsChange?: (stats: { total: number; published: number }) => void
+}) {
   const { user, centerId, loading: authLoading } = useAuth()
   const resolvedCenterId = centerId || user?.uid || null
   const [courts, setCourts] = useState<CourtRow[]>([])
@@ -78,7 +84,10 @@ export function CourtsTab({ onCourtCreated }: { onCourtCreated?: (courtId: strin
   const [editingCourtHasSchedule, setEditingCourtHasSchedule] = useState(false)
   const [courtsRootCollection, setCourtsRootCollection] = useState<"centers" | "padel_centers">(FIRESTORE_COLLECTIONS.centers)
 
-  const canSave = useMemo(() => form.name.trim().length > 0, [form.name])
+  const canSave = useMemo(() => {
+    const price = Number(form.pricePerHour)
+    return form.name.trim().length > 0 && Number.isFinite(price) && price > 0
+  }, [form.name, form.pricePerHour])
 
   // Obtener deportes únicos de las canchas
   const uniqueSports = useMemo(() => {
@@ -91,6 +100,12 @@ export function CourtsTab({ onCourtCreated }: { onCourtCreated?: (courtId: strin
     if (selectedSport === "all") return courts
     return courts.filter(c => (c.sport || "padel") === selectedSport)
   }, [courts, selectedSport])
+
+  useEffect(() => {
+    const total = courts.length
+    const published = courts.filter((court) => court.published === true).length
+    onCourtsStatsChange?.({ total, published })
+  }, [courts, onCourtsStatsChange])
 
   const validateForm = (): boolean => {
     if (!form.name.trim()) {
@@ -115,6 +130,11 @@ export function CourtsTab({ onCourtCreated }: { onCourtCreated?: (courtId: strin
     }
     if (form.surfaceType === "Otra" && !form.otherSurfaceType) {
       setValidationError("Debes especificar el tipo de superficie.")
+      return false
+    }
+    const price = Number(form.pricePerHour)
+    if (!form.pricePerHour || !Number.isFinite(price) || price <= 0) {
+      setValidationError("Debes ingresar un precio por hora mayor a 0.")
       return false
     }
     setValidationError(null)
@@ -600,7 +620,7 @@ export function CourtsTab({ onCourtCreated }: { onCourtCreated?: (courtId: strin
             <div className="space-y-4">
               <div className="grid grid-cols-2 gap-4">
                 <div className="space-y-2">
-                  <Label className="text-sm font-medium text-slate-700">Precio por hora</Label>
+                  <Label className="text-sm font-medium text-slate-700">Precio por hora *</Label>
                   <div className="relative">
                     <span className="absolute left-3 top-3 text-slate-500 font-medium">$</span>
                     <Input 
@@ -636,7 +656,7 @@ export function CourtsTab({ onCourtCreated }: { onCourtCreated?: (courtId: strin
 
             {/* Publicar - Solo para ediciones */}
             {editingId && (
-              <div className={`p-4 rounded-xl border ${editingCourtHasSchedule ? 'bg-slate-50 border-slate-200' : 'bg-red-50/50 border-red-100'}`}>
+              <div className="p-4 rounded-xl border bg-slate-50 border-slate-200">
                 <Label className="flex items-start gap-3 cursor-pointer">
                   <input 
                     type="checkbox" 
@@ -646,15 +666,11 @@ export function CourtsTab({ onCourtCreated }: { onCourtCreated?: (courtId: strin
                     className="h-5 w-5 rounded border-slate-300 text-blue-600 focus:ring-blue-600 mt-0.5 disabled:opacity-50 disabled:cursor-not-allowed" 
                   />
                   <div className="space-y-1">
-                    <span className={`text-sm font-medium block ${editingCourtHasSchedule ? 'text-slate-900' : 'text-red-900'}`}>
-                      {editingCourtHasSchedule 
-                        ? "Mostrar esta cancha en páginas públicas"
-                        : "Configura los horarios primero"}
+                    <span className="text-sm font-medium block text-slate-900">
+                      Mostrar esta cancha en páginas públicas
                     </span>
-                    <p className={`text-xs ${editingCourtHasSchedule ? 'text-slate-500' : 'text-red-600'}`}>
-                      {editingCourtHasSchedule 
-                        ? "Los jugadores podrán ver y reservar esta cancha"
-                        : "Debes configurar los horarios para poder publicar"}
+                    <p className="text-xs text-slate-500">
+                      Los jugadores podrán ver y reservar esta cancha
                     </p>
                   </div>
                 </Label>
@@ -668,7 +684,7 @@ export function CourtsTab({ onCourtCreated }: { onCourtCreated?: (courtId: strin
             </Button>
             <Button 
               onClick={handleSave} 
-              disabled={saving} 
+              disabled={saving || !canSave} 
               className="bg-blue-600 hover:bg-blue-700 text-white h-11 px-8 w-full sm:w-auto shadow-sm"
             >
               {saving ? (

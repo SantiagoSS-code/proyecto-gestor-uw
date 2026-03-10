@@ -195,7 +195,7 @@ export function AppSidebar() {
             <Check className="size-2.5 text-white" strokeWidth={3} />
           </span>
         )}
-        {obStatus === "current" && (
+        {obStatus === "current" && isActive && (
           <span className="relative flex size-2.5 flex-shrink-0">
             <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-primary opacity-75" />
             <span className="relative inline-flex rounded-full size-2.5 bg-primary" />
@@ -225,7 +225,7 @@ export function AppSidebar() {
         {primaryItems.map((item) => {
           const isActive = isActiveRoute(item.href)
           // During onboarding, only "Canchas" (courts step) is reachable among primary items
-          const locked = isOnboarding && !isOnboardingReachable(item.href, obState.completed, obState.currentStep)
+          const locked = isOnboarding && !isOnboardingReachable(item.href, obState.completed, obState.currentStep) && !isActive
 
           if (locked) {
             return renderSidebarLink(item, true, false)
@@ -296,7 +296,7 @@ export function AppSidebar() {
           <div className="space-y-1 pl-2">
             {configItems.map((item) => {
               const isActive = isActiveRoute(item.href)
-              const locked = isOnboarding && !isOnboardingReachable(item.href, obState.completed, obState.currentStep)
+              const locked = isOnboarding && !isOnboardingReachable(item.href, obState.completed, obState.currentStep) && !isActive
               const obStatus = isOnboarding ? getOnboardingStatus(item.href, obState.completed, obState.currentStep) : "none"
               return renderSidebarLink(item, locked, isActive, obStatus)
             })}
@@ -458,7 +458,7 @@ export function MobileSidebar() {
               <Check className="size-2.5 text-white" strokeWidth={3} />
             </span>
           )}
-          {obStatus === "current" && (
+          {obStatus === "current" && isActive && (
             <span className="relative flex size-2.5 flex-shrink-0">
               <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-primary opacity-75" />
               <span className="relative inline-flex rounded-full size-2.5 bg-primary" />
@@ -509,7 +509,7 @@ export function MobileSidebar() {
                   {/* ── Primary items ── */}
                   {primaryItems.map((item) => {
                     const isActive = isActiveRoute(item.href)
-                    const locked = isOnboarding && !isOnboardingReachable(item.href, obState.completed, obState.currentStep)
+                    const locked = isOnboarding && !isOnboardingReachable(item.href, obState.completed, obState.currentStep) && !isActive
                     const obStatus = isOnboarding ? getOnboardingStatus(item.href, obState.completed, obState.currentStep) : "none"
                     return renderMobileLink(item, locked, isActive, obStatus)
                   })}
@@ -568,7 +568,7 @@ export function MobileSidebar() {
                           <div className="space-y-1 pl-2">
                             {configItems.map((item) => {
                               const isActive = isActiveRoute(item.href)
-                              const locked = isOnboarding && !isOnboardingReachable(item.href, obState.completed, obState.currentStep)
+                              const locked = isOnboarding && !isOnboardingReachable(item.href, obState.completed, obState.currentStep) && !isActive
                               const obStatus = isOnboarding ? getOnboardingStatus(item.href, obState.completed, obState.currentStep) : "none"
                               return renderMobileLink(item, locked, isActive, obStatus)
                             })}

@@ -4,6 +4,7 @@ import { useMemo, useState, useEffect } from "react"
 import { useRouter, useSearchParams } from "next/navigation"
 import { CourtsLayout } from "@/components/dashboard/courts-layout"
 import { cn } from "@/lib/utils"
+import { Button } from "@/components/ui/button"
 import { CourtsTab } from "@/components/dashboard/center/courts-tab"
 import { ScheduleTab } from "@/components/dashboard/center/schedule-tab"
 import { useOnboarding } from "@/lib/onboarding"
@@ -20,8 +21,10 @@ export default function CourtsTabsClient() {
   const router = useRouter()
   const { isOnboarding, completeStep } = useOnboarding()
   const [justCreatedCourtId, setJustCreatedCourtId] = useState<string | null>(null)
+  const [courtsStats, setCourtsStats] = useState<{ total: number; published: number }>({ total: 0, published: 0 })
   const [tab, setTabState] = useState<TabKey>("courts")
   const activeTab: TabKey = useMemo(() => (TABS.some((t) => t.key === tab) ? tab : "courts"), [tab])
+  const canAdvanceToPublish = courtsStats.total > 0 && courtsStats.published === courtsStats.total
 
   useEffect(() => {
     const tabFromParams = (searchParams?.get("tab") as TabKey) || "courts"
@@ -39,16 +42,20 @@ export default function CourtsTabsClient() {
     setJustCreatedCourtId(courtId)
 
     if (isOnboarding) {
-      // Complete courts step and redirect to Centro for publish
-      const nextHref = await completeStep("courts")
-      if (nextHref) {
-        router.push(nextHref)
-        return
-      }
+      // Complete courts step but keep user here so they can continue configuring horarios.
+      await completeStep("courts")
     }
 
-    // Normal flow: auto-switch to schedule tab
+    // Auto-switch to schedule tab after creating a court.
     setTab("schedule")
+  }
+
+  const handleNextOnboardingStep = async () => {
+    if (!canAdvanceToPublish) return
+    const nextHref = await completeStep("courts")
+    if (nextHref) {
+      router.push(nextHref)
+    }
   }
 
   return (
@@ -83,8 +90,20 @@ export default function CourtsTabsClient() {
         </div>
       </div>
 
-      {activeTab === "courts" ? <CourtsTab onCourtCreated={handleCourtCreated} /> : null}
+      {activeTab === "courts" ? <CourtsTab onCourtCreated={handleCourtCreated} onCourtsStatsChange={setCourtsStats} /> : null}
       {activeTab === "schedule" ? <ScheduleTab autoSelectCourtId={justCreatedCourtId} /> : null}
+
+      {isOnboarding && (
+        <div className="mt-6 flex justify-end">
+          <Button
+            onClick={handleNextOnboardingStep}
+            disabled={!canAdvanceToPublish}
+            className="bg-blue-600 hover:bg-blue-700 text-white shadow-sm transition-all h-10 px-5 rounded-lg"
+          >
+            Siguiente: Publicar
+          </Button>
+        </div>
+      )}
     </CourtsLayout>
   )
 }

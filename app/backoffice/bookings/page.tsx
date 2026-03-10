@@ -54,11 +54,12 @@ export default function BackofficeBookingsPage() {
   const [error, setError]   = useState<{ message: string; status?: number } | null>(null)
 
   // Filters (client-side after load)
-  const [search, setSearch]         = useState("")
-  const [filterDate, setFilterDate]  = useState("")
-  const [filterStatus, setFilterStatus] = useState("")
-  const [filterPayment, setFilterPayment] = useState("")
-  const [filterSport, setFilterSport]   = useState("")
+  const [search, setSearch]               = useState("")
+  const [filterDateFrom, setFilterDateFrom] = useState("")
+  const [filterDateTo, setFilterDateTo]     = useState("")
+  const [filterStatus, setFilterStatus]     = useState("")
+  const [filterPayment, setFilterPayment]   = useState("")
+  const [filterSport, setFilterSport]       = useState("")
 
   useEffect(() => {
     const load = async () => {
@@ -81,7 +82,8 @@ export default function BackofficeBookingsPage() {
   // Client-side filtering
   const filtered = useMemo(() => {
     return items.filter((b) => {
-      if (filterDate   && b.date !== filterDate) return false
+      if (filterDateFrom && b.date && b.date < filterDateFrom) return false
+      if (filterDateTo   && b.date && b.date > filterDateTo)   return false
       if (filterStatus && b.bookingStatus !== filterStatus) return false
       if (filterPayment && b.paymentStatus !== filterPayment) return false
       if (filterSport  && b.sport !== filterSport) return false
@@ -92,11 +94,11 @@ export default function BackofficeBookingsPage() {
       }
       return true
     })
-  }, [items, search, filterDate, filterStatus, filterPayment, filterSport])
+  }, [items, search, filterDateFrom, filterDateTo, filterStatus, filterPayment, filterSport])
 
-  const hasFilters = search || filterDate || filterStatus || filterPayment || filterSport
+  const hasFilters = search || filterDateFrom || filterDateTo || filterStatus || filterPayment || filterSport
   const clearFilters = () => {
-    setSearch(""); setFilterDate(""); setFilterStatus(""); setFilterPayment(""); setFilterSport("")
+    setSearch(""); setFilterDateFrom(""); setFilterDateTo(""); setFilterStatus(""); setFilterPayment(""); setFilterSport("")
   }
 
   return (
@@ -118,12 +120,23 @@ export default function BackofficeBookingsPage() {
             className="pl-8 h-9 w-52 text-sm"
           />
         </div>
-        <input
-          type="date"
-          value={filterDate}
-          onChange={(e) => setFilterDate(e.target.value)}
-          className="h-9 rounded-lg border border-slate-200 bg-white px-2.5 text-sm text-slate-700 focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-400"
-        />
+        <div className="flex items-center gap-1.5 rounded-lg border border-slate-200 bg-white px-2.5 h-9">
+          <span className="text-xs text-slate-400 whitespace-nowrap">Desde</span>
+          <input
+            type="date"
+            value={filterDateFrom}
+            onChange={(e) => setFilterDateFrom(e.target.value)}
+            className="h-full bg-transparent text-sm text-slate-700 focus:outline-none"
+          />
+          <span className="text-xs text-slate-300">–</span>
+          <span className="text-xs text-slate-400 whitespace-nowrap">Hasta</span>
+          <input
+            type="date"
+            value={filterDateTo}
+            onChange={(e) => setFilterDateTo(e.target.value)}
+            className="h-full bg-transparent text-sm text-slate-700 focus:outline-none"
+          />
+        </div>
         <FilterSelect value={filterStatus}  onChange={setFilterStatus}  options={BOOKING_STATUSES} placeholder="Booking status" />
         <FilterSelect value={filterPayment} onChange={setFilterPayment} options={PAYMENT_STATUSES} placeholder="Payment status" />
         <FilterSelect value={filterSport}   onChange={setFilterSport}   options={SPORTS}           placeholder="Sport" />

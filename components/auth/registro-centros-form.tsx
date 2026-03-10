@@ -29,10 +29,52 @@ import {
   ArrowLeft,
   ArrowRight,
 } from "lucide-react"
-import { auth, db } from "@/lib/firebaseClient"
+import { app, auth, db } from "@/lib/firebaseClient"
 import { signInWithPopup, GoogleAuthProvider, signInWithEmailAndPassword, createUserWithEmailAndPassword } from "firebase/auth"
 import { doc, setDoc, serverTimestamp } from "firebase/firestore"
 import { getStorage, ref, uploadBytes, getDownloadURL } from "firebase/storage"
+
+const normalizeBucketName = (value?: string | null) => {
+  if (!value) return ""
+  return value.trim().replace(/^gs:\/\//, "").replace(/\/$/, "")
+}
+
+const alternateBucketName = (value: string) => {
+  if (value.endsWith(".appspot.com")) {
+    return value.replace(/\.appspot\.com$/, ".firebasestorage.app")
+  }
+  if (value.endsWith(".firebasestorage.app")) {
+    return value.replace(/\.firebasestorage\.app$/, ".appspot.com")
+  }
+  return ""
+}
+
+const isBucketMissingError = (error: any) => {
+  const message = String(error?.message || "").toLowerCase()
+  const code = String(error?.code || "").toLowerCase()
+  return message.includes("specified bucket does not exist") || code.includes("bucket-not-found")
+}
+
+const uploadImageWithBucketFallback = async (path: string, file: File) => {
+  const primaryStorage = app ? getStorage(app) : getStorage()
+  const primaryRef = ref(primaryStorage, path)
+
+  try {
+    await uploadBytes(primaryRef, file)
+    return await getDownloadURL(primaryRef)
+  } catch (error: any) {
+    if (!isBucketMissingError(error)) throw error
+
+    const configuredBucket = normalizeBucketName(process.env.NEXT_PUBLIC_FIREBASE_STORAGE_BUCKET)
+    const fallbackBucket = alternateBucketName(configuredBucket)
+    if (!fallbackBucket) throw error
+
+    const fallbackStorage = app ? getStorage(app, `gs://${fallbackBucket}`) : getStorage(undefined, `gs://${fallbackBucket}`)
+    const fallbackRef = ref(fallbackStorage, path)
+    await uploadBytes(fallbackRef, file)
+    return await getDownloadURL(fallbackRef)
+  }
+}
 
 const DAYS_OF_WEEK = [
   { key: "monday", label: "Lunes" },
@@ -421,13 +463,9 @@ export function RegistroCentrosForm({ initialGoogleEmail, initialGoogleName }: R
         // Upload image first
         let imageUrl = null
         if (centerData.image) {
-          const storage = getStorage()
           const fileExt = centerData.image.name.split(".").pop()
           const fileName = `${user.uid}-${Date.now()}.${fileExt}`
-          const storageRef = ref(storage, `center-images/${fileName}`)
-
-          await uploadBytes(storageRef, centerData.image)
-          imageUrl = await getDownloadURL(storageRef)
+          imageUrl = await uploadImageWithBucketFallback(`center-images/${fileName}`, centerData.image)
         }
 
         // Use server API for Google users too
@@ -478,13 +516,9 @@ export function RegistroCentrosForm({ initialGoogleEmail, initialGoogleName }: R
       // Upload image first using anon client (storage should be public for uploads)
       let imageUrl = null
       if (centerData.image) {
-        const storage = getStorage()
         const fileExt = centerData.image.name.split(".").pop()
         const fileName = `temp-${Date.now()}.${fileExt}`
-        const storageRef = ref(storage, `center-images/${fileName}`)
-
-        await uploadBytes(storageRef, centerData.image)
-        imageUrl = await getDownloadURL(storageRef)
+        imageUrl = await uploadImageWithBucketFallback(`center-images/${fileName}`, centerData.image)
       }
 
       // Call server API to create user and insert all data

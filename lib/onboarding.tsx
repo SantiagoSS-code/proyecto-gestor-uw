@@ -11,7 +11,7 @@ export const ONBOARDING_STEPS = [
   { key: "center", label: "Centro", href: "/clubos/dashboard/settings", number: 2 },
   { key: "operations", label: "Operación", href: "/clubos/dashboard/settings/operacion", number: 3 },
   { key: "courts", label: "Canchas", href: "/clubos/dashboard/courts", number: 4 },
-  { key: "publish", label: "Publicar", href: "/clubos/dashboard/settings?step=publish", number: 5 },
+  { key: "publish", label: "Publicar", href: "/clubos/dashboard/settings/publish", number: 5 },
 ] as const
 
 export type OnboardingStepKey = (typeof ONBOARDING_STEPS)[number]["key"]
@@ -33,6 +33,34 @@ const DEFAULT_STATE: OnboardingState = {
   },
   currentStep: "profile",
   onboardingComplete: false,
+}
+
+function normalizeState(input?: Partial<OnboardingState>): OnboardingState {
+  const rawCompleted = { ...DEFAULT_STATE.completed, ...(input?.completed || {}) }
+  const normalizedCompleted = { ...DEFAULT_STATE.completed }
+
+  let allowComplete = true
+  for (const step of ONBOARDING_STEPS) {
+    const done = Boolean(rawCompleted[step.key]) && allowComplete
+    normalizedCompleted[step.key] = done
+    if (!done) allowComplete = false
+  }
+
+  const firstIncomplete = ONBOARDING_STEPS.find((step) => !normalizedCompleted[step.key])
+  const onboardingComplete = !firstIncomplete
+
+  return {
+    completed: normalizedCompleted,
+    currentStep: onboardingComplete ? "publish" : firstIncomplete.key,
+    onboardingComplete,
+    updatedAt: input?.updatedAt,
+  }
+}
+
+function getNextStepHref(state: OnboardingState): string | null {
+  if (state.onboardingComplete) return null
+  const step = ONBOARDING_STEPS.find((s) => s.key === state.currentStep)
+  return step?.href || null
 }
 
 /* ────────── context ────────── */
@@ -83,11 +111,7 @@ export function OnboardingProvider({ children }: { children: React.ReactNode }) 
       const snap = await getDoc(firestorePath)
       if (snap.exists()) {
         const data = snap.data() as Partial<OnboardingState>
-        setState({
-          completed: { ...DEFAULT_STATE.completed, ...(data.completed || {}) },
-          currentStep: data.currentStep || DEFAULT_STATE.currentStep,
-          onboardingComplete: Boolean(data.onboardingComplete),
-        })
+        setState(normalizeState(data))
       }
     } catch (err) {
       console.error("[Onboarding] Error loading state:", err)
@@ -104,18 +128,20 @@ export function OnboardingProvider({ children }: { children: React.ReactNode }) 
     async (step: OnboardingStepKey): Promise<string | null> => {
       if (!firestorePath) return null
 
-      const nextCompleted = { ...state.completed, [step]: true }
+      const currentState = normalizeState(state)
+      const alreadyDone = currentState.completed[step]
 
-      // determine next incomplete step
-      const nextStep = ONBOARDING_STEPS.find((s) => !nextCompleted[s.key])
-      const nextStepKey = nextStep?.key || "publish"
-      const allDone = ONBOARDING_STEPS.every((s) => nextCompleted[s.key])
-
-      const nextState: OnboardingState = {
-        completed: nextCompleted,
-        currentStep: nextStepKey,
-        onboardingComplete: allDone,
+      // Enforce strict sequence: only current step can be completed.
+      if (!alreadyDone && step !== currentState.currentStep) {
+        return getNextStepHref(currentState)
       }
+
+      const nextState = normalizeState({
+        completed: {
+          ...currentState.completed,
+          [step]: true,
+        },
+      })
 
       setState(nextState)
 
@@ -125,8 +151,7 @@ export function OnboardingProvider({ children }: { children: React.ReactNode }) 
         console.error("[Onboarding] Error saving state:", err)
       }
 
-      if (allDone) return null
-      return nextStep?.href || null
+      return getNextStepHref(nextState)
     },
     [firestorePath, state]
   )

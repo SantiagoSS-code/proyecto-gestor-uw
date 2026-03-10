@@ -15,27 +15,37 @@ export function OnboardingGate({ children }: { children: React.ReactNode }) {
   const pathname = usePathname()
   const router = useRouter()
 
+  const pathToStepKey = (path: string): (typeof ONBOARDING_STEPS)[number]["key"] | null => {
+    if (path.startsWith("/clubos/dashboard/settings/publish")) return "publish"
+    if (path.startsWith("/clubos/dashboard/settings/profile")) return "profile"
+    if (path.startsWith("/clubos/dashboard/settings/operacion")) return "operations"
+    if (path.startsWith("/clubos/dashboard/courts")) return "courts"
+
+    if (path === "/clubos/dashboard/settings" || path.startsWith("/clubos/dashboard/settings/center")) {
+      // Same base path is used by center and publish step.
+      return state.currentStep === "publish" ? "publish" : "center"
+    }
+
+    return null
+  }
+
   useEffect(() => {
     if (loading || !isOnboarding) return
 
     const currentStep = ONBOARDING_STEPS[currentStepIndex]
     if (!currentStep) return
 
-    const expectedPath = currentStep.href.split("?")[0] // strip query string for pathname comparison
+    const expectedPath = currentStep.href.split("?")[0]
+    const routeStep = pathToStepKey(pathname)
 
-    // Allow the user to be on the expected path
-    // For "courts" step, also allow /clubos/dashboard/courts sub-routes
-    // For "publish" step, also allow being on /clubos/dashboard/settings (same base as center)
-    const isOnExpectedPath =
-      pathname === expectedPath ||
-      pathname.startsWith(expectedPath + "/") ||
-      (currentStep.key === "courts" && pathname.startsWith("/clubos/dashboard/courts")) ||
-      (currentStep.key === "publish" && pathname.startsWith("/clubos/dashboard/settings"))
+    // Allow current step and any previously completed onboarding step.
+    const canStayOnRoute =
+      routeStep !== null && (routeStep === state.currentStep || Boolean(state.completed[routeStep]))
 
-    if (!isOnExpectedPath) {
+    if (!canStayOnRoute) {
       router.replace(expectedPath)
     }
-  }, [loading, isOnboarding, currentStepIndex, pathname, router])
+  }, [loading, isOnboarding, currentStepIndex, pathname, router, state.currentStep, state.completed])
 
   if (loading) {
     return (

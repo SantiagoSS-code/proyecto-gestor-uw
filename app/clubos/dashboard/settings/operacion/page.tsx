@@ -87,17 +87,20 @@ const ADVANCE_HOURS = [
 	{ value: 6, label: "6 horas" },
 	{ value: 12, label: "12 horas" },
 	{ value: 24, label: "24 horas" },
-	{ value: 48, label: "48 horas" },
 ]
+
+const PRESET_ADVANCE_VALUES = new Set(ADVANCE_HOURS.map((o) => o.value))
 
 const ADVANCE_DAYS = [
 	{ value: 7, label: "7 días" },
 	{ value: 14, label: "14 días" },
 	{ value: 21, label: "21 días" },
 	{ value: 30, label: "30 días" },
-	{ value: 60, label: "60 días" },
-	{ value: 90, label: "90 días" },
 ]
+
+const PRESET_ADVANCE_DAYS_VALUES = new Set(ADVANCE_DAYS.map((o) => o.value))
+const FREE_CANCEL_HOURS_OPTIONS = [1, 2, 3, 6, 12, 24, 48]
+const PRESET_FREE_CANCEL_HOURS_VALUES = new Set(FREE_CANCEL_HOURS_OPTIONS)
 
 const HOUR_OPTIONS = Array.from({ length: 24 }, (_, i) => {
 	const hh = String(i).padStart(2, "0")
@@ -111,6 +114,28 @@ function durationLabel(mins: number) {
 	return m ? `${h} h ${m} min` : `${h} hora${h > 1 ? "s" : ""}`
 }
 
+function hoursToClock(value: number) {
+	if (!Number.isFinite(value) || value < 0) return "00:00"
+	const totalMinutes = Math.round(value * 60)
+	const hh = String(Math.floor(totalMinutes / 60)).padStart(2, "0")
+	const mm = String(totalMinutes % 60).padStart(2, "0")
+	return `${hh}:${mm}`
+}
+
+function parseClockToHours(value: string) {
+	const match = value.trim().match(/^(\d{1,3}):([0-5]\d)$/)
+	if (!match) return null
+	const hours = Number(match[1])
+	const minutes = Number(match[2])
+	return hours + minutes / 60
+}
+
+function splitClock(value: string) {
+	const match = value.trim().match(/^(\d{1,3}):([0-5]\d)$/)
+	if (!match) return { hour: "00", minute: "00" }
+	return { hour: String(Number(match[1])), minute: match[2] }
+}
+
 /* ────────── component ────────── */
 export default function OperacionPage() {
 	const { user, loading: authLoading } = useAuth()
@@ -119,6 +144,16 @@ export default function OperacionPage() {
 	const [loading, setLoading] = useState(true)
 	const [saving, setSaving] = useState(false)
 	const [settings, setSettings] = useState<OperationSettings>({ ...DEFAULT_SETTINGS })
+	const [customMinAdvanceClock, setCustomMinAdvanceClock] = useState("00:00")
+	const [customMinAdvanceHour, setCustomMinAdvanceHour] = useState("0")
+	const [customMinAdvanceMinute, setCustomMinAdvanceMinute] = useState("00")
+	const [customMaxAdvanceDays, setCustomMaxAdvanceDays] = useState("30")
+	const [customFreeCancelClock, setCustomFreeCancelClock] = useState("24:00")
+	const [customFreeCancelHour, setCustomFreeCancelHour] = useState("24")
+	const [customFreeCancelMinute, setCustomFreeCancelMinute] = useState("00")
+	const [isMinAdvanceCustom, setIsMinAdvanceCustom] = useState(false)
+	const [isMaxAdvanceCustom, setIsMaxAdvanceCustom] = useState(false)
+	const [isFreeCancelCustom, setIsFreeCancelCustom] = useState(false)
 	const [openSections, setOpenSections] = useState<Record<string, boolean>>({
 		turnos: true,
 		cancelacion: false,
@@ -129,6 +164,10 @@ export default function OperacionPage() {
 
 	const toggleSection = (s: string) =>
 		setOpenSections((prev) => ({ ...prev, [s]: !prev[s] }))
+
+	const minAdvanceSelectValue = isMinAdvanceCustom ? "custom" : String(settings.minAdvanceHours)
+	const maxAdvanceSelectValue = isMaxAdvanceCustom ? "custom" : String(settings.maxAdvanceDays)
+	const freeCancelSelectValue = isFreeCancelCustom ? "custom" : String(settings.freeCancelHours)
 
 	/* ── redirect ── */
 	useEffect(() => {
@@ -150,7 +189,36 @@ export default function OperacionPage() {
 				const snap = await getDoc(ref)
 				if (snap.exists()) {
 					const data = snap.data() as Partial<OperationSettings>
-					setSettings({ ...DEFAULT_SETTINGS, ...data })
+					const next = { ...DEFAULT_SETTINGS, ...data }
+					setSettings(next)
+					if (!PRESET_ADVANCE_VALUES.has(next.minAdvanceHours)) {
+						setIsMinAdvanceCustom(true)
+						const clock = hoursToClock(next.minAdvanceHours)
+						setCustomMinAdvanceClock(clock)
+						const parts = splitClock(clock)
+						setCustomMinAdvanceHour(parts.hour)
+						setCustomMinAdvanceMinute(parts.minute)
+					} else {
+						setIsMinAdvanceCustom(false)
+					}
+
+					if (!PRESET_ADVANCE_DAYS_VALUES.has(next.maxAdvanceDays)) {
+						setIsMaxAdvanceCustom(true)
+						setCustomMaxAdvanceDays(String(next.maxAdvanceDays))
+					} else {
+						setIsMaxAdvanceCustom(false)
+					}
+
+					if (!PRESET_FREE_CANCEL_HOURS_VALUES.has(next.freeCancelHours)) {
+						setIsFreeCancelCustom(true)
+						const clock = hoursToClock(next.freeCancelHours)
+						setCustomFreeCancelClock(clock)
+						const parts = splitClock(clock)
+						setCustomFreeCancelHour(parts.hour)
+						setCustomFreeCancelMinute(parts.minute)
+					} else {
+						setIsFreeCancelCustom(false)
+					}
 				}
 			} catch (err) {
 				console.error("Error loading operation settings:", err)
@@ -222,7 +290,7 @@ export default function OperacionPage() {
 			},
 			{
 				id: "cancelacion",
-				label: "Política de cancelación y no-show",
+				label: "Política de cancelación y auscencia",
 				done:
 					settings.cancellationEnabled
 						? settings.freeCancelHours >= 1 &&
@@ -281,6 +349,122 @@ export default function OperacionPage() {
 		setSettings((prev) => ({ ...prev, [key]: value }))
 
 	/* ── holiday helpers ── */
+	const handleMinAdvanceSelect = (value: string) => {
+		if (value === "custom") {
+			if (!isMinAdvanceCustom) {
+				const initialClock = hoursToClock(settings.minAdvanceHours || 0)
+				const normalizedClock = initialClock === "24:00" ? "00:00" : initialClock
+				setCustomMinAdvanceClock(normalizedClock)
+				const parts = splitClock(normalizedClock)
+				setCustomMinAdvanceHour(parts.hour)
+				setCustomMinAdvanceMinute(parts.minute)
+			}
+			setIsMinAdvanceCustom(true)
+			const parsed = parseClockToHours(customMinAdvanceClock)
+			if (parsed !== null) {
+				set("minAdvanceHours", parsed)
+			}
+			return
+		}
+		setIsMinAdvanceCustom(false)
+		set("minAdvanceHours", Number(value))
+	}
+
+	const updateCustomClock = (hour: string, minute: string) => {
+		const safeHour = String(Math.max(0, Math.min(999, Number(hour || "0") || 0)))
+		const safeMinuteNum = Math.max(0, Math.min(59, Number(minute || "0") || 0))
+		const safeMinute = String(safeMinuteNum).padStart(2, "0")
+		const clock = `${safeHour}:${safeMinute}`
+		setCustomMinAdvanceClock(clock)
+		const parsed = parseClockToHours(clock)
+		if (parsed !== null) {
+			set("minAdvanceHours", parsed)
+		}
+	}
+
+	const handleCustomHourChange = (value: string) => {
+		const clean = value.replace(/\D/g, "").slice(0, 3)
+		const nextHour = clean || "0"
+		setCustomMinAdvanceHour(nextHour)
+		updateCustomClock(nextHour, customMinAdvanceMinute)
+	}
+
+	const handleCustomMinuteChange = (value: string) => {
+		const clean = value.replace(/\D/g, "").slice(0, 2)
+		const minuteNum = Math.max(0, Math.min(59, Number(clean || "0") || 0))
+		const nextMinute = String(minuteNum).padStart(2, "0")
+		setCustomMinAdvanceMinute(nextMinute)
+		updateCustomClock(customMinAdvanceHour, nextMinute)
+	}
+
+	const handleMaxAdvanceSelect = (value: string) => {
+		if (value === "custom") {
+			setIsMaxAdvanceCustom(true)
+			if (PRESET_ADVANCE_DAYS_VALUES.has(settings.maxAdvanceDays)) {
+				setCustomMaxAdvanceDays(String(settings.maxAdvanceDays || 30))
+			}
+			return
+		}
+		setIsMaxAdvanceCustom(false)
+		set("maxAdvanceDays", Number(value))
+	}
+
+	const handleCustomMaxAdvanceDaysChange = (value: string) => {
+		const digits = value.replace(/\D/g, "").slice(0, 4)
+		setCustomMaxAdvanceDays(digits)
+		const parsed = Number(digits)
+		if (Number.isFinite(parsed) && parsed >= 1) {
+			set("maxAdvanceDays", parsed)
+		}
+	}
+
+	const handleFreeCancelSelect = (value: string) => {
+		if (value === "custom") {
+			if (!isFreeCancelCustom) {
+				const clock = hoursToClock(settings.freeCancelHours || 24)
+				setCustomFreeCancelClock(clock)
+				const parts = splitClock(clock)
+				setCustomFreeCancelHour(parts.hour)
+				setCustomFreeCancelMinute(parts.minute)
+			}
+			setIsFreeCancelCustom(true)
+			const parsed = parseClockToHours(customFreeCancelClock)
+			if (parsed !== null) {
+				set("freeCancelHours", parsed)
+			}
+			return
+		}
+		setIsFreeCancelCustom(false)
+		set("freeCancelHours", Number(value))
+	}
+
+	const updateCustomFreeCancelClock = (hour: string, minute: string) => {
+		const safeHour = String(Math.max(0, Math.min(999, Number(hour || "0") || 0)))
+		const safeMinuteNum = Math.max(0, Math.min(59, Number(minute || "0") || 0))
+		const safeMinute = String(safeMinuteNum).padStart(2, "0")
+		const clock = `${safeHour}:${safeMinute}`
+		setCustomFreeCancelClock(clock)
+		const parsed = parseClockToHours(clock)
+		if (parsed !== null) {
+			set("freeCancelHours", parsed)
+		}
+	}
+
+	const handleCustomFreeCancelHourChange = (value: string) => {
+		const clean = value.replace(/\D/g, "").slice(0, 3)
+		const nextHour = clean || "0"
+		setCustomFreeCancelHour(nextHour)
+		updateCustomFreeCancelClock(nextHour, customFreeCancelMinute)
+	}
+
+	const handleCustomFreeCancelMinuteChange = (value: string) => {
+		const clean = value.replace(/\D/g, "").slice(0, 2)
+		const minuteNum = Math.max(0, Math.min(59, Number(clean || "0") || 0))
+		const nextMinute = String(minuteNum).padStart(2, "0")
+		setCustomFreeCancelMinute(nextMinute)
+		updateCustomFreeCancelClock(customFreeCancelHour, nextMinute)
+	}
+
 	const addHoliday = () => {
 		const entry: HolidayEntry = { date: "", label: "", closed: true }
 		set("holidays", [...settings.holidays, entry])
@@ -434,27 +618,70 @@ export default function OperacionPage() {
 									<div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
 										<div className="space-y-1.5">
 											<Label className="text-sm">Anticipación mínima</Label>
-											<Select value={String(settings.minAdvanceHours)} onValueChange={(v) => set("minAdvanceHours", Number(v))}>
+											<Select value={minAdvanceSelectValue} onValueChange={handleMinAdvanceSelect}>
 												<SelectTrigger className="h-10"><SelectValue /></SelectTrigger>
 												<SelectContent>
 													{ADVANCE_HOURS.map((o) => (
 														<SelectItem key={o.value} value={String(o.value)}>{o.label}</SelectItem>
 													))}
+													<SelectItem value="custom">Personalizado</SelectItem>
 												</SelectContent>
 											</Select>
+											{isMinAdvanceCustom && (
+												<div className="space-y-1.5 pt-1">
+													<Label className="text-xs text-slate-500 flex items-center gap-1">
+														<Clock className="w-3.5 h-3.5" />
+														Tiempo personalizado (HH:MM)
+													</Label>
+													<div className="flex items-center gap-2">
+														<Input
+															type="text"
+															inputMode="numeric"
+															value={customMinAdvanceHour}
+															onChange={(e) => handleCustomHourChange(e.target.value)}
+															className="h-12 text-center text-2xl font-semibold w-24"
+															aria-label="Hora"
+														/>
+														<span className="text-3xl font-semibold text-slate-500">:</span>
+														<Input
+															type="text"
+															inputMode="numeric"
+															value={customMinAdvanceMinute}
+															onChange={(e) => handleCustomMinuteChange(e.target.value)}
+															className="h-12 text-center text-2xl font-semibold w-24"
+															aria-label="Minutos"
+														/>
+													</div>
+												</div>
+											)}
 											<p className="text-xs text-slate-400">El jugador debe reservar con al menos esta anticipación.</p>
 										</div>
 
 										<div className="space-y-1.5">
 											<Label className="text-sm">Anticipación máxima</Label>
-											<Select value={String(settings.maxAdvanceDays)} onValueChange={(v) => set("maxAdvanceDays", Number(v))}>
+											<Select value={maxAdvanceSelectValue} onValueChange={handleMaxAdvanceSelect}>
 												<SelectTrigger className="h-10"><SelectValue /></SelectTrigger>
 												<SelectContent>
 													{ADVANCE_DAYS.map((o) => (
 														<SelectItem key={o.value} value={String(o.value)}>{o.label}</SelectItem>
 													))}
+													<SelectItem value="custom">Personalizado</SelectItem>
 												</SelectContent>
 											</Select>
+											{isMaxAdvanceCustom && (
+												<div className="space-y-1.5 pt-1">
+													<Label className="text-xs text-slate-500">Días personalizados</Label>
+													<Input
+														type="number"
+														min={1}
+														step={1}
+														placeholder="Ej: 45"
+														value={customMaxAdvanceDays}
+														onChange={(e) => handleCustomMaxAdvanceDaysChange(e.target.value)}
+														className="h-10"
+													/>
+												</div>
+											)}
 											<p className="text-xs text-slate-400">Hasta cuántos días en el futuro se puede reservar.</p>
 										</div>
 									</div>
@@ -464,7 +691,7 @@ export default function OperacionPage() {
 						</div>
 					</div>
 
-					{/* ═══════ 2. Cancelación y no-show ═══════ */}
+					{/* ═══════ 2. Cancelación y auscencia ═══════ */}
 					<div className="rounded-lg border border-slate-200 overflow-hidden">
 						<button
 							type="button"
@@ -474,7 +701,7 @@ export default function OperacionPage() {
 							<div className="flex items-center gap-2">
 								<ShieldAlert className="w-4 h-4 text-amber-600" />
 								<div>
-									<p className="text-sm font-medium text-slate-900">Cancelación y no-show</p>
+									<p className="text-sm font-medium text-slate-900">Cancelación y auscencia</p>
 									<p className="text-xs text-slate-500 mt-0.5">Ventana de cancelación gratuita y cargos.</p>
 								</div>
 							</div>
@@ -501,14 +728,42 @@ export default function OperacionPage() {
 											<div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
 												<div className="space-y-1.5">
 													<Label className="text-sm">Cancelación gratis si faltan más de</Label>
-													<Select value={String(settings.freeCancelHours)} onValueChange={(v) => set("freeCancelHours", Number(v))}>
+													<Select value={freeCancelSelectValue} onValueChange={handleFreeCancelSelect}>
 														<SelectTrigger className="h-10"><SelectValue /></SelectTrigger>
 														<SelectContent>
-															{[1, 2, 3, 6, 12, 24, 48, 72].map((h) => (
+															{FREE_CANCEL_HOURS_OPTIONS.map((h) => (
 																<SelectItem key={h} value={String(h)}>{h} hora{h > 1 ? "s" : ""}</SelectItem>
 															))}
+															<SelectItem value="custom">Personalizado</SelectItem>
 														</SelectContent>
 													</Select>
+													{isFreeCancelCustom && (
+														<div className="space-y-1.5 pt-1">
+															<Label className="text-xs text-slate-500 flex items-center gap-1">
+																<Clock className="w-3.5 h-3.5" />
+																Tiempo personalizado (HH:MM)
+															</Label>
+															<div className="flex items-center gap-2">
+																<Input
+																	type="text"
+																	inputMode="numeric"
+																	value={customFreeCancelHour}
+																	onChange={(e) => handleCustomFreeCancelHourChange(e.target.value)}
+																	className="h-12 text-center text-2xl font-semibold w-24"
+																	aria-label="Horas para cancelación"
+																/>
+																<span className="text-3xl font-semibold text-slate-500">:</span>
+																<Input
+																	type="text"
+																	inputMode="numeric"
+																	value={customFreeCancelMinute}
+																	onChange={(e) => handleCustomFreeCancelMinuteChange(e.target.value)}
+																	className="h-12 text-center text-2xl font-semibold w-24"
+																	aria-label="Minutos para cancelación"
+																/>
+															</div>
+														</div>
+													)}
 												</div>
 
 												<div className="space-y-1.5">
@@ -525,7 +780,7 @@ export default function OperacionPage() {
 												</div>
 
 												<div className="space-y-1.5">
-													<Label className="text-sm">Cargo por no-show</Label>
+													<Label className="text-sm">Cargo por auscencia</Label>
 													<Select value={String(settings.noShowFeePercent)} onValueChange={(v) => set("noShowFeePercent", Number(v))}>
 														<SelectTrigger className="h-10"><SelectValue /></SelectTrigger>
 														<SelectContent>

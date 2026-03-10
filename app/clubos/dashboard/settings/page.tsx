@@ -3,9 +3,8 @@
 import { useState, useEffect, useMemo } from "react"
 import { useRouter } from "next/navigation"
 import { doc, getDoc, setDoc, serverTimestamp } from "firebase/firestore"
-import { getDownloadURL, ref, uploadBytesResumable } from "firebase/storage"
 import { useAuth } from "@/lib/auth-context"
-import { auth, db, storage } from "@/lib/firebaseClient"
+import { auth, db } from "@/lib/firebaseClient"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
@@ -69,6 +68,58 @@ const DEFAULT_OPENING_DAYS: Record<string, OpeningDay> = {
 	"4": { enabled: true, open: "09:00", close: "23:00" },
 	"5": { enabled: true, open: "09:00", close: "23:00" },
 	"6": { enabled: true, open: "09:00", close: "23:00" },
+}
+
+const UPLOAD_TIMEOUT_MS = 30_000
+
+const isBucketMissingError = (error: any) => {
+	const message = String(error?.message || "").toLowerCase()
+	const code = String(error?.code || "").toLowerCase()
+	return message.includes("specified bucket does not exist") || code.includes("bucket-not-found")
+}
+
+const imageFileToOptimizedDataUrl = async (file: File) => {
+	const readAsDataUrl =
+		await new Promise<string>((resolve, reject) => {
+			const reader = new FileReader()
+			reader.onload = () => resolve(String(reader.result || ""))
+			reader.onerror = () => reject(new Error("No se pudo leer la imagen."))
+			reader.readAsDataURL(file)
+		})
+
+	if (typeof document === "undefined") return readAsDataUrl
+
+	const image = new Image()
+	await new Promise<void>((resolve, reject) => {
+		image.onload = () => resolve()
+		image.onerror = () => reject(new Error("No se pudo procesar la imagen."))
+		image.src = readAsDataUrl
+	})
+
+	const maxSize = 1280
+	const scale = Math.min(1, maxSize / Math.max(image.width, image.height))
+	const width = Math.max(1, Math.round(image.width * scale))
+	const height = Math.max(1, Math.round(image.height * scale))
+
+	const canvas = document.createElement("canvas")
+	canvas.width = width
+	canvas.height = height
+	const ctx = canvas.getContext("2d")
+	if (!ctx) return readAsDataUrl
+	ctx.drawImage(image, 0, 0, width, height)
+
+	let quality = 0.82
+	let output = canvas.toDataURL("image/webp", quality)
+	while (output.length > 900_000 && quality > 0.45) {
+		quality -= 0.08
+		output = canvas.toDataURL("image/webp", quality)
+	}
+
+	if (output.length > 980_000) {
+		throw new Error("La imagen es demasiado grande. Probá una más liviana.")
+	}
+
+	return output
 }
 
 export default function SettingsPage() {
@@ -209,7 +260,7 @@ export default function SettingsPage() {
 		body.append("file", file)
 
 		const controller = new AbortController()
-		const timeout = setTimeout(() => controller.abort(), 30000)
+		const timeout = setTimeout(() => controller.abort(), UPLOAD_TIMEOUT_MS)
 
 		try {
 			const res = await fetch("/api/centers/upload-image", {
@@ -220,9 +271,21 @@ export default function SettingsPage() {
 			})
 			const data = await res.json().catch(() => null)
 			if (!res.ok) {
-				throw new Error(data?.error || `Upload failed (${res.status})`)
+				const err = new Error(data?.error || `Upload failed (${res.status})`)
+				if (isBucketMissingError(err)) {
+					return await imageFileToOptimizedDataUrl(file)
+				}
+				throw err
 			}
 			return data?.imageUrl || null
+		} catch (error: any) {
+			if (error?.name === "AbortError") {
+				throw new Error("La subida tardó demasiado. Intentá nuevamente.")
+			}
+			if (isBucketMissingError(error)) {
+				return await imageFileToOptimizedDataUrl(file)
+			}
+			throw error
 		} finally {
 			clearTimeout(timeout)
 		}
