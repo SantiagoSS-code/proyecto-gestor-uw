@@ -94,6 +94,7 @@ export default function ProfilePage() {
         setInitialSnapshot(hydrated)
         setForm({
           ...hydrated,
+          currentPassword: "",
           newPassword: "",
           confirmPassword: "",
         })

@@ -1,6 +1,4 @@
-import Link from "next/link"
-import { Sparkles } from "lucide-react"
-
+import { Suspense } from "react"
 import { LoginCentrosForm } from "@/components/auth/login-centros-form"
 
 export default function ClubOsLoginPage() {
@@ -77,7 +75,9 @@ export default function ClubOsLoginPage() {
             </p>
           </div>
 
-          <LoginCentrosForm />
+          <Suspense fallback={null}>
+            <LoginCentrosForm />
+          </Suspense>
         </div>
       </div>
     </main>

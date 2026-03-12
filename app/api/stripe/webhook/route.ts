@@ -14,8 +14,6 @@ function getStripe() {
   }
 
   if (!stripeClient) {
-    // Omit `apiVersion` so Stripe uses the account default.
-    // This avoids TypeScript literal mismatches when Stripe typings update.
     stripeClient = new Stripe(stripeSecret)
   }
 
@@ -42,6 +40,7 @@ function formatMoney(amount: number, currency: string) {
   }
 }
 
+// ─── Booking confirmation email ───────────────────────────────────────────────
 async function sendBookingConfirmationEmail(params: {
   to: string
   customerName: string
@@ -90,10 +89,187 @@ async function sendBookingConfirmationEmail(params: {
             <p style="margin: 0; white-space: pre-line; color: #1e293b;">${params.remainingInstructions || "El club se contactará para indicarte cómo abonar el saldo pendiente."}</p>
           </div>
         </div>
-      ",
+      `,
     }),
   }).catch((err) => {
     console.error("[Courtly] Error sending booking confirmation email:", err)
+  })
+}
+
+// ─── ClubOS plan activation email (to client) ────────────────────────────────
+async function sendPlanActivationEmailToClient(params: {
+  to: string
+  centerId: string
+  plan: string
+  period: "monthly" | "annual"
+  nextRenewalDate: Date
+  amount: number
+  currency: string
+}) {
+  const RESEND_API_KEY = process.env.RESEND_API_KEY
+  if (!RESEND_API_KEY) {
+    console.log("[ClubOS] Plan activation email to client (no RESEND_API_KEY):", params)
+    return
+  }
+
+  const planLabel = params.plan.charAt(0).toUpperCase() + params.plan.slice(1)
+  const periodLabel = params.period === "annual" ? "Anual" : "Mensual"
+  const renewalDateStr = params.nextRenewalDate.toLocaleDateString("es-AR", {
+    day: "numeric", month: "long", year: "numeric",
+  })
+  const amountStr = formatMoney(params.amount, params.currency)
+
+  await fetch("https://api.resend.com/emails", {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+      Authorization: `Bearer ${RESEND_API_KEY}`,
+    },
+    body: JSON.stringify({
+      from: process.env.RESEND_FROM_EMAIL || "Voyd ClubOS <onboarding@resend.dev>",
+      to: [params.to],
+      subject: "¡Tu suscripción a ClubOS está activa! 🎉",
+      html: `
+        <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto; padding: 24px; color: #0f172a; background: #f8fafc;">
+          <div style="background: #fff; border-radius: 12px; padding: 32px; border: 1px solid #e2e8f0;">
+            <h1 style="margin: 0 0 8px; font-size: 24px; color: #16a34a;">¡Bienvenido a ClubOS! 🎉</h1>
+            <p style="margin: 0 0 24px; color: #64748b; font-size: 15px;">Tu suscripción fue activada correctamente. Ya podés acceder al panel de administración.</p>
+
+            <div style="background: #f0fdf4; border: 1px solid #bbf7d0; border-radius: 8px; padding: 16px; margin-bottom: 24px;">
+              <p style="margin: 0 0 8px; font-size: 13px; color: #166534; font-weight: 600; text-transform: uppercase; letter-spacing: 0.05em;">Detalles de tu plan</p>
+              <table style="width: 100%; border-collapse: collapse;">
+                <tr><td style="padding: 4px 0; color: #374151; font-size: 14px;">Plan</td><td style="padding: 4px 0; text-align: right; font-weight: 600; color: #111827; font-size: 14px;">${planLabel}</td></tr>
+                <tr><td style="padding: 4px 0; color: #374151; font-size: 14px;">Período</td><td style="padding: 4px 0; text-align: right; font-weight: 600; color: #111827; font-size: 14px;">${periodLabel}</td></tr>
+                <tr><td style="padding: 4px 0; color: #374151; font-size: 14px;">Monto</td><td style="padding: 4px 0; text-align: right; font-weight: 600; color: #111827; font-size: 14px;">${amountStr}</td></tr>
+                <tr><td style="padding: 4px 0; color: #374151; font-size: 14px;">Próxima renovación</td><td style="padding: 4px 0; text-align: right; font-weight: 600; color: #111827; font-size: 14px;">${renewalDateStr}</td></tr>
+              </table>
+            </div>
+
+            <a href="${process.env.NEXT_PUBLIC_APP_URL || "https://voyd.com.ar"}/clubos/login" style="display: inline-block; background: #16a34a; color: #fff; text-decoration: none; font-weight: 700; font-size: 14px; padding: 12px 24px; border-radius: 8px; margin-bottom: 24px;">
+              Ingresar a ClubOS →
+            </a>
+
+            <p style="margin: 0; font-size: 13px; color: #94a3b8;">
+              Tu suscripción se renueva automáticamente. Podés cancelarla en cualquier momento desde el panel.
+              Si tenés alguna duda, contactanos a <a href="mailto:soporte@voyd.com.ar" style="color: #16a34a;">soporte@voyd.com.ar</a>.
+            </p>
+          </div>
+        </div>
+      `,
+    }),
+  }).catch((err) => {
+    console.error("[ClubOS] Error sending activation email to client:", err)
+  })
+}
+
+// ─── ClubOS plan activation email (internal notification to Voyd team) ────────
+async function sendPlanActivationEmailToAdmin(params: {
+  centerId: string
+  email: string
+  plan: string
+  period: "monthly" | "annual"
+  amount: number
+  currency: string
+  stripeSessionId: string
+}) {
+  const RESEND_API_KEY = process.env.RESEND_API_KEY
+  const adminEmails = process.env.PLATFORM_ADMIN_EMAILS || process.env.NOTIFY_EMAIL_TO
+  if (!RESEND_API_KEY || !adminEmails) {
+    console.log("[ClubOS] Plan activation admin notification (no RESEND_API_KEY or admin emails):", params)
+    return
+  }
+
+  const toList = adminEmails.split(",").map((e: string) => e.trim()).filter(Boolean)
+  if (!toList.length) return
+
+  const planLabel = params.plan.charAt(0).toUpperCase() + params.plan.slice(1)
+  const periodLabel = params.period === "annual" ? "Anual" : "Mensual"
+  const amountStr = formatMoney(params.amount, params.currency)
+  const now = new Date().toLocaleString("es-AR", { timeZone: "America/Argentina/Buenos_Aires" })
+
+  await fetch("https://api.resend.com/emails", {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+      Authorization: `Bearer ${RESEND_API_KEY}`,
+    },
+    body: JSON.stringify({
+      from: process.env.RESEND_FROM_EMAIL || "Voyd ClubOS <onboarding@resend.dev>",
+      to: toList,
+      subject: `[ClubOS] Nuevo pago confirmado — ${params.email} (${planLabel} ${periodLabel})`,
+      html: `
+        <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto; padding: 24px; color: #0f172a;">
+          <h2 style="margin: 0 0 16px; color: #0f172a;">💳 Nuevo pago de suscripción ClubOS</h2>
+          <div style="background: #f8fafc; border: 1px solid #e2e8f0; border-radius: 8px; padding: 16px; margin-bottom: 16px;">
+            <table style="width: 100%; border-collapse: collapse;">
+              <tr><td style="padding: 5px 0; color: #64748b; font-size: 14px; width: 140px;">Email</td><td style="padding: 5px 0; font-weight: 600; font-size: 14px;">${params.email}</td></tr>
+              <tr><td style="padding: 5px 0; color: #64748b; font-size: 14px;">Center ID</td><td style="padding: 5px 0; font-weight: 600; font-size: 14px;">${params.centerId}</td></tr>
+              <tr><td style="padding: 5px 0; color: #64748b; font-size: 14px;">Plan</td><td style="padding: 5px 0; font-weight: 600; font-size: 14px;">${planLabel}</td></tr>
+              <tr><td style="padding: 5px 0; color: #64748b; font-size: 14px;">Período</td><td style="padding: 5px 0; font-weight: 600; font-size: 14px;">${periodLabel}</td></tr>
+              <tr><td style="padding: 5px 0; color: #64748b; font-size: 14px;">Monto</td><td style="padding: 5px 0; font-weight: 600; font-size: 14px; color: #16a34a;">${amountStr}</td></tr>
+              <tr><td style="padding: 5px 0; color: #64748b; font-size: 14px;">Fecha (ARG)</td><td style="padding: 5px 0; font-weight: 600; font-size: 14px;">${now}</td></tr>
+              <tr><td style="padding: 5px 0; color: #64748b; font-size: 14px;">Stripe Session</td><td style="padding: 5px 0; font-size: 13px; color: #64748b;">${params.stripeSessionId}</td></tr>
+            </table>
+          </div>
+          <p style="font-size: 13px; color: #94a3b8; margin: 0;">Este es un mensaje automático de ClubOS.</p>
+        </div>
+      `,
+    }),
+  }).catch((err) => {
+    console.error("[ClubOS] Error sending activation admin notification:", err)
+  })
+}
+
+// ─── ClubOS renewal email (to client) ────────────────────────────────────────
+async function sendRenewalEmailToClient(params: {
+  to: string
+  plan: string
+  period: "monthly" | "annual"
+  nextRenewalDate: Date
+  amount: number
+  currency: string
+}) {
+  const RESEND_API_KEY = process.env.RESEND_API_KEY
+  if (!RESEND_API_KEY) return
+
+  const planLabel = params.plan.charAt(0).toUpperCase() + params.plan.slice(1)
+  const periodLabel = params.period === "annual" ? "anual" : "mensual"
+  const renewalDateStr = params.nextRenewalDate.toLocaleDateString("es-AR", {
+    day: "numeric", month: "long", year: "numeric",
+  })
+  const amountStr = formatMoney(params.amount, params.currency)
+
+  await fetch("https://api.resend.com/emails", {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+      Authorization: `Bearer ${RESEND_API_KEY}`,
+    },
+    body: JSON.stringify({
+      from: process.env.RESEND_FROM_EMAIL || "Voyd ClubOS <onboarding@resend.dev>",
+      to: [params.to],
+      subject: `Tu suscripción ClubOS ${periodLabel} fue renovada ✅`,
+      html: `
+        <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto; padding: 24px; color: #0f172a; background: #f8fafc;">
+          <div style="background: #fff; border-radius: 12px; padding: 32px; border: 1px solid #e2e8f0;">
+            <h1 style="margin: 0 0 8px; font-size: 22px; color: #0f172a;">Suscripción renovada ✅</h1>
+            <p style="margin: 0 0 24px; color: #64748b; font-size: 15px;">Tu suscripción ${periodLabel} a ClubOS fue renovada correctamente.</p>
+            <div style="background: #f0fdf4; border: 1px solid #bbf7d0; border-radius: 8px; padding: 16px; margin-bottom: 24px;">
+              <table style="width: 100%; border-collapse: collapse;">
+                <tr><td style="padding: 4px 0; color: #374151; font-size: 14px;">Plan</td><td style="padding: 4px 0; text-align: right; font-weight: 600; color: #111827; font-size: 14px;">${planLabel}</td></tr>
+                <tr><td style="padding: 4px 0; color: #374151; font-size: 14px;">Monto cobrado</td><td style="padding: 4px 0; text-align: right; font-weight: 600; color: #16a34a; font-size: 14px;">${amountStr}</td></tr>
+                <tr><td style="padding: 4px 0; color: #374151; font-size: 14px;">Próxima renovación</td><td style="padding: 4px 0; text-align: right; font-weight: 600; color: #111827; font-size: 14px;">${renewalDateStr}</td></tr>
+              </table>
+            </div>
+            <p style="margin: 0; font-size: 13px; color: #94a3b8;">
+              Si no reconocés este cargo, contactanos a <a href="mailto:soporte@voyd.com.ar" style="color: #16a34a;">soporte@voyd.com.ar</a>.
+            </p>
+          </div>
+        </div>
+      `,
+    }),
+  }).catch((err) => {
+    console.error("[ClubOS] Error sending renewal email to client:", err)
   })
 }
 
@@ -124,6 +300,60 @@ export async function POST(request: Request) {
     const centerId = metadata.centerId
     const bookingId = metadata.bookingId
 
+    // ── ClubOS plan activation ──────────────────────────────────────────────
+    if (metadata.type === "clubos_plan_activation" && centerId) {
+      const email = metadata.email || session.customer_email || ""
+      const plan = metadata.plan || "profesional"
+      const billing = (metadata.billing === "annual" ? "annual" : "monthly") as "monthly" | "annual"
+
+      // Fetch next renewal date from the Stripe subscription
+      let nextRenewalDate = new Date()
+      const subscriptionId = typeof session.subscription === "string" ? session.subscription : null
+
+      if (subscriptionId) {
+        try {
+          const stripe = getStripe()
+          const subscription = await stripe.subscriptions.retrieve(subscriptionId)
+          nextRenewalDate = new Date(subscription.current_period_end * 1000)
+        } catch (e) {
+          // Fallback: compute locally
+          nextRenewalDate = new Date()
+          if (billing === "annual") {
+            nextRenewalDate.setFullYear(nextRenewalDate.getFullYear() + 1)
+          } else {
+            nextRenewalDate.setMonth(nextRenewalDate.getMonth() + 1)
+          }
+        }
+      }
+
+      const amount = session.amount_total ? session.amount_total / 100 : 0
+      const currency = (session.currency || "usd").toUpperCase()
+
+      const activationData = {
+        subscriptionStatus: "active",
+        subscriptionStartDate: FieldValue.serverTimestamp(),
+        subscriptionPeriod: billing,
+        selectedPlan: plan,
+        nextRenewalDate,
+        stripeSubscriptionId: subscriptionId,
+        stripeCustomerId: typeof session.customer === "string" ? session.customer : null,
+        updatedAt: FieldValue.serverTimestamp(),
+      }
+
+      await Promise.all([
+        adminDb.collection("users").doc(centerId).set(activationData, { merge: true }),
+        adminDb.collection("centers").doc(centerId).set(activationData, { merge: true }),
+      ])
+
+      await Promise.all([
+        sendPlanActivationEmailToClient({ to: email, centerId, plan, period: billing, nextRenewalDate, amount, currency }),
+        sendPlanActivationEmailToAdmin({ centerId, email, plan, period: billing, amount, currency, stripeSessionId: session.id }),
+      ])
+
+      console.log(`[ClubOS] Plan activated: centerId=${centerId}, plan=${plan}, billing=${billing}`)
+    }
+
+    // ── Booking payment confirmation ────────────────────────────────────────
     if (centerId && bookingId) {
       const bookingRef = adminDb.collection("padel_centers").doc(centerId).collection("bookings").doc(bookingId)
       await bookingRef.update({
@@ -177,6 +407,65 @@ export async function POST(request: Request) {
     }
   }
 
+  // ── Subscription renewal ──────────────────────────────────────────────────
+  if (event.type === "invoice.payment_succeeded") {
+    const invoice = event.data.object as Stripe.Invoice
+    const billingReason = invoice.billing_reason
+
+    // Only process renewals, not the initial payment (handled via checkout.session.completed)
+    if (billingReason === "subscription_cycle" && invoice.subscription) {
+      const subscriptionId = invoice.subscription as string
+      try {
+        const stripe = getStripe()
+        const subscription = await stripe.subscriptions.retrieve(subscriptionId)
+        const subMeta = subscription.metadata || {}
+        const centerId = subMeta.centerId
+
+        if (centerId) {
+          const nextRenewalDate = new Date(subscription.current_period_end * 1000)
+          const billing = (subMeta.billing === "annual" ? "annual" : "monthly") as "monthly" | "annual"
+          const plan = subMeta.plan || "profesional"
+          const email = subMeta.email || ""
+          const amount = invoice.amount_paid ? invoice.amount_paid / 100 : 0
+          const currency = (invoice.currency || "usd").toUpperCase()
+
+          await adminDb.collection("users").doc(centerId).set({
+            subscriptionStatus: "active",
+            nextRenewalDate,
+            updatedAt: FieldValue.serverTimestamp(),
+          }, { merge: true })
+
+          if (email) {
+            await sendRenewalEmailToClient({ to: email, plan, period: billing, nextRenewalDate, amount, currency })
+          }
+
+          console.log(`[ClubOS] Subscription renewed: centerId=${centerId}, plan=${plan}, nextRenewal=${nextRenewalDate.toISOString()}`)
+        }
+      } catch (e) {
+        console.error("[ClubOS] Error processing subscription renewal:", e)
+      }
+    }
+  }
+
+  // ── Subscription cancelled/deleted ───────────────────────────────────────
+  if (event.type === "customer.subscription.deleted") {
+    const subscription = event.data.object as Stripe.Subscription
+    const subMeta = subscription.metadata || {}
+    const centerId = subMeta.centerId
+
+    if (centerId) {
+      await adminDb.collection("users").doc(centerId).set({
+        subscriptionStatus: "cancelled",
+        updatedAt: FieldValue.serverTimestamp(),
+      }, { merge: true }).catch((e) => {
+        console.error("[ClubOS] Error marking subscription as cancelled:", e)
+      })
+
+      console.log(`[ClubOS] Subscription cancelled: centerId=${centerId}`)
+    }
+  }
+
+  // ── Booking session expired ───────────────────────────────────────────────
   if (event.type === "checkout.session.expired") {
     const session = event.data.object as Stripe.Checkout.Session
     const metadata = session.metadata || {}
@@ -193,4 +482,3 @@ export async function POST(request: Request) {
   }
 
   return NextResponse.json({ received: true })
-}

@@ -84,6 +84,23 @@ type CreateCenterAdminPayload = {
   phone?: string
 }
 
+type UpdateCenterAdminPayload = {
+  uid?: string
+  centerId?: string
+  email?: string
+  password?: string
+  firstName?: string
+  lastName?: string
+  phone?: string
+  status?: string
+  onboardingCompleted?: boolean
+}
+
+type DeleteCenterAdminPayload = {
+  uid?: string
+  centerId?: string
+}
+
 function normalizeEmail(value: string) {
   return value.trim().toLowerCase()
 }
@@ -122,7 +139,8 @@ export async function POST(
       const centerRef = adminDb.collection("centers").doc(centerId)
       const legacyCenterRef = adminDb.collection("padel_centers").doc(centerId)
 
-      const [centerSnap, legacyCenterSnap] = await Promise.all([centerRef.get(), legacyCenterRef.get()])
+      const [centerSnap, legacyCenterSnap, existingUserSnap] = await Promise.all([centerRef.get(), legacyCenterRef.get(), adminDb.collection("users").doc(centerId).get()])
+      const existingSubscriptionStatus = existingUserSnap.exists ? (existingUserSnap.data() as any)?.subscriptionStatus : null
 
       if (!centerSnap.exists && !legacyCenterSnap.exists) {
         return NextResponse.json({ error: "Centro no encontrado" }, { status: 404 })
@@ -167,6 +185,7 @@ export async function POST(
             lastName,
             phone,
             status: "active",
+            subscriptionStatus: existingSubscriptionStatus || "pending_payment",
             updatedAt: now,
           },
           { merge: true }
@@ -238,6 +257,7 @@ export async function POST(
           phone,
           status: "active",
           onboardingCompleted: false,
+          subscriptionStatus: "pending_payment",
           createdAt: now,
           updatedAt: now,
         },
@@ -310,6 +330,195 @@ export async function POST(
       )
     }
 
+    return NextResponse.json({ error: e?.message || "Failed" }, { status: 500 })
+  }
+}
+
+export async function PATCH(request: Request) {
+  try {
+    await requirePlatformAdmin(request)
+
+    const body = (await request.json().catch(() => null)) as UpdateCenterAdminPayload | null
+    const uid = String(body?.uid || "").trim()
+    const explicitCenterId = String(body?.centerId || "").trim()
+
+    if (!uid) {
+      return NextResponse.json({ error: "uid es obligatorio" }, { status: 400 })
+    }
+
+    const userRef = adminDb.collection("users").doc(uid)
+    const centerAdminRef = adminDb.collection("center_admins").doc(uid)
+
+    const [userSnap, centerAdminSnap] = await Promise.all([userRef.get(), centerAdminRef.get()])
+
+    const userData = userSnap.exists ? (userSnap.data() as any) : null
+    const centerAdminData = centerAdminSnap.exists ? (centerAdminSnap.data() as any) : null
+
+    const resolvedCenterId =
+      explicitCenterId ||
+      String(userData?.centerId || centerAdminData?.centerId || uid).trim()
+
+    const currentEmail = String(userData?.email || centerAdminData?.email || "").trim().toLowerCase()
+    const nextEmailRaw = String(body?.email || "").trim()
+    const nextEmail = nextEmailRaw ? normalizeEmail(nextEmailRaw) : currentEmail
+
+    const currentFirstName = String(userData?.firstName || centerAdminData?.first_name || "").trim()
+    const currentLastName = String(userData?.lastName || centerAdminData?.last_name || "").trim()
+    const nextFirstName = String(body?.firstName ?? currentFirstName).trim()
+    const nextLastName = String(body?.lastName ?? currentLastName).trim()
+    const nextPhone = String(body?.phone ?? userData?.phone ?? centerAdminData?.phone ?? "").trim()
+
+    const nextStatus = String(body?.status || userData?.status || "active").trim() || "active"
+    const nextOnboardingCompleted =
+      typeof body?.onboardingCompleted === "boolean"
+        ? body.onboardingCompleted
+        : userData?.onboardingCompleted
+
+    const password = String(body?.password || "")
+    if (password && password.length < 8) {
+      return NextResponse.json({ error: "La contraseña debe tener al menos 8 caracteres" }, { status: 400 })
+    }
+
+    const authUpdate: {
+      email?: string
+      password?: string
+      displayName?: string
+      emailVerified?: boolean
+    } = {}
+
+    if (nextEmail && nextEmail !== currentEmail) {
+      authUpdate.email = nextEmail
+      authUpdate.emailVerified = true
+    }
+    if (password) {
+      authUpdate.password = password
+    }
+
+    const displayName = [nextFirstName, nextLastName].filter(Boolean).join(" ").trim()
+    if (displayName) {
+      authUpdate.displayName = displayName
+    }
+
+    if (Object.keys(authUpdate).length > 0) {
+      try {
+        await adminAuth.updateUser(uid, authUpdate)
+      } catch (e: any) {
+        if (e?.code === "auth/user-not-found") {
+          return NextResponse.json({ error: "Usuario auth no encontrado" }, { status: 404 })
+        }
+        throw e
+      }
+    }
+
+    const now = new Date()
+
+    await Promise.all([
+      userRef.set(
+        {
+          role: "center_admin",
+          legacyRole: "padel_center_admin",
+          centerId: resolvedCenterId,
+          email: nextEmail || null,
+          firstName: nextFirstName || null,
+          lastName: nextLastName || null,
+          phone: nextPhone || null,
+          status: nextStatus,
+          onboardingCompleted: nextOnboardingCompleted ?? false,
+          updatedAt: now,
+        },
+        { merge: true }
+      ),
+      centerAdminRef.set(
+        {
+          centerId: resolvedCenterId,
+          email: nextEmail || null,
+          first_name: nextFirstName || null,
+          last_name: nextLastName || null,
+          phone: nextPhone || null,
+          updatedAt: now,
+        },
+        { merge: true }
+      ),
+      adminDb.collection("centers").doc(resolvedCenterId).set(
+        {
+          email: nextEmail || null,
+          phone: nextPhone || null,
+          updatedAt: now,
+        },
+        { merge: true }
+      ),
+      adminDb.collection("padel_centers").doc(resolvedCenterId).set(
+        {
+          email: nextEmail || null,
+          phone: nextPhone || null,
+          updatedAt: now,
+        },
+        { merge: true }
+      ),
+    ])
+
+    return NextResponse.json({ ok: true, message: "Usuario actualizado correctamente" })
+  } catch (e: any) {
+    if (e instanceof Response) return e
+
+    if (e?.code === "auth/email-already-exists") {
+      return NextResponse.json({ error: "Ese email ya está asociado a otro usuario" }, { status: 409 })
+    }
+
+    return NextResponse.json({ error: e?.message || "Failed" }, { status: 500 })
+  }
+}
+
+export async function DELETE(request: Request) {
+  try {
+    await requirePlatformAdmin(request)
+
+    const body = (await request.json().catch(() => null)) as DeleteCenterAdminPayload | null
+    const uid = String(body?.uid || body?.centerId || "").trim()
+
+    if (!uid) {
+      return NextResponse.json({ error: "uid es obligatorio" }, { status: 400 })
+    }
+
+    const userRef = adminDb.collection("users").doc(uid)
+    const centerAdminRef = adminDb.collection("center_admins").doc(uid)
+
+    const [userSnap, centerAdminSnap] = await Promise.all([userRef.get(), centerAdminRef.get()])
+    const userData = userSnap.exists ? (userSnap.data() as any) : null
+    const centerAdminData = centerAdminSnap.exists ? (centerAdminSnap.data() as any) : null
+    const resolvedCenterId = String(userData?.centerId || centerAdminData?.centerId || uid).trim()
+
+    try {
+      await adminAuth.deleteUser(uid)
+    } catch (e: any) {
+      if (e?.code !== "auth/user-not-found") {
+        throw e
+      }
+    }
+
+    const now = new Date()
+    await Promise.all([
+      userRef.delete(),
+      centerAdminRef.delete(),
+      adminDb.collection("centers").doc(resolvedCenterId).set(
+        {
+          email: null,
+          updatedAt: now,
+        },
+        { merge: true }
+      ),
+      adminDb.collection("padel_centers").doc(resolvedCenterId).set(
+        {
+          email: null,
+          updatedAt: now,
+        },
+        { merge: true }
+      ),
+    ])
+
+    return NextResponse.json({ ok: true, message: "Usuario eliminado correctamente" })
+  } catch (e: any) {
+    if (e instanceof Response) return e
     return NextResponse.json({ error: e?.message || "Failed" }, { status: 500 })
   }
 }

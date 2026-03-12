@@ -1,5 +1,6 @@
 "use client"
 
+import Link from "next/link"
 import { ONBOARDING_STEPS, useOnboarding } from "@/lib/onboarding"
 import { CheckCircle } from "lucide-react"
 import { cn } from "@/lib/utils"
@@ -32,18 +33,14 @@ export function OnboardingBanner() {
           {ONBOARDING_STEPS.map((step, idx) => {
             const done = state.completed[step.key]
             const isCurrent = idx === currentStepIndex
-            return (
+            const canNavigate = done || isCurrent
+            return canNavigate ? (
+              <Link key={step.key} href={step.href} className="flex items-center flex-1 min-w-0 gap-1 hover:opacity-80 transition-opacity">
+                <div className={cn("h-1.5 flex-1 rounded-full transition-all duration-300", done ? "bg-white" : "bg-white/60")} />
+              </Link>
+            ) : (
               <div key={step.key} className="flex items-center flex-1 min-w-0 gap-1">
-                <div
-                  className={cn(
-                    "h-1.5 flex-1 rounded-full transition-all duration-300",
-                    done
-                      ? "bg-white"
-                      : isCurrent
-                        ? "bg-white/60"
-                        : "bg-white/20"
-                  )}
-                />
+                <div className="h-1.5 flex-1 rounded-full transition-all duration-300 bg-white/20" />
               </div>
             )
           })}
@@ -54,19 +51,17 @@ export function OnboardingBanner() {
           {ONBOARDING_STEPS.map((step, idx) => {
             const done = state.completed[step.key]
             const isCurrent = idx === currentStepIndex
-            return (
-              <div key={step.key} className="flex-1 min-w-0 text-center">
-                <span
-                  className={cn(
-                    "text-[11px] leading-tight inline-flex items-center gap-1",
-                    done
-                      ? "text-white font-medium"
-                      : isCurrent
-                        ? "text-white/80 font-medium"
-                        : "text-white/40"
-                  )}
-                >
+            const canNavigate = done || isCurrent
+            return canNavigate ? (
+              <Link key={step.key} href={step.href} className="flex-1 min-w-0 text-center hover:opacity-80 transition-opacity">
+                <span className={cn("text-[11px] leading-tight inline-flex items-center gap-1", done ? "text-white font-medium" : "text-white/80 font-medium")}>
                   {done ? <CheckCircle className="w-3 h-3 shrink-0" /> : null}
+                  <span className="truncate">{step.label}</span>
+                </span>
+              </Link>
+            ) : (
+              <div key={step.key} className="flex-1 min-w-0 text-center">
+                <span className="text-[11px] leading-tight inline-flex items-center gap-1 text-white/40">
                   <span className="truncate">{step.label}</span>
                 </span>
               </div>

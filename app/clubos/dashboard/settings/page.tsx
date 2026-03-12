@@ -794,7 +794,20 @@ export default function SettingsPage() {
 												<div className="space-y-2"><Label>Calle</Label><Input value={formData.street} onChange={(e) => handleInputChange('street', e.target.value)} className="h-11" placeholder="Ej: Av. Corrientes" /></div>
 												<div className="space-y-2"><Label>Número</Label><Input value={formData.streetNumber} onChange={(e) => handleInputChange('streetNumber', e.target.value)} className="h-11" placeholder="Ej: 1234" /></div>
 												<div className="space-y-2"><Label>CP</Label><Input value={formData.postalCode} onChange={(e) => handleInputChange('postalCode', e.target.value)} className="h-11" placeholder="Ej: C1414" /></div>
-												<div className="space-y-2"><Label>Google Place ID</Label><Input value={formData.placeId} onChange={(e) => handleInputChange('placeId', e.target.value)} className="h-11" placeholder="Opcional" /></div>
+												<div className="space-y-2">
+													<Label className="flex items-center gap-1.5">
+														Google Place ID
+														<span className="text-[10px] font-normal text-muted-foreground bg-muted px-1.5 py-0.5 rounded">Solo lectura</span>
+													</Label>
+													<Input
+														value={formData.placeId}
+														readOnly
+														disabled
+														className="h-11 cursor-not-allowed opacity-60 select-all"
+														placeholder="Asignado por Voyd"
+													/>
+													<p className="text-xs text-muted-foreground">Este valor es gestionado por el equipo de Voyd y determina el mapa que ven los jugadores.</p>
+												</div>
 											</div>
 										</div>
 									</div>

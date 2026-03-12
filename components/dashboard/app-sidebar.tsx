@@ -25,7 +25,6 @@ import {
   FolderKanban,
   Lock,
   Check,
-  Circle,
 } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { VoydLogo } from "@/components/ui/voyd-logo"
@@ -207,17 +206,58 @@ export function AppSidebar() {
 
   return (
     <div className="flex flex-col h-screen w-64 border-r bg-card/50 hidden md:flex sticky top-0">
-      <div className="p-6">
+      <div className={cn("p-6", isOnboarding && "flex flex-col items-center")}>
         <Link
           href="/clubos/dashboard"
-          className="flex items-center"
+          className={cn("flex items-center", isOnboarding && "justify-center")}
           aria-label="Ir al dashboard de ClubOS"
         >
           <VoydLogo className="h-8" />
         </Link>
+        {isOnboarding && (
+          <p className="mt-2 text-[11px] font-semibold text-blue-600 uppercase tracking-widest">
+            Configuración inicial
+          </p>
+        )}
       </div>
       
       <div className="flex-1 overflow-y-auto py-2 px-3 space-y-1">
+        {isOnboarding ? ONBOARDING_STEPS.map((step, idx) => {
+          const done = obState.completed[step.key]
+          const isCurrent = idx === currentStepIndex
+          const locked = !done && !isCurrent
+          const isActive = pathname === step.href || pathname?.startsWith(step.href + "/")
+
+          if (locked) {
+            return (
+              <div key={step.key} className="flex items-center gap-3 px-3 py-2.5 text-sm font-medium rounded-md text-slate-400 cursor-not-allowed select-none">
+                <span className="size-5 rounded-full border border-slate-300 flex-shrink-0 flex items-center justify-center">
+                  <Lock className="size-3 text-slate-300" />
+                </span>
+                {step.label}
+              </div>
+            )
+          }
+          return (
+            <Link key={step.key} href={step.href}
+              className={cn("flex items-center gap-3 px-3 py-2.5 text-sm font-medium rounded-md transition-colors",
+                isActive ? "bg-primary/10 text-primary" : done ? "text-emerald-700 hover:bg-emerald-50" : "text-slate-700 hover:bg-primary/5"
+              )}
+            >
+              {done ? (
+                <span className="size-5 rounded-full bg-emerald-500 flex items-center justify-center flex-shrink-0">
+                  <Check className="size-3 text-white" strokeWidth={3} />
+                </span>
+              ) : (
+                <span className="relative flex size-5 items-center justify-center flex-shrink-0">
+                  <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-primary opacity-75" />
+                  <span className="relative inline-flex rounded-full size-5 border-2 border-primary bg-primary/10" />
+                </span>
+              )}
+              <span className={cn(done && "line-through opacity-60")}>{step.label}</span>
+            </Link>
+          )
+        }) : <>
         {/* ── Primary nav items ── */}
         {primaryItems.map((item) => {
           const isActive = isActiveRoute(item.href)
@@ -300,45 +340,7 @@ export function AppSidebar() {
           </div>
         )}
 
-        {/* ── Onboarding progress indicator ── */}
-        {isOnboarding && (
-          <div className="mt-4 mx-1 p-3 rounded-lg bg-gradient-to-b from-blue-50 to-indigo-50 border border-blue-200/60">
-            <p className="text-[11px] font-semibold text-blue-700 uppercase tracking-wider mb-2">
-              Configuración inicial
-            </p>
-            <div className="space-y-1.5">
-              {ONBOARDING_STEPS.map((step, idx) => {
-                const done = obState.completed[step.key]
-                const isCurrent = idx === currentStepIndex
-                return (
-                  <div key={step.key} className="flex items-center gap-2 text-xs">
-                    {done ? (
-                      <span className="size-4 rounded-full bg-emerald-500 flex items-center justify-center flex-shrink-0">
-                        <Check className="size-2.5 text-white" strokeWidth={3} />
-                      </span>
-                    ) : isCurrent ? (
-                      <span className="size-4 rounded-full border-2 border-primary bg-primary/10 flex items-center justify-center flex-shrink-0">
-                        <Circle className="size-1.5 fill-primary text-primary" />
-                      </span>
-                    ) : (
-                      <span className="size-4 rounded-full border border-slate-300 flex-shrink-0" />
-                    )}
-                    <span
-                      className={cn(
-                        "truncate",
-                        done && "text-emerald-700 line-through",
-                        isCurrent && "text-primary font-semibold",
-                        !done && !isCurrent && "text-slate-400",
-                      )}
-                    >
-                      {step.label}
-                    </span>
-                  </div>
-                )
-              })}
-            </div>
-          </div>
-        )}
+        </>}
       </div>
 
       <div className="p-4 border-t">

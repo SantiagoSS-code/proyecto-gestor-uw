@@ -2,9 +2,9 @@
 
 import type React from "react"
 
-import { useState } from "react"
+import { useMemo, useState } from "react"
 import Link from "next/link"
-import { useRouter } from "next/navigation"
+import { useRouter, useSearchParams } from "next/navigation"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
@@ -17,11 +17,19 @@ import { signInWithEmailAndPassword } from "firebase/auth"
 
 export function LoginCentrosForm() {
   const router = useRouter()
+  const searchParams = useSearchParams()
   const [email, setEmail] = useState("")
   const [password, setPassword] = useState("")
   const [showPassword, setShowPassword] = useState(false)
   const [isLoading, setIsLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
+
+  const postLoginRedirect = useMemo(() => {
+    const requestedNext = String(searchParams.get("next") || "").trim()
+    if (!requestedNext) return "/clubos/dashboard"
+    if (!requestedNext.startsWith("/clubos/dashboard")) return "/clubos/dashboard"
+    return requestedNext
+  }, [searchParams])
 
   const handleEmailLogin = async (e: React.FormEvent) => {
     e.preventDefault()
@@ -58,8 +66,8 @@ export function LoginCentrosForm() {
       // Esperar un poco para asegurar que la cookie se ha establecido
       await new Promise(resolve => setTimeout(resolve, 500))
       
-      console.log("[Login] Redirecting to dashboard")
-      router.push("/clubos/dashboard")
+      console.log("[Login] Redirecting after login:", postLoginRedirect)
+      router.push(postLoginRedirect)
       
       // Refresca la página para asegurar que el middleware se ejecute
       await new Promise(resolve => setTimeout(resolve, 300))

@@ -17,8 +17,23 @@ import type { SportKey } from "@/lib/types"
 import { FIRESTORE_COLLECTIONS, CENTER_SUBCOLLECTIONS } from "@/lib/firestorePaths"
 import { showSavePopupAndRefresh } from "@/lib/save-feedback"
 
-const SURFACE_TYPES = ["Sintética", "Césped", "Arcilla", "Dura", "Otra"]
 const SPORTS: SportKey[] = ["padel", "tennis", "futbol", "pickleball", "squash"]
+
+const SPORT_LABELS: Record<SportKey, string> = {
+  padel: "Padel",
+  tennis: "Tennis",
+  futbol: "Fútbol",
+  pickleball: "Pickleball",
+  squash: "Squash",
+}
+
+const SURFACES_BY_SPORT: Record<SportKey, string[]> = {
+  padel:      ["Césped sintético", "Hormigón", "Resina sintética"],
+  tennis:     ["Polvo de ladrillo", "Cemento / hard", "Césped", "Resina sintética"],
+  futbol:     ["Césped natural", "Césped sintético", "Cemento", "Piso deportivo / indoor"],
+  pickleball: ["Cemento", "Asfalto", "Resina acrílica", "Piso deportivo indoor"],
+  squash:     ["Madera", "Piso deportivo", "Cemento con resina"],
+}
 
 type CourtForm = {
   name: string
@@ -83,6 +98,7 @@ export function CourtsTab({
   const [selectedSport, setSelectedSport] = useState<SportKey | "all">("all")
   const [editingCourtHasSchedule, setEditingCourtHasSchedule] = useState(false)
   const [courtsRootCollection, setCourtsRootCollection] = useState<"centers" | "padel_centers">(FIRESTORE_COLLECTIONS.centers)
+  const [centerSports, setCenterSports] = useState<SportKey[] | null>(null)
 
   const canSave = useMemo(() => {
     const price = Number(form.pricePerHour)
@@ -94,6 +110,18 @@ export function CourtsTab({
     const sports = new Set(courts.map(c => c.sport || "padel"))
     return Array.from(sports).sort()
   }, [courts])
+
+  // Deportes disponibles según lo configurado en el centro (si aún no cargó, muestra todos)
+  const availableSports = useMemo(
+    () => (centerSports && centerSports.length > 0 ? SPORTS.filter((s) => centerSports.includes(s)) : SPORTS),
+    [centerSports]
+  )
+
+  // Superficies disponibles según el deporte seleccionado en el formulario
+  const surfacesForSport = useMemo(
+    () => (form.sport ? (SURFACES_BY_SPORT[form.sport] ?? []) : []),
+    [form.sport]
+  )
 
   // Filtrar canchas según el deporte seleccionado
   const filteredCourts = useMemo(() => {
@@ -126,10 +154,6 @@ export function CourtsTab({
     }
     if (!form.surfaceType) {
       setValidationError("Debes seleccionar una superficie.")
-      return false
-    }
-    if (form.surfaceType === "Otra" && !form.otherSurfaceType) {
-      setValidationError("Debes especificar el tipo de superficie.")
       return false
     }
     const price = Number(form.pricePerHour)
@@ -184,6 +208,31 @@ export function CourtsTab({
     if (!authLoading && resolvedCenterId) fetchCourts()
   }, [authLoading, resolvedCenterId])
 
+  useEffect(() => {
+    const fetchCenterSports = async () => {
+      if (!resolvedCenterId) return
+      try {
+        const centerRef = doc(db, FIRESTORE_COLLECTIONS.centers, resolvedCenterId)
+        const centerSnap = await getDoc(centerRef)
+        const data = centerSnap.exists() ? (centerSnap.data() as any) : {}
+        if (Array.isArray(data.sports) && data.sports.length > 0) {
+          setCenterSports(data.sports as SportKey[])
+          return
+        }
+        // fallback: try legacy collection
+        const legacyRef = doc(db, FIRESTORE_COLLECTIONS.legacyCenters, resolvedCenterId)
+        const legacySnap = await getDoc(legacyRef)
+        const legacyData = legacySnap.exists() ? (legacySnap.data() as any) : {}
+        if (Array.isArray(legacyData.sports) && legacyData.sports.length > 0) {
+          setCenterSports(legacyData.sports as SportKey[])
+        }
+      } catch (err) {
+        console.error("Error loading center sports:", err)
+      }
+    }
+    if (!authLoading && resolvedCenterId) fetchCenterSports()
+  }, [authLoading, resolvedCenterId])
+
   const resetForm = () => {
     setEditingId(null)
     setEditingCourtHasSchedule(false)
@@ -234,7 +283,7 @@ export function CourtsTab({
     setMessage(null)
 
     try {
-      const surfaceType = form.surfaceType === "Otra" ? form.otherSurfaceType : form.surfaceType
+      const surfaceType = form.surfaceType
 
       const payload = {
         name: form.name.trim(),
@@ -499,14 +548,14 @@ export function CourtsTab({
               <div className="grid grid-cols-2 gap-4">
                 <div className="space-y-2">
                   <Label className="text-sm font-medium text-slate-700">Deporte *</Label>
-                  <Select value={form.sport} onValueChange={(value) => handleFormChange({ ...form, sport: value as SportKey })}>
+                  <Select value={form.sport} onValueChange={(value) => handleFormChange({ ...form, sport: value as SportKey, surfaceType: "" })}>
                     <SelectTrigger className="h-11 shadow-sm focus:ring-blue-500">
                       <SelectValue placeholder="Selecciona un deporte" />
                     </SelectTrigger>
                     <SelectContent>
-                      {SPORTS.map((s) => (
+                      {availableSports.map((s) => (
                         <SelectItem key={s} value={s} className="cursor-pointer">
-                          {s.charAt(0).toUpperCase() + s.slice(1)}
+                          {SPORT_LABELS[s]}
                         </SelectItem>
                       ))}
                     </SelectContent>
@@ -541,12 +590,16 @@ export function CourtsTab({
 
               <div className="space-y-2">
                 <Label className="text-sm font-medium text-slate-700">Superficie *</Label>
-                <Select value={form.surfaceType} onValueChange={(value) => handleFormChange({ ...form, surfaceType: value })}>
+                <Select
+                  value={form.surfaceType}
+                  onValueChange={(value) => handleFormChange({ ...form, surfaceType: value })}
+                  disabled={!form.sport}
+                >
                   <SelectTrigger className="h-11 shadow-sm focus:ring-blue-500">
-                    <SelectValue placeholder="Selecciona una superficie" />
+                    <SelectValue placeholder={form.sport ? "Selecciona una superficie" : "Primero seleccioná un deporte"} />
                   </SelectTrigger>
                   <SelectContent>
-                    {SURFACE_TYPES.map((surface) => (
+                    {surfacesForSport.map((surface) => (
                       <SelectItem key={surface} value={surface} className="cursor-pointer">
                         {surface}
                       </SelectItem>
@@ -554,19 +607,33 @@ export function CourtsTab({
                   </SelectContent>
                 </Select>
               </div>
+            </div>
 
-              {/* Otra superficie - condicional */}
-              {form.surfaceType === "Otra" && (
-                <div className="p-4 bg-slate-50 rounded-lg border border-slate-200">
-                  <Label className="text-sm font-medium text-slate-700 block mb-2">Especificar tipo de superficie</Label>
-                  <Input 
-                    value={form.otherSurfaceType || ""} 
-                    onChange={(e) => handleFormChange({ ...form, otherSurfaceType: e.target.value })} 
-                    placeholder="Ej: Piso de madera, PVC, etc."
-                    className="h-11 bg-white"
-                  />
+            <hr className="border-slate-100" />
+
+            {/* Precio y Moneda */}
+            <div className="space-y-4">
+              <div className="grid grid-cols-2 gap-4">
+                <div className="space-y-2">
+                  <Label className="text-sm font-medium text-slate-700">Precio por hora *</Label>
+                  <div className="relative">
+                    <span className="absolute left-3 top-3 text-slate-500 font-medium">$</span>
+                    <Input 
+                      type="number" 
+                      min="0" 
+                      step="0.01"
+                      value={form.pricePerHour} 
+                      onChange={(e) => handleFormChange({ ...form, pricePerHour: e.target.value })} 
+                      placeholder="0.00"
+                      className="h-11 pl-7 shadow-sm focus-visible:ring-blue-500"
+                    />
+                  </div>
                 </div>
-              )}
+                <div className="space-y-2">
+                  <Label className="text-sm font-medium text-slate-700">Moneda</Label>
+                  <Input value="ARS" disabled className="h-11 bg-slate-50 text-slate-500 font-medium shadow-sm" />
+                </div>
+              </div>
             </div>
 
             <hr className="border-slate-100" />
@@ -612,33 +679,6 @@ export function CourtsTab({
                   </div>
                 </div>
               )}
-            </div>
-
-            <hr className="border-slate-100" />
-
-            {/* Precio y Moneda */}
-            <div className="space-y-4">
-              <div className="grid grid-cols-2 gap-4">
-                <div className="space-y-2">
-                  <Label className="text-sm font-medium text-slate-700">Precio por hora *</Label>
-                  <div className="relative">
-                    <span className="absolute left-3 top-3 text-slate-500 font-medium">$</span>
-                    <Input 
-                      type="number" 
-                      min="0" 
-                      step="0.01"
-                      value={form.pricePerHour} 
-                      onChange={(e) => handleFormChange({ ...form, pricePerHour: e.target.value })} 
-                      placeholder="0.00"
-                      className="h-11 pl-7 shadow-sm focus-visible:ring-blue-500"
-                    />
-                  </div>
-                </div>
-                <div className="space-y-2">
-                  <Label className="text-sm font-medium text-slate-700">Moneda</Label>
-                  <Input value="ARS" disabled className="h-11 bg-slate-50 text-slate-500 font-medium shadow-sm" />
-                </div>
-              </div>
             </div>
 
             {/* Nota sobre estado Borrador */}

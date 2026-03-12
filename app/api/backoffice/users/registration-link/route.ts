@@ -137,11 +137,21 @@ export async function POST(request: Request) {
         ) || "Nuevo Club"
       ) || "Nuevo Club"
 
-    await sendRegistrationWelcomeEmail({
-      to: email,
-      centerName,
-      registrationUrl: url,
-    })
+    let emailSent = false
+    let emailWarning: string | null = null
+
+    try {
+      await sendRegistrationWelcomeEmail({
+        to: email,
+        centerName,
+        registrationUrl: url,
+      })
+      emailSent = true
+    } catch (emailErr: any) {
+      // Log but don't fail — the link is already created and can be shared manually
+      console.warn("[Registration link] Email could not be sent:", emailErr?.message || emailErr)
+      emailWarning = emailErr?.message || "No se pudo enviar el email de invitación"
+    }
 
     return NextResponse.json({
       ok: true,
@@ -149,7 +159,11 @@ export async function POST(request: Request) {
       expiresAt: expiresAt.toISOString(),
       centerId,
       email,
-      message: "Link de registro creado correctamente",
+      emailSent,
+      emailWarning,
+      message: emailSent
+        ? "Link de registro creado y email enviado correctamente"
+        : "Link de registro creado. No se pudo enviar el email — compartí el link manualmente.",
     })
   } catch (e: any) {
     if (e instanceof Response) return e

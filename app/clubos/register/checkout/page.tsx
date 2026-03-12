@@ -3,11 +3,11 @@
 import { useMemo, useState, useEffect } from "react"
 import { useRouter, useSearchParams } from "next/navigation"
 import { VoydLogo } from "@/components/ui/voyd-logo"
-import { Check, CreditCard, Lock, ArrowLeft, Zap, Building2, Trophy } from "lucide-react"
+import { Check, Lock, ArrowLeft, Zap, Building2, Trophy, CreditCard } from "lucide-react"
 import { cn } from "@/lib/utils"
 
 const PLAN_INFO: Record<string, { name: string; monthlyPrice: number; annualPrice: number; icon: React.ElementType; courts: string }> = {
-  estandar:    { name: "Estandar",    monthlyPrice: 30000, annualPrice: 25000, icon: Zap,       courts: "1-3 Canchas" },
+  estandar:    { name: "Estándar",    monthlyPrice: 30000, annualPrice: 25000, icon: Zap,       courts: "1-3 Canchas" },
   profesional: { name: "Profesional", monthlyPrice: 45000, annualPrice: 37500, icon: Building2, courts: "4-6 Canchas" },
   maestro:     { name: "Maestro",     monthlyPrice: 60000, annualPrice: 50000, icon: Trophy,    courts: "7+ Canchas" },
 }
@@ -26,26 +26,19 @@ function formatExpiry(val: string) {
   return digits
 }
 
-// ─── Processing overlay ───────────────────────────────────────────────────────
+// Processing overlay
 function ProcessingScreen() {
   return (
     <div className="fixed inset-0 bg-[#080808] flex flex-col items-center justify-center z-50">
       <div className="flex flex-col items-center gap-8">
-        {/* Animated card */}
         <div className="relative w-24 h-16">
           <div
             className="absolute inset-0 rounded-xl bg-gradient-to-br from-green-400 to-green-600 shadow-lg shadow-green-500/30"
             style={{ animation: "cardSlide 1.2s ease-in-out infinite alternate" }}
           />
-          <div
-            className="absolute bottom-0 left-1/2 -translate-x-1/2 translate-y-1/2 w-16 h-1 rounded-full bg-green-400/40"
-            style={{ animation: "cardSlide 1.2s ease-in-out infinite alternate", animationDelay: "0.1s" }}
-          />
         </div>
-
         <div className="text-center space-y-3">
           <p className="text-white text-lg font-semibold">Procesando tu pago</p>
-          {/* Bouncing dots */}
           <div className="flex items-center justify-center gap-1.5">
             {[0, 1, 2].map((i) => (
               <span
@@ -57,7 +50,6 @@ function ProcessingScreen() {
           </div>
         </div>
       </div>
-
       <style>{`
         @keyframes cardSlide {
           0%   { transform: translateX(-12px) rotate(-3deg); }
@@ -72,12 +64,12 @@ function ProcessingScreen() {
   )
 }
 
-// ─── Success overlay ──────────────────────────────────────────────────────────
+// Success overlay
 function SuccessScreen({ planName, onContinue }: { planName: string; onContinue: () => void }) {
-  const [showParticles, setShowParticles] = useState(false)
+  const [show, setShow] = useState(false)
 
   useEffect(() => {
-    const t = setTimeout(() => setShowParticles(true), 100)
+    const t = setTimeout(() => setShow(true), 100)
     return () => clearTimeout(t)
   }, [])
 
@@ -96,62 +88,43 @@ function SuccessScreen({ planName, onContinue }: { planName: string; onContinue:
   return (
     <div className="fixed inset-0 bg-[#080808] flex flex-col items-center justify-center z-50">
       <div className="flex flex-col items-center gap-6">
-        {/* Circle + check */}
         <div className="relative flex items-center justify-center w-28 h-28">
-          {/* Outer ring – drawn with stroke-dashoffset */}
           <svg className="absolute inset-0 w-full h-full -rotate-90" viewBox="0 0 112 112">
-            <circle
-              cx="56" cy="56" r="50"
-              fill="none"
-              stroke="#22c55e"
-              strokeWidth="3"
-              strokeLinecap="round"
-              strokeDasharray="314"
-              strokeDashoffset={showParticles ? "0" : "314"}
+            <circle cx="56" cy="56" r="50" fill="none" stroke="#22c55e" strokeWidth="3"
+              strokeLinecap="round" strokeDasharray="314"
+              strokeDashoffset={show ? "0" : "314"}
               style={{ transition: "stroke-dashoffset 0.7s ease-out" }}
             />
           </svg>
-          {/* Inner ring */}
           <svg className="absolute w-[76px] h-[76px] -rotate-90" viewBox="0 0 76 76">
-            <circle
-              cx="38" cy="38" r="34"
-              fill="none"
-              stroke="#4ade80"
-              strokeWidth="2"
-              strokeOpacity="0.35"
-              strokeDasharray="214"
-              strokeDashoffset={showParticles ? "0" : "214"}
+            <circle cx="38" cy="38" r="34" fill="none" stroke="#4ade80" strokeWidth="2"
+              strokeOpacity="0.35" strokeDasharray="214"
+              strokeDashoffset={show ? "0" : "214"}
               style={{ transition: "stroke-dashoffset 0.55s ease-out 0.15s" }}
             />
           </svg>
-          {/* Check icon */}
           <Check
             className="w-9 h-9 text-green-400"
             style={{
-              opacity: showParticles ? 1 : 0,
-              transform: showParticles ? "scale(1)" : "scale(0.4)",
+              opacity: show ? 1 : 0,
+              transform: show ? "scale(1)" : "scale(0.4)",
               transition: "opacity 0.35s ease-out 0.55s, transform 0.35s ease-out 0.55s",
             }}
           />
-          {/* Particles */}
           {particles.map((p, i) => (
             <span
               key={i}
-              className={cn(
-                "absolute bg-green-400",
-                p.shape === "circle" ? "rounded-full" : "rounded-sm rotate-45",
-              )}
+              className={cn("absolute bg-green-400", p.shape === "circle" ? "rounded-full" : "rounded-sm rotate-45")}
               style={{
                 width: p.size,
                 height: p.size,
                 top: "50%",
                 left: "50%",
-                opacity: showParticles ? 0 : 0,
-                transform: showParticles
+                opacity: show ? 0.7 : 0,
+                transform: show
                   ? `translate(calc(-50% + ${p.x}px), calc(-50% + ${p.y}px)) scale(1)`
                   : `translate(-50%, -50%) scale(0)`,
                 transition: `transform 0.55s ease-out ${p.delay + 0.45}s, opacity 0.1s ease-out ${p.delay + 0.45}s`,
-                ...(showParticles ? { opacity: 0.7 } : {}),
               }}
             />
           ))}
@@ -175,7 +148,7 @@ function SuccessScreen({ planName, onContinue }: { planName: string; onContinue:
   )
 }
 
-// ─── Main page ────────────────────────────────────────────────────────────────
+// Main page
 export default function ClubOSCheckoutPage() {
   const router = useRouter()
   const searchParams = useSearchParams()
@@ -205,15 +178,29 @@ export default function ClubOSCheckoutPage() {
     }
     setError("")
     setStage("processing")
+
+    // Simulate payment processing delay
     await new Promise((r) => setTimeout(r, 2200))
+
+    // Activate account in Firestore + send confirmation emails
+    try {
+      await fetch("/api/clubos/register/simulate-payment", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ centerId, email, plan: planKey, billing }),
+      })
+    } catch {
+      // Non-blocking — show success regardless
+    }
+
     setStage("success")
   }
 
   if (stage === "processing") return <ProcessingScreen />
-  if (stage === "success")    return (
+  if (stage === "success") return (
     <SuccessScreen
       planName={plan.name}
-      onContinue={() => router.push(`/clubos/login?checkout=success&plan=${planKey}`)}
+      onContinue={() => router.push(`/clubos/login?checkout=success&plan=${planKey}&next=${encodeURIComponent("/clubos/dashboard/settings/profile")}`)}
     />
   )
 
@@ -222,14 +209,12 @@ export default function ClubOSCheckoutPage() {
       <div className="absolute inset-0 bg-[radial-gradient(ellipse_at_top,_#16a34a12_0%,_transparent_60%)] pointer-events-none" />
 
       <div className="container mx-auto px-4 py-10 relative max-w-5xl">
-        {/* Logo */}
         <div className="flex justify-center mb-10">
           <VoydLogo className="h-9 brightness-0 invert" />
         </div>
 
         <div className="grid md:grid-cols-[1fr_420px] gap-8 items-start">
 
-          {/* Left – Payment form */}
           <div className="space-y-6">
             <button
               onClick={() => router.back()}
@@ -245,7 +230,6 @@ export default function ClubOSCheckoutPage() {
             </div>
 
             <form onSubmit={handlePay} className="space-y-4">
-              {/* Card number */}
               <div className="space-y-1.5">
                 <label className="text-sm text-zinc-400 font-medium">Número de tarjeta</label>
                 <div className="relative">
@@ -261,7 +245,6 @@ export default function ClubOSCheckoutPage() {
                 </div>
               </div>
 
-              {/* Cardholder */}
               <div className="space-y-1.5">
                 <label className="text-sm text-zinc-400 font-medium">Nombre en la tarjeta</label>
                 <input
@@ -273,7 +256,6 @@ export default function ClubOSCheckoutPage() {
                 />
               </div>
 
-              {/* Expiry + CVV */}
               <div className="grid grid-cols-2 gap-4">
                 <div className="space-y-1.5">
                   <label className="text-sm text-zinc-400 font-medium">Vencimiento</label>
@@ -300,9 +282,7 @@ export default function ClubOSCheckoutPage() {
                 </div>
               </div>
 
-              {error && (
-                <p className="text-red-400 text-sm">{error}</p>
-              )}
+              {error && <p className="text-red-400 text-sm">{error}</p>}
 
               <button
                 type="submit"
@@ -318,11 +298,9 @@ export default function ClubOSCheckoutPage() {
             </form>
           </div>
 
-          {/* Right – Order summary */}
           <div className="rounded-2xl bg-zinc-900 border border-zinc-800 p-6 space-y-6 md:sticky md:top-8">
             <h2 className="text-sm font-semibold text-zinc-400 uppercase tracking-wider">Resumen del pedido</h2>
 
-            {/* Plan card */}
             <div className="flex items-center gap-4 p-4 bg-zinc-800/60 rounded-xl border border-zinc-700/50">
               <div className="w-10 h-10 rounded-xl bg-green-500/15 border border-green-500/20 flex items-center justify-center flex-shrink-0">
                 <Icon className="w-5 h-5 text-green-400" />
@@ -337,7 +315,6 @@ export default function ClubOSCheckoutPage() {
               </div>
             </div>
 
-            {/* Line items */}
             <div className="space-y-3 text-sm">
               {isAnnual && (
                 <div className="flex justify-between text-zinc-500 text-xs">
@@ -360,8 +337,7 @@ export default function ClubOSCheckoutPage() {
               {isAnnual ? (
                 <p className="text-zinc-600 text-xs">
                   Después del mes gratis se cobra {formatPrice(annualTotal)} en un único pago anual.
-                  La suscripción cubre 12 meses y se renueva automáticamente al vencimiento.
-                  Podés cancelar en cualquier momento antes del vencimiento.
+                  Se renueva automáticamente al vencimiento. Podés cancelar antes.
                 </p>
               ) : (
                 <p className="text-zinc-600 text-xs">
@@ -371,14 +347,8 @@ export default function ClubOSCheckoutPage() {
               )}
             </div>
 
-            {/* Perks */}
             <div className="space-y-2 pt-2 border-t border-zinc-800">
-              {[
-                "1 mes de prueba gratis incluido",
-                "Cancelá cuando quieras",
-                "Acceso completo desde el primer día",
-                "Soporte incluido",
-              ].map((perk) => (
+              {["1 mes de prueba gratis incluido", "Cancelá cuando quieras", "Acceso completo desde el primer día", "Soporte incluido"].map((perk) => (
                 <div key={perk} className="flex items-center gap-2 text-xs text-zinc-500">
                   <div className="w-4 h-4 rounded-full bg-green-500/15 flex items-center justify-center flex-shrink-0">
                     <Check className="w-2.5 h-2.5 text-green-400" />
