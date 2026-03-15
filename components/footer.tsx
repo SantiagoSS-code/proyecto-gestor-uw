@@ -1,5 +1,6 @@
 import Link from "next/link"
-import { Linkedin, Sparkles } from "lucide-react"
+import { Linkedin } from "lucide-react"
+import { VoydLogo } from "@/components/ui/voyd-logo"
 
 export function Footer() {
   return (
@@ -7,11 +8,8 @@ export function Footer() {
       <div className="container mx-auto px-4">
         <div className="flex flex-col md:flex-row justify-between items-center gap-8">
           {/* Logo */}
-          <Link href="/" className="flex items-center gap-2">
-            <div className="w-8 h-8 rounded-lg bg-primary flex items-center justify-center">
-              <Sparkles className="w-4 h-4 text-primary-foreground" />
-            </div>
-            <span className="font-semibold text-xl tracking-tight text-foreground">courtly</span>
+          <Link href="/" className="flex items-center">
+            <VoydLogo className="h-8" />
           </Link>
 
           <nav className="flex flex-wrap justify-center gap-6">
@@ -45,7 +43,7 @@ export function Footer() {
         </div>
 
         <div className="mt-8 pt-8 border-t border-border/30 flex flex-col md:flex-row justify-between items-center gap-4">
-          <p className="text-xs text-muted-foreground">© 2026 Courtly. Todos los derechos reservados.</p>
+          <p className="text-xs text-muted-foreground">© 2026 Voyd. Todos los derechos reservados.</p>
           <div className="flex gap-6">
             <Link href="#" className="text-xs text-muted-foreground hover:text-foreground transition-colors">
               Privacidad

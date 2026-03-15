@@ -1,6 +1,7 @@
 import { initializeApp } from "firebase/app"
 import { getAuth, connectAuthEmulator } from "firebase/auth"
 import { getFirestore, connectFirestoreEmulator } from "firebase/firestore"
+import { getStorage, connectStorageEmulator } from "firebase/storage"
 
 const firebaseConfig = {
   apiKey: process.env.NEXT_PUBLIC_FIREBASE_API_KEY || "",
@@ -14,19 +15,22 @@ const firebaseConfig = {
 let app: any = null;
 let auth: any = null;
 let db: any = null;
+let storage: any = null;
 
 try {
   app = initializeApp(firebaseConfig);
   auth = getAuth(app);
   db = getFirestore(app);
+  storage = getStorage(app);
 } catch (e) {
   console.error('Firebase initialization failed:', e);
   // Create dummy instances for SSR
   auth = null;
   db = null;
+  storage = null;
 }
 
-export { auth, db };
+export { app, auth, db, storage };
 
 // Connect to emulators only when explicitly enabled.
 // IMPORTANT: when viewing the app from a phone via LAN IP, "localhost" refers to the phone,
@@ -50,6 +54,7 @@ if (shouldUseEmulators) {
 
     connectAuthEmulator(auth, `http://${host}:9099`)
     connectFirestoreEmulator(db, host, 8080)
+    if (storage) connectStorageEmulator(storage, host, 9199)
   } catch {
     console.log("Emulators already connected")
   }

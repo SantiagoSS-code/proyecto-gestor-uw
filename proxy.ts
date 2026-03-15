@@ -31,35 +31,42 @@ const CLUBOS_ALLOWED_ROLES = new Set([
   "club_admin",
 ])
 
-async function resolveClubRole(decodedToken: { uid: string; role?: unknown; legacyRole?: unknown }) {
-  if (!adminDb) return ""
+type ClubRoleResult = { role: string; subscriptionStatus: string | null }
+
+async function resolveClubRole(decodedToken: { uid: string; role?: unknown; legacyRole?: unknown }): Promise<ClubRoleResult> {
+  if (!adminDb) return { role: "", subscriptionStatus: null }
 
   const claimRole = typeof decodedToken.role === "string" ? decodedToken.role : ""
-  if (claimRole) return claimRole
-
   const claimLegacyRole = typeof decodedToken.legacyRole === "string" ? decodedToken.legacyRole : ""
-  if (claimLegacyRole) return claimLegacyRole
 
   try {
     const userSnap = await adminDb.collection("users").doc(decodedToken.uid).get()
     if (userSnap.exists) {
-      const data = userSnap.data() as { role?: unknown; legacyRole?: unknown }
-      const role = typeof data.role === "string" ? data.role : ""
-      if (role) return role
+      const data = userSnap.data() as { role?: unknown; legacyRole?: unknown; subscriptionStatus?: string }
+      const subscriptionStatus = data?.subscriptionStatus || null
 
+      if (claimRole) return { role: claimRole, subscriptionStatus }
+      if (claimLegacyRole) return { role: claimLegacyRole, subscriptionStatus }
+
+      const role = typeof data.role === "string" ? data.role : ""
       const legacyRole = typeof data.legacyRole === "string" ? data.legacyRole : ""
-      if (legacyRole) return legacyRole
+      if (role) return { role, subscriptionStatus }
+      if (legacyRole) return { role: legacyRole, subscriptionStatus }
     }
+
+    if (claimRole) return { role: claimRole, subscriptionStatus: null }
+    if (claimLegacyRole) return { role: claimLegacyRole, subscriptionStatus: null }
 
     const centerAdminSnap = await adminDb.collection("center_admins").doc(decodedToken.uid).get()
     if (centerAdminSnap.exists) {
-      return "center_admin"
+      return { role: "center_admin", subscriptionStatus: null }
     }
   } catch (e) {
-    // Ignore errors
+    if (claimRole) return { role: claimRole, subscriptionStatus: null }
+    if (claimLegacyRole) return { role: claimLegacyRole, subscriptionStatus: null }
   }
 
-  return ""
+  return { role: "", subscriptionStatus: null }
 }
 
 function isClubRole(role: string) {
@@ -76,17 +83,23 @@ export async function proxy(request: NextRequest) {
     return NextResponse.redirect(new URL('/clubos/login', request.url))
   }
 
+  if (pathname === "/auth/signup" || pathname === "/registro-centros") {
+    return NextResponse.redirect(new URL('/clubos/login?invite_only=1', request.url))
+  }
+
   // Protect ClubOS routes
   if (pathname.startsWith('/clubos')) {
     const token = request.cookies.get('__session')?.value
+    const isClubOsPublicAuthPath =
+      pathname === '/clubos/login' || pathname === '/clubos/register' || pathname.startsWith('/clubos/register/')
 
     // Allow login page when user is not authenticated
-    if (!token && pathname === '/clubos/login') {
+    if (!token && isClubOsPublicAuthPath) {
       return NextResponse.next()
     }
 
     // Redirect to login if no token and not login page
-    if (!token && pathname !== '/clubos/login') {
+    if (!token && !isClubOsPublicAuthPath) {
       return NextResponse.redirect(new URL('/clubos/login', request.url))
     }
 
@@ -94,7 +107,7 @@ export async function proxy(request: NextRequest) {
     if (token && adminAuth) {
       try {
         const decodedToken = await adminAuth.verifyIdToken(token)
-        const role = await resolveClubRole({
+        const { role, subscriptionStatus } = await resolveClubRole({
           uid: decodedToken.uid,
           role: decodedToken.role,
           legacyRole: (decodedToken as { legacyRole?: unknown }).legacyRole,
@@ -104,8 +117,15 @@ export async function proxy(request: NextRequest) {
         // Allow login page for authenticated users
         if (pathname === '/clubos/login') {
           if (hasClubAccess) {
-            return NextResponse.redirect(new URL('/clubos/dashboard', request.url))
+            const requestedNext = request.nextUrl.searchParams.get("next") || ""
+            const safeNext = requestedNext.startsWith("/clubos/dashboard") ? requestedNext : "/clubos/dashboard"
+            return NextResponse.redirect(new URL(safeNext, request.url))
           }
+          return NextResponse.next()
+        }
+
+        if (pathname === '/clubos/register' || pathname.startsWith('/clubos/register/')) {
+          // Always allow registration pages — one-time token links must be accessible
           return NextResponse.next()
         }
 
@@ -114,6 +134,13 @@ export async function proxy(request: NextRequest) {
           const loginUrl = new URL('/clubos/login', request.url)
           loginUrl.searchParams.set('error', 'club_account_required')
           return NextResponse.redirect(loginUrl)
+        }
+
+        // Block dashboard until subscription is active
+        if (pathname.startsWith('/clubos/dashboard') && hasClubAccess && subscriptionStatus !== "active") {
+          const pendingUrl = new URL('/clubos/register/pending-payment', request.url)
+          pendingUrl.searchParams.set('uid', decodedToken.uid)
+          return NextResponse.redirect(pendingUrl)
         }
 
         return NextResponse.next()
@@ -157,5 +184,5 @@ export async function proxy(request: NextRequest) {
 }
 
 export const config = {
-  matcher: ["/dashboard/:path*", "/clubos/:path*", "/auth/login", "/login-centros"],
+  matcher: ["/dashboard/:path*", "/clubos/:path*", "/auth/login", "/auth/signup", "/registro-centros", "/login-centros"],
 }

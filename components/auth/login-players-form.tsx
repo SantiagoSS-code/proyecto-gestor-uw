@@ -8,7 +8,7 @@ import { useRouter, useSearchParams } from "next/navigation"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { AuthInput } from "@/components/auth/auth-input"
 import { PrimaryButton } from "@/components/ui/primary-button"
-import { Sparkles } from "lucide-react"
+import { VoydLogo } from "@/components/ui/voyd-logo"
 import { GoogleAuthProvider, browserLocalPersistence, setPersistence, signInWithEmailAndPassword, signInWithPopup } from "firebase/auth"
 import { auth } from "@/lib/firebaseClient"
 import { createMinimalPlayerProfile, getPlayerOnboardingStatus } from "@/lib/players"
@@ -138,13 +138,8 @@ export function LoginPlayersForm() {
   return (
     <Card className="w-full max-w-md backdrop-blur-sm bg-white/85 border-0 shadow-2xl">
       <CardHeader className="text-center pb-2">
-        <Link href="/" className="inline-flex items-center gap-2 justify-center">
-          <div className="w-10 h-10 rounded-xl bg-gradient-to-r from-blue-600 to-blue-500 flex items-center justify-center">
-            <Sparkles className="w-5 h-5 text-white" />
-          </div>
-          <span className="font-bold text-2xl bg-gradient-to-r from-blue-600 to-blue-500 bg-clip-text text-transparent">
-            courtly
-          </span>
+        <Link href="/" className="inline-flex items-center justify-center">
+          <VoydLogo className="h-10" />
         </Link>
         <div className="mt-4">
           <CardTitle className="text-2xl font-bold text-gray-900">Inicia sesión para jugar</CardTitle>

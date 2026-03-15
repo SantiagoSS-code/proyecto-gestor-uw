@@ -94,6 +94,7 @@ export default function SignupPage() {
         streetNumber: step2Data.streetNumber,
         postalCode: step2Data.postalCode,
         slug,
+        centerCode: user.uid.slice(0, 6).toLowerCase(),
         published: false,
         featuredRank: null,
         createdAt: new Date(),

@@ -109,7 +109,7 @@ export function PricingSection() {
   }
 
   return (
-    <section className="py-24 md:py-32 relative overflow-hidden">
+    <section className="pt-8 pb-24 md:pb-32 relative overflow-hidden">
       {/* Background elements */}
       <div className="absolute inset-0 bg-gradient-to-b from-primary/5 via-transparent to-transparent" />
       <div className="absolute top-40 -left-40 w-80 h-80 bg-primary/10 rounded-full blur-3xl" />
@@ -128,7 +128,7 @@ export function PricingSection() {
             <span className="text-primary">para tu club</span>
           </h1>
           <p className="text-lg text-muted-foreground max-w-2xl mx-auto mb-10">
-            Sin costos ocultos. Cancela cuando quieras. Todos los planes incluyen 14 días de prueba gratis.
+            Sin costos ocultos. Cancela cuando quieras. Todos los planes incluyen 1 mes de prueba gratis.
           </p>
 
           {/* Toggle */}

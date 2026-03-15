@@ -67,6 +67,8 @@ export default function PublicCenterPage() {
   const [customerEmail, setCustomerEmail] = useState("")
   const [bookingMessage, setBookingMessage] = useState<string | null>(null)
   const [submitting, setSubmitting] = useState(false)
+  const [depositEnabled, setDepositEnabled] = useState(false)
+  const [depositPercent, setDepositPercent] = useState(0)
 
   useEffect(() => {
     const fetchData = async () => {
@@ -91,6 +93,21 @@ export default function PublicCenterPage() {
           setSelectedDuration(config.slotDuration || 60)
           setOpeningHours(config.openingHours || defaultOpeningHours)
           setOverrides(config.overrides || {})
+        }
+
+        const operationRefs = [
+          doc(db, "centers", centerId, "settings", "operations"),
+          doc(db, "padel_centers", centerId, "settings", "operations"),
+        ]
+        for (const operationRef of operationRefs) {
+          const operationSnap = await getDoc(operationRef)
+          if (operationSnap.exists()) {
+            const operationData = operationSnap.data() as any
+            setDepositEnabled(Boolean(operationData.depositEnabled))
+            const nextPercent = Number(operationData.depositPercent || 0)
+            setDepositPercent(Number.isFinite(nextPercent) ? Math.max(0, Math.min(100, nextPercent)) : 0)
+            break
+          }
         }
       } catch (error) {
         console.error("Error loading center data:", error)
@@ -123,6 +140,39 @@ export default function PublicCenterPage() {
     }
     return result
   }, [loading, openingHours, overrides, selectedCourt, selectedDate, selectedDuration])
+
+  const pricingPreview = useMemo(() => {
+    if (!selectedCourt || !Number.isFinite(selectedCourt.pricePerHour) || selectedCourt.pricePerHour <= 0) {
+      return null
+    }
+
+    const reservationTotal = Number(((selectedCourt.pricePerHour * selectedDuration) / 60).toFixed(2))
+    const reservationAmountNow = depositEnabled
+      ? Number(((reservationTotal * depositPercent) / 100).toFixed(2))
+      : reservationTotal
+    const remainingAmount = Number((reservationTotal - reservationAmountNow).toFixed(2))
+    const totalNow = Number(reservationAmountNow.toFixed(2))
+
+    return {
+      currency: selectedCourt.currency || "ARS",
+      reservationTotal,
+      reservationAmountNow,
+      remainingAmount,
+      totalNow,
+    }
+  }, [selectedCourt, selectedDuration, depositEnabled, depositPercent])
+
+  const formatMoney = (amount: number, currency: string) => {
+    try {
+      return new Intl.NumberFormat("es-AR", {
+        style: "currency",
+        currency: currency || "ARS",
+        maximumFractionDigits: 2,
+      }).format(amount)
+    } catch {
+      return `${currency} ${amount.toFixed(2)}`
+    }
+  }
 
   if (loading) {
     return <div className="min-h-screen flex items-center justify-center text-gray-500">Loading center...</div>
@@ -293,6 +343,31 @@ export default function PublicCenterPage() {
                   </SelectContent>
                 </Select>
               </div>
+
+              {pricingPreview ? (
+                <div className="rounded-lg border border-slate-200 bg-slate-50 p-3 space-y-2">
+                  <div className="flex items-center justify-between text-sm text-slate-700">
+                    <span>{depositEnabled ? "Seña" : "Reserva"}</span>
+                    <span className="font-medium">{formatMoney(pricingPreview.reservationAmountNow, pricingPreview.currency)}</span>
+                  </div>
+                  {depositEnabled ? (
+                    <div className="flex items-center justify-between text-sm text-slate-700">
+                      <span>Saldo pendiente</span>
+                      <span className="font-medium">{formatMoney(pricingPreview.remainingAmount, pricingPreview.currency)}</span>
+                    </div>
+                  ) : null}
+                  <div className="pt-2 border-t border-slate-200 flex items-center justify-between text-sm text-black">
+                    <span className="font-semibold">Total a pagar ahora</span>
+                    <span className="font-semibold">{formatMoney(pricingPreview.totalNow, pricingPreview.currency)}</span>
+                  </div>
+                  {depositEnabled ? (
+                    <p className="text-xs text-slate-500 pt-1">
+                      El saldo pendiente se abona según las condiciones definidas por el club.
+                    </p>
+                  ) : null}
+                </div>
+              ) : null}
+
               {bookingMessage ? <p className="text-sm text-black">{bookingMessage}</p> : null}
               <Button onClick={handleBooking} disabled={submitting || !selectedCourt || slots.length === 0}>
                 {submitting ? "Creando sesión…" : "Confirmar y pagar"}

@@ -17,8 +17,23 @@ import type { SportKey } from "@/lib/types"
 import { FIRESTORE_COLLECTIONS, CENTER_SUBCOLLECTIONS } from "@/lib/firestorePaths"
 import { showSavePopupAndRefresh } from "@/lib/save-feedback"
 
-const SURFACE_TYPES = ["Sintética", "Césped", "Arcilla", "Dura", "Otra"]
 const SPORTS: SportKey[] = ["padel", "tennis", "futbol", "pickleball", "squash"]
+
+const SPORT_LABELS: Record<SportKey, string> = {
+  padel: "Padel",
+  tennis: "Tennis",
+  futbol: "Fútbol",
+  pickleball: "Pickleball",
+  squash: "Squash",
+}
+
+const SURFACES_BY_SPORT: Record<SportKey, string[]> = {
+  padel:      ["Césped sintético", "Hormigón", "Resina sintética"],
+  tennis:     ["Polvo de ladrillo", "Cemento / hard", "Césped", "Resina sintética"],
+  futbol:     ["Césped natural", "Césped sintético", "Cemento", "Piso deportivo / indoor"],
+  pickleball: ["Cemento", "Asfalto", "Resina acrílica", "Piso deportivo indoor"],
+  squash:     ["Madera", "Piso deportivo", "Cemento con resina"],
+}
 
 type CourtForm = {
   name: string
@@ -36,6 +51,7 @@ type CourtForm = {
 type CourtRow = {
   id: string
   name: string
+  sourceCollection?: "centers" | "padel_centers"
   sport?: SportKey
   indoor?: boolean
   lighting?: boolean
@@ -61,7 +77,13 @@ const emptyForm: CourtForm = {
   imageUrl: "",
 }
 
-export function CourtsTab({ onCourtCreated }: { onCourtCreated?: (courtId: string, courtName: string) => void }) {
+export function CourtsTab({
+  onCourtCreated,
+  onCourtsStatsChange,
+}: {
+  onCourtCreated?: (courtId: string, courtName: string) => void
+  onCourtsStatsChange?: (stats: { total: number; published: number }) => void
+}) {
   const { user, centerId, loading: authLoading } = useAuth()
   const resolvedCenterId = centerId || user?.uid || null
   const [courts, setCourts] = useState<CourtRow[]>([])
@@ -77,8 +99,12 @@ export function CourtsTab({ onCourtCreated }: { onCourtCreated?: (courtId: strin
   const [selectedSport, setSelectedSport] = useState<SportKey | "all">("all")
   const [editingCourtHasSchedule, setEditingCourtHasSchedule] = useState(false)
   const [courtsRootCollection, setCourtsRootCollection] = useState<"centers" | "padel_centers">(FIRESTORE_COLLECTIONS.centers)
+  const [centerSports, setCenterSports] = useState<SportKey[] | null>(null)
 
-  const canSave = useMemo(() => form.name.trim().length > 0, [form.name])
+  const canSave = useMemo(() => {
+    const price = Number(form.pricePerHour)
+    return form.name.trim().length > 0 && Number.isFinite(price) && price > 0
+  }, [form.name, form.pricePerHour])
 
   // Obtener deportes únicos de las canchas
   const uniqueSports = useMemo(() => {
@@ -86,11 +112,29 @@ export function CourtsTab({ onCourtCreated }: { onCourtCreated?: (courtId: strin
     return Array.from(sports).sort()
   }, [courts])
 
+  // Deportes disponibles según lo configurado en el centro (si aún no cargó, muestra todos)
+  const availableSports = useMemo(
+    () => (centerSports && centerSports.length > 0 ? SPORTS.filter((s) => centerSports.includes(s)) : SPORTS),
+    [centerSports]
+  )
+
+  // Superficies disponibles según el deporte seleccionado en el formulario
+  const surfacesForSport = useMemo(
+    () => (form.sport ? (SURFACES_BY_SPORT[form.sport] ?? []) : []),
+    [form.sport]
+  )
+
   // Filtrar canchas según el deporte seleccionado
   const filteredCourts = useMemo(() => {
     if (selectedSport === "all") return courts
     return courts.filter(c => (c.sport || "padel") === selectedSport)
   }, [courts, selectedSport])
+
+  useEffect(() => {
+    const total = courts.length
+    const published = courts.filter((court) => court.published === true).length
+    onCourtsStatsChange?.({ total, published })
+  }, [courts, onCourtsStatsChange])
 
   const validateForm = (): boolean => {
     if (!form.name.trim()) {
@@ -113,8 +157,9 @@ export function CourtsTab({ onCourtCreated }: { onCourtCreated?: (courtId: strin
       setValidationError("Debes seleccionar una superficie.")
       return false
     }
-    if (form.surfaceType === "Otra" && !form.otherSurfaceType) {
-      setValidationError("Debes especificar el tipo de superficie.")
+    const price = Number(form.pricePerHour)
+    if (!form.pricePerHour || !Number.isFinite(price) || price <= 0) {
+      setValidationError("Debes ingresar un precio por hora mayor a 0.")
       return false
     }
     setValidationError(null)
@@ -125,24 +170,56 @@ export function CourtsTab({ onCourtCreated }: { onCourtCreated?: (courtId: strin
     const fetchCourts = async () => {
       if (!resolvedCenterId) return
       try {
+        const centerDocRef = doc(db, FIRESTORE_COLLECTIONS.centers, resolvedCenterId)
+        const legacyCenterDocRef = doc(db, FIRESTORE_COLLECTIONS.legacyCenters, resolvedCenterId)
         const centersRef = collection(db, FIRESTORE_COLLECTIONS.centers, resolvedCenterId, CENTER_SUBCOLLECTIONS.courts)
-        const centersSnapshot = await getDocs(centersRef)
-
-        const usingLegacy = centersSnapshot.empty
         const legacyRef = collection(db, FIRESTORE_COLLECTIONS.legacyCenters, resolvedCenterId, CENTER_SUBCOLLECTIONS.courts)
-        const legacySnapshot = usingLegacy ? await getDocs(legacyRef) : null
 
-        const sourceSnapshot = usingLegacy ? legacySnapshot : centersSnapshot
-        const sourceRootCollection = usingLegacy ? FIRESTORE_COLLECTIONS.legacyCenters : FIRESTORE_COLLECTIONS.centers
-        setCourtsRootCollection(sourceRootCollection)
+        const [centerDocSnap, legacyCenterDocSnap, centersSnapshot, legacySnapshot] = await Promise.all([
+          getDoc(centerDocRef),
+          getDoc(legacyCenterDocRef),
+          getDocs(centersRef),
+          getDocs(legacyRef),
+        ])
 
-        const data = (sourceSnapshot?.docs || []).map((docSnap) => ({ id: docSnap.id, ...(docSnap.data() as any) })) as CourtRow[]
+        const preferredRootCollection = centerDocSnap.exists()
+          ? FIRESTORE_COLLECTIONS.centers
+          : legacyCenterDocSnap.exists()
+            ? FIRESTORE_COLLECTIONS.legacyCenters
+            : FIRESTORE_COLLECTIONS.centers
+        setCourtsRootCollection(preferredRootCollection)
+
+        const mergedCourts = new Map<string, CourtRow>()
+
+        legacySnapshot.docs.forEach((docSnap) => {
+          mergedCourts.set(docSnap.id, {
+            id: docSnap.id,
+            ...(docSnap.data() as any),
+            sourceCollection: FIRESTORE_COLLECTIONS.legacyCenters,
+          })
+        })
+
+        centersSnapshot.docs.forEach((docSnap) => {
+          mergedCourts.set(docSnap.id, {
+            id: docSnap.id,
+            ...(docSnap.data() as any),
+            sourceCollection: FIRESTORE_COLLECTIONS.centers,
+          })
+        })
+
+        const data = Array.from(mergedCourts.values()) as CourtRow[]
         
         // Verificar cuáles tienen schedule
         const courtsWithScheduleInfo = await Promise.all(
           data.map(async (court) => {
             try {
-              const courtRef = doc(db, sourceRootCollection, resolvedCenterId, CENTER_SUBCOLLECTIONS.courts, court.id)
+              const courtRef = doc(
+                db,
+                court.sourceCollection || preferredRootCollection,
+                resolvedCenterId,
+                CENTER_SUBCOLLECTIONS.courts,
+                court.id
+              )
               const courtSnap = await getDoc(courtRef)
               const hasSchedule = courtSnap.exists() && !!courtSnap.data()?.schedule
               return { ...court, hasSchedule }
@@ -162,6 +239,31 @@ export function CourtsTab({ onCourtCreated }: { onCourtCreated?: (courtId: strin
     }
 
     if (!authLoading && resolvedCenterId) fetchCourts()
+  }, [authLoading, resolvedCenterId])
+
+  useEffect(() => {
+    const fetchCenterSports = async () => {
+      if (!resolvedCenterId) return
+      try {
+        const centerRef = doc(db, FIRESTORE_COLLECTIONS.centers, resolvedCenterId)
+        const centerSnap = await getDoc(centerRef)
+        const data = centerSnap.exists() ? (centerSnap.data() as any) : {}
+        if (Array.isArray(data.sports) && data.sports.length > 0) {
+          setCenterSports(data.sports as SportKey[])
+          return
+        }
+        // fallback: try legacy collection
+        const legacyRef = doc(db, FIRESTORE_COLLECTIONS.legacyCenters, resolvedCenterId)
+        const legacySnap = await getDoc(legacyRef)
+        const legacyData = legacySnap.exists() ? (legacySnap.data() as any) : {}
+        if (Array.isArray(legacyData.sports) && legacyData.sports.length > 0) {
+          setCenterSports(legacyData.sports as SportKey[])
+        }
+      } catch (err) {
+        console.error("Error loading center sports:", err)
+      }
+    }
+    if (!authLoading && resolvedCenterId) fetchCenterSports()
   }, [authLoading, resolvedCenterId])
 
   const resetForm = () => {
@@ -214,7 +316,7 @@ export function CourtsTab({ onCourtCreated }: { onCourtCreated?: (courtId: strin
     setMessage(null)
 
     try {
-      const surfaceType = form.surfaceType === "Otra" ? form.otherSurfaceType : form.surfaceType
+      const surfaceType = form.surfaceType
 
       const payload = {
         name: form.name.trim(),
@@ -230,9 +332,11 @@ export function CourtsTab({ onCourtCreated }: { onCourtCreated?: (courtId: strin
       }
 
       if (editingId) {
-        const courtRef = doc(db, courtsRootCollection, resolvedCenterId, CENTER_SUBCOLLECTIONS.courts, editingId)
+        const existingCourt = courts.find((court) => court.id === editingId)
+        const targetCollection = existingCourt?.sourceCollection || courtsRootCollection
+        const courtRef = doc(db, targetCollection, resolvedCenterId, CENTER_SUBCOLLECTIONS.courts, editingId)
         await updateDoc(courtRef, payload)
-        setCourts((prev) => prev.map((c) => (c.id === editingId ? ({ ...c, ...payload } as any) : c)))
+        setCourts((prev) => prev.map((c) => (c.id === editingId ? ({ ...c, ...payload, sourceCollection: targetCollection } as any) : c)))
         resetForm()
         setIsModalOpen(false)
         showSavePopupAndRefresh("Cancha guardada correctamente.")
@@ -240,7 +344,7 @@ export function CourtsTab({ onCourtCreated }: { onCourtCreated?: (courtId: strin
       } else {
         const courtsRef = collection(db, courtsRootCollection, resolvedCenterId, CENTER_SUBCOLLECTIONS.courts)
         const newDoc = await addDoc(courtsRef, { ...payload, createdAt: serverTimestamp() })
-        const newCourt = { id: newDoc.id, ...(payload as any) }
+        const newCourt = { id: newDoc.id, ...(payload as any), sourceCollection: courtsRootCollection }
         setCourts((prev) => [...prev, newCourt])
         resetForm()
         setIsModalOpen(false)
@@ -263,7 +367,9 @@ export function CourtsTab({ onCourtCreated }: { onCourtCreated?: (courtId: strin
     if (!window.confirm("¿Eliminar esta cancha? Esta acción no se puede deshacer.")) return
 
     try {
-      await deleteDoc(doc(db, courtsRootCollection, resolvedCenterId, CENTER_SUBCOLLECTIONS.courts, courtId))
+      const existingCourt = courts.find((court) => court.id === courtId)
+      const targetCollection = existingCourt?.sourceCollection || courtsRootCollection
+      await deleteDoc(doc(db, targetCollection, resolvedCenterId, CENTER_SUBCOLLECTIONS.courts, courtId))
       setCourts((prev) => prev.filter((court) => court.id !== courtId))
     } catch (error) {
       console.error("Error deleting court:", error)
@@ -479,14 +585,14 @@ export function CourtsTab({ onCourtCreated }: { onCourtCreated?: (courtId: strin
               <div className="grid grid-cols-2 gap-4">
                 <div className="space-y-2">
                   <Label className="text-sm font-medium text-slate-700">Deporte *</Label>
-                  <Select value={form.sport} onValueChange={(value) => handleFormChange({ ...form, sport: value as SportKey })}>
+                  <Select value={form.sport} onValueChange={(value) => handleFormChange({ ...form, sport: value as SportKey, surfaceType: "" })}>
                     <SelectTrigger className="h-11 shadow-sm focus:ring-blue-500">
                       <SelectValue placeholder="Selecciona un deporte" />
                     </SelectTrigger>
                     <SelectContent>
-                      {SPORTS.map((s) => (
+                      {availableSports.map((s) => (
                         <SelectItem key={s} value={s} className="cursor-pointer">
-                          {s.charAt(0).toUpperCase() + s.slice(1)}
+                          {SPORT_LABELS[s]}
                         </SelectItem>
                       ))}
                     </SelectContent>
@@ -521,12 +627,16 @@ export function CourtsTab({ onCourtCreated }: { onCourtCreated?: (courtId: strin
 
               <div className="space-y-2">
                 <Label className="text-sm font-medium text-slate-700">Superficie *</Label>
-                <Select value={form.surfaceType} onValueChange={(value) => handleFormChange({ ...form, surfaceType: value })}>
+                <Select
+                  value={form.surfaceType}
+                  onValueChange={(value) => handleFormChange({ ...form, surfaceType: value })}
+                  disabled={!form.sport}
+                >
                   <SelectTrigger className="h-11 shadow-sm focus:ring-blue-500">
-                    <SelectValue placeholder="Selecciona una superficie" />
+                    <SelectValue placeholder={form.sport ? "Selecciona una superficie" : "Primero seleccioná un deporte"} />
                   </SelectTrigger>
                   <SelectContent>
-                    {SURFACE_TYPES.map((surface) => (
+                    {surfacesForSport.map((surface) => (
                       <SelectItem key={surface} value={surface} className="cursor-pointer">
                         {surface}
                       </SelectItem>
@@ -534,19 +644,33 @@ export function CourtsTab({ onCourtCreated }: { onCourtCreated?: (courtId: strin
                   </SelectContent>
                 </Select>
               </div>
+            </div>
 
-              {/* Otra superficie - condicional */}
-              {form.surfaceType === "Otra" && (
-                <div className="p-4 bg-slate-50 rounded-lg border border-slate-200">
-                  <Label className="text-sm font-medium text-slate-700 block mb-2">Especificar tipo de superficie</Label>
-                  <Input 
-                    value={form.otherSurfaceType || ""} 
-                    onChange={(e) => handleFormChange({ ...form, otherSurfaceType: e.target.value })} 
-                    placeholder="Ej: Piso de madera, PVC, etc."
-                    className="h-11 bg-white"
-                  />
+            <hr className="border-slate-100" />
+
+            {/* Precio y Moneda */}
+            <div className="space-y-4">
+              <div className="grid grid-cols-2 gap-4">
+                <div className="space-y-2">
+                  <Label className="text-sm font-medium text-slate-700">Precio por hora *</Label>
+                  <div className="relative">
+                    <span className="absolute left-3 top-3 text-slate-500 font-medium">$</span>
+                    <Input 
+                      type="number" 
+                      min="0" 
+                      step="0.01"
+                      value={form.pricePerHour} 
+                      onChange={(e) => handleFormChange({ ...form, pricePerHour: e.target.value })} 
+                      placeholder="0.00"
+                      className="h-11 pl-7 shadow-sm focus-visible:ring-blue-500"
+                    />
+                  </div>
                 </div>
-              )}
+                <div className="space-y-2">
+                  <Label className="text-sm font-medium text-slate-700">Moneda</Label>
+                  <Input value="ARS" disabled className="h-11 bg-slate-50 text-slate-500 font-medium shadow-sm" />
+                </div>
+              </div>
             </div>
 
             <hr className="border-slate-100" />
@@ -594,33 +718,6 @@ export function CourtsTab({ onCourtCreated }: { onCourtCreated?: (courtId: strin
               )}
             </div>
 
-            <hr className="border-slate-100" />
-
-            {/* Precio y Moneda */}
-            <div className="space-y-4">
-              <div className="grid grid-cols-2 gap-4">
-                <div className="space-y-2">
-                  <Label className="text-sm font-medium text-slate-700">Precio por hora</Label>
-                  <div className="relative">
-                    <span className="absolute left-3 top-3 text-slate-500 font-medium">$</span>
-                    <Input 
-                      type="number" 
-                      min="0" 
-                      step="0.01"
-                      value={form.pricePerHour} 
-                      onChange={(e) => handleFormChange({ ...form, pricePerHour: e.target.value })} 
-                      placeholder="0.00"
-                      className="h-11 pl-7 shadow-sm focus-visible:ring-blue-500"
-                    />
-                  </div>
-                </div>
-                <div className="space-y-2">
-                  <Label className="text-sm font-medium text-slate-700">Moneda</Label>
-                  <Input value="ARS" disabled className="h-11 bg-slate-50 text-slate-500 font-medium shadow-sm" />
-                </div>
-              </div>
-            </div>
-
             {/* Nota sobre estado Borrador */}
             {!editingId && (
               <div className="rounded-xl bg-blue-50/50 border border-blue-100 p-4">
@@ -636,7 +733,7 @@ export function CourtsTab({ onCourtCreated }: { onCourtCreated?: (courtId: strin
 
             {/* Publicar - Solo para ediciones */}
             {editingId && (
-              <div className={`p-4 rounded-xl border ${editingCourtHasSchedule ? 'bg-slate-50 border-slate-200' : 'bg-red-50/50 border-red-100'}`}>
+              <div className="p-4 rounded-xl border bg-slate-50 border-slate-200">
                 <Label className="flex items-start gap-3 cursor-pointer">
                   <input 
                     type="checkbox" 
@@ -646,15 +743,11 @@ export function CourtsTab({ onCourtCreated }: { onCourtCreated?: (courtId: strin
                     className="h-5 w-5 rounded border-slate-300 text-blue-600 focus:ring-blue-600 mt-0.5 disabled:opacity-50 disabled:cursor-not-allowed" 
                   />
                   <div className="space-y-1">
-                    <span className={`text-sm font-medium block ${editingCourtHasSchedule ? 'text-slate-900' : 'text-red-900'}`}>
-                      {editingCourtHasSchedule 
-                        ? "Mostrar esta cancha en páginas públicas"
-                        : "Configura los horarios primero"}
+                    <span className="text-sm font-medium block text-slate-900">
+                      Mostrar esta cancha en páginas públicas
                     </span>
-                    <p className={`text-xs ${editingCourtHasSchedule ? 'text-slate-500' : 'text-red-600'}`}>
-                      {editingCourtHasSchedule 
-                        ? "Los jugadores podrán ver y reservar esta cancha"
-                        : "Debes configurar los horarios para poder publicar"}
+                    <p className="text-xs text-slate-500">
+                      Los jugadores podrán ver y reservar esta cancha
                     </p>
                   </div>
                 </Label>
@@ -668,7 +761,7 @@ export function CourtsTab({ onCourtCreated }: { onCourtCreated?: (courtId: strin
             </Button>
             <Button 
               onClick={handleSave} 
-              disabled={saving} 
+              disabled={saving || !canSave} 
               className="bg-blue-600 hover:bg-blue-700 text-white h-11 px-8 w-full sm:w-auto shadow-sm"
             >
               {saving ? (

@@ -7,7 +7,7 @@ import { Footer } from "@/components/footer"
 
 export default function PricingPage() {
   return (
-    <main className="min-h-screen bg-background pt-16">
+    <main className="min-h-screen bg-background">
       <Header />
       {/* B2B Section - For Clubs */}
       <PricingSection />

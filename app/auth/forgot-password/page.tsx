@@ -8,7 +8,7 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Alert, AlertDescription } from '@/components/ui/alert';
-import { Sparkles } from 'lucide-react';
+import { VoydLogo } from '@/components/ui/voyd-logo';
 
 export default function ForgotPasswordPage() {
   const [email, setEmail] = useState('');
@@ -37,7 +37,7 @@ export default function ForgotPasswordPage() {
       <Card className="w-full max-w-md">
         <CardHeader className="text-center">
           <div className="flex justify-center mb-4">
-            <Sparkles className="w-8 h-8" />
+            <VoydLogo className="h-[2.75rem]" />
           </div>
           <CardTitle>Reset Password</CardTitle>
           <CardDescription>Enter your email to receive a reset link</CardDescription>

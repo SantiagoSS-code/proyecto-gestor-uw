@@ -6,5 +6,5 @@ export const metadata = {
 }
 
 export default function RegistroCentrosPage() {
-  redirect("/auth/signup")
+  redirect("/clubos/login?invite_only=1")
 }

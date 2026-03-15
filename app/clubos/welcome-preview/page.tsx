@@ -1,0 +1,129 @@
+"use client"
+
+import { useState } from "react"
+import { VoydLogo } from "@/components/ui/voyd-logo"
+import { Sparkles, RefreshCw } from "lucide-react"
+import { cn } from "@/lib/utils"
+
+/* ── Standalone preview — does NOT use auth or localStorage ── */
+export default function WelcomePreviewPage() {
+  const [key, setKey] = useState(0)
+
+  const replay = () => setKey((k) => k + 1)
+
+  return (
+    <div className="relative">
+      <WelcomeDemo key={key} />
+      <button
+        onClick={replay}
+        className="fixed bottom-6 right-6 z-[99999] flex items-center gap-2 bg-zinc-800 hover:bg-zinc-700 text-white text-xs font-medium px-4 py-2 rounded-full border border-zinc-600 shadow-lg transition-colors"
+      >
+        <RefreshCw className="w-3.5 h-3.5" />
+        Repetir animación
+      </button>
+    </div>
+  )
+}
+
+const PARTICLE_CONFIG = [
+  { x: -120, y: -90,  size: 5, delay: 0.3,  round: true  },
+  { x:  130, y: -80,  size: 4, delay: 0.45, round: false },
+  { x: -150, y:  20,  size: 4, delay: 0.6,  round: true  },
+  { x:  155, y:  30,  size: 5, delay: 0.4,  round: false },
+  { x:  -60, y:  120, size: 4, delay: 0.55, round: true  },
+  { x:   65, y:  125, size: 5, delay: 0.35, round: false },
+  { x:    0, y: -140, size: 4, delay: 0.5,  round: true  },
+  { x: -100, y:  95,  size: 3, delay: 0.65, round: false },
+  { x:  105, y: -40,  size: 3, delay: 0.42, round: true  },
+  { x:   40, y: -130, size: 4, delay: 0.58, round: false },
+  { x:  -45, y: -110, size: 3, delay: 0.48, round: true  },
+  { x:  160, y: -10,  size: 3, delay: 0.62, round: false },
+]
+
+function WelcomeDemo() {
+  return (
+    <div className="fixed inset-0 z-[9998] flex flex-col items-center justify-center bg-[#080808]">
+      {/* Radial glow */}
+      <div
+        className="absolute inset-0"
+        style={{
+          background: "radial-gradient(ellipse 60% 50% at 50% 50%, rgba(34,197,94,0.13) 0%, transparent 70%)",
+          animation: "wFadeIn 0.8s ease-out both",
+        }}
+      />
+
+      {/* Particles */}
+      {PARTICLE_CONFIG.map((p, i) => (
+        <span
+          key={i}
+          className={cn("fixed top-1/2 left-1/2 bg-green-400", p.round ? "rounded-full" : "rounded-sm rotate-45")}
+          style={{
+            width: p.size,
+            height: p.size,
+            ["--tx" as any]: `calc(-50% + ${p.x}px)`,
+            ["--ty" as any]: `calc(-50% + ${p.y}px)`,
+            animation: `wParticle 1.1s ease-out ${p.delay}s both`,
+          }}
+        />
+      ))}
+
+      <div className="relative flex flex-col items-center gap-8 text-center px-6">
+        {/* Logo */}
+        <div style={{ animation: "wSlideUp 0.6s ease-out 0.1s both" }}>
+          <VoydLogo className="h-12 brightness-0 invert" />
+        </div>
+
+        {/* Icon badge */}
+        <div
+          className="flex items-center justify-center w-20 h-20 rounded-2xl border border-green-500/30 bg-green-500/10"
+          style={{ animation: "wPop 0.5s ease-out 0.25s both" }}
+        >
+          <Sparkles className="w-9 h-9 text-green-400" />
+        </div>
+
+        {/* Headline */}
+        <div className="space-y-2" style={{ animation: "wSlideUp 0.6s ease-out 0.4s both" }}>
+          <h1 className="text-3xl sm:text-4xl font-bold text-white tracking-tight">
+            ¡Bienvenido a ClubOS!
+          </h1>
+          <p className="text-zinc-400 text-base max-w-sm">
+            Tu cuenta está activa. Vamos a configurar tu club en unos simples pasos.
+          </p>
+        </div>
+
+        {/* Progress bar */}
+        <div className="flex flex-col items-center gap-3" style={{ animation: "wSlideUp 0.6s ease-out 0.6s both" }}>
+          <div className="w-40 h-0.5 rounded-full bg-zinc-800 overflow-hidden">
+            <div
+              className="h-full bg-green-400 rounded-full"
+              style={{ animation: "wProgress 3s linear 0.65s both" }}
+            />
+          </div>
+          <p className="text-xs text-zinc-600">Tocá en cualquier lugar para continuar</p>
+        </div>
+      </div>
+
+      <style>{`
+        @keyframes wFadeIn {
+          from { opacity: 0; } to { opacity: 1; }
+        }
+        @keyframes wSlideUp {
+          from { opacity: 0; transform: translateY(18px); }
+          to   { opacity: 1; transform: translateY(0); }
+        }
+        @keyframes wPop {
+          from { opacity: 0; transform: scale(0.7); }
+          to   { opacity: 1; transform: scale(1); }
+        }
+        @keyframes wProgress {
+          from { width: 0%; } to { width: 100%; }
+        }
+        @keyframes wParticle {
+          0%   { opacity: 0; transform: translate(-50%, -50%) scale(0); }
+          30%  { opacity: 0.6; }
+          100% { opacity: 0; transform: translate(var(--tx), var(--ty)) scale(1); }
+        }
+      `}</style>
+    </div>
+  )
+}

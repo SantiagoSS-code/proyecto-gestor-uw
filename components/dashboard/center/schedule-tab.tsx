@@ -62,6 +62,7 @@ const formatTimeDisplay = (time: string): string => {
 type CourtsRow = {
   id: string
   name: string
+  sourceCollection?: "centers" | "padel_centers"
   sport?: SportKey
 }
 
@@ -83,7 +84,13 @@ type CourtSchedule = {
   dom: DaySchedule
 }
 
-export function ScheduleTab({ autoSelectCourtId }: { autoSelectCourtId?: string | null }) {
+function ScheduleTab({
+  autoSelectCourtId,
+  onCourtPublishChange,
+}: {
+  autoSelectCourtId?: string | null
+  onCourtPublishChange?: (courtId: string, published: boolean) => void
+}) {
   const { user, centerId, loading: authLoading } = useAuth()
   const resolvedCenterId = centerId || user?.uid || null
   const [courts, setCourts] = useState<CourtsRow[]>([])
@@ -108,22 +115,46 @@ export function ScheduleTab({ autoSelectCourtId }: { autoSelectCourtId?: string 
     const fetchCourts = async () => {
       if (!resolvedCenterId) return
       try {
+        const centerDocRef = doc(db, FIRESTORE_COLLECTIONS.centers, resolvedCenterId)
+        const legacyCenterDocRef = doc(db, FIRESTORE_COLLECTIONS.legacyCenters, resolvedCenterId)
         const centersRef = collection(db, FIRESTORE_COLLECTIONS.centers, resolvedCenterId, CENTER_SUBCOLLECTIONS.courts)
-        const centersSnapshot = await getDocs(centersRef)
-
-        const usingLegacy = centersSnapshot.empty
         const legacyRef = collection(db, FIRESTORE_COLLECTIONS.legacyCenters, resolvedCenterId, CENTER_SUBCOLLECTIONS.courts)
-        const legacySnapshot = usingLegacy ? await getDocs(legacyRef) : null
 
-        const sourceSnapshot = usingLegacy ? legacySnapshot : centersSnapshot
-        const sourceRootCollection = usingLegacy ? FIRESTORE_COLLECTIONS.legacyCenters : FIRESTORE_COLLECTIONS.centers
-        setCourtsRootCollection(sourceRootCollection)
+        const [centerDocSnap, legacyCenterDocSnap, centersSnapshot, legacySnapshot] = await Promise.all([
+          getDoc(centerDocRef),
+          getDoc(legacyCenterDocRef),
+          getDocs(centersRef),
+          getDocs(legacyRef),
+        ])
 
-        const data = (sourceSnapshot?.docs || []).map((docSnap) => ({
-          id: docSnap.id,
-          name: (docSnap.data() as any).name,
-          sport: (docSnap.data() as any).sport,
-        })) as CourtsRow[]
+        const preferredRootCollection = centerDocSnap.exists()
+          ? FIRESTORE_COLLECTIONS.centers
+          : legacyCenterDocSnap.exists()
+            ? FIRESTORE_COLLECTIONS.legacyCenters
+            : FIRESTORE_COLLECTIONS.centers
+        setCourtsRootCollection(preferredRootCollection)
+
+        const mergedCourts = new Map<string, CourtsRow>()
+
+        legacySnapshot.docs.forEach((docSnap) => {
+          mergedCourts.set(docSnap.id, {
+            id: docSnap.id,
+            name: (docSnap.data() as any).name,
+            sport: (docSnap.data() as any).sport,
+            sourceCollection: FIRESTORE_COLLECTIONS.legacyCenters,
+          })
+        })
+
+        centersSnapshot.docs.forEach((docSnap) => {
+          mergedCourts.set(docSnap.id, {
+            id: docSnap.id,
+            name: (docSnap.data() as any).name,
+            sport: (docSnap.data() as any).sport,
+            sourceCollection: FIRESTORE_COLLECTIONS.centers,
+          })
+        })
+
+        const data = Array.from(mergedCourts.values()) as CourtsRow[]
         setCourts(data)
         
         // Si viene autoSelectCourtId, usarlo; si no, usar el primero
@@ -193,9 +224,10 @@ export function ScheduleTab({ autoSelectCourtId }: { autoSelectCourtId?: string 
     const loadSchedule = async () => {
       if (!selectedCourtId || !resolvedCenterId) return
       try {
+        const selectedCourt = courts.find((court) => court.id === selectedCourtId)
         const courtRef = doc(
           db,
-          courtsRootCollection,
+          selectedCourt?.sourceCollection || courtsRootCollection,
           resolvedCenterId,
           CENTER_SUBCOLLECTIONS.courts,
           selectedCourtId
@@ -278,9 +310,10 @@ export function ScheduleTab({ autoSelectCourtId }: { autoSelectCourtId?: string 
     setMessage(null)
 
     try {
+      const selectedCourt = courts.find((court) => court.id === selectedCourtId)
       const courtRef = doc(
         db,
-        courtsRootCollection,
+        selectedCourt?.sourceCollection || courtsRootCollection,
         resolvedCenterId!,
         CENTER_SUBCOLLECTIONS.courts,
         selectedCourtId
@@ -302,14 +335,16 @@ export function ScheduleTab({ autoSelectCourtId }: { autoSelectCourtId?: string 
         },
         { merge: true }
       )
+
+      onCourtPublishChange?.(selectedCourtId, action === "publish")
       
       const actionText = action === "publish" ? "publicada" : "guardada como borrador"
       setPublishDialogOpen(false)
-      showSavePopupAndRefresh(`La cancha fue ${actionText} correctamente.`)
+      showSavePopupAndRefresh(`La cancha fue ${actionText} correctamente.`, "success", false)
       return
     } catch (error) {
       console.error("Error saving schedule:", error)
-      showSavePopupAndRefresh("No se pudieron guardar los horarios. La página se va a recargar.", "error")
+      showSavePopupAndRefresh("No se pudieron guardar los horarios.", "error", false)
       return
     } finally {
       setSaving(false)
@@ -769,3 +804,6 @@ export function ScheduleTab({ autoSelectCourtId }: { autoSelectCourtId?: string 
     </div>
   )
 }
+
+export { ScheduleTab }
+export default ScheduleTab

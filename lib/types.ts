@@ -48,6 +48,14 @@ export interface PadelCenterClient {
     center?: ContactProfile;
     admin?: ContactProfile;
   };
+  shortDescription?: string;
+  coverImageUrl?: string | null;
+  logoUrl?: string | null;
+  amenities?: AmenityKey[];
+  slug?: string;
+  centerCode?: string;
+  published?: boolean;
+  publicationReady?: boolean;
   plan: string;
   status: string;
   createdAt: Date;
@@ -113,9 +121,12 @@ export interface CenterProfile {
   amenities?: AmenityKey[];
   sports?: SportKey[];
   coverImageUrl?: string | null;
+  logoUrl?: string | null;
   galleryImageUrls?: string[];
   slug?: string;
+  centerCode?: string;
   published?: boolean;
+  publicationReady?: boolean;
   classesEnabled?: boolean;
   featuredRank?: number | null;
   topSearchedRank?: number | null;
@@ -167,6 +178,11 @@ export interface OperationSettings {
   peakPriceMultiplier: number;  // e.g. 1.5
   weekendPriceMultiplier: number; // e.g. 1.25
 
+  // Seña de reserva
+  depositEnabled: boolean;
+  depositPercent: number;       // 0-100
+  remainingPaymentInstructions: string;
+
   // Feriados
   holidays: HolidayEntry[];
 
@@ -181,6 +197,34 @@ export interface HolidayEntry {
   closeTime?: string;
 }
 
+// ─── Player-facing booking types ────────────────────────────────────────────
+export type PlayerBookingStatus = "pending_payment" | "confirmed" | "cancelled" | "expired"
+export type PaymentStatus = "pending" | "approved" | "failed"
+
+export interface PlayerBookingDoc {
+  clubId: string
+  clubName: string
+  courtId: string
+  courtName: string
+  sport: string
+  userId: string
+  userName: string
+  userEmail: string
+  date: string        // "YYYY-MM-DD"
+  startTime: string   // "HH:MM"
+  endTime: string     // "HH:MM"
+  durationMinutes: number
+  price: number | null
+  currency: string
+  bookingStatus: PlayerBookingStatus
+  paymentStatus: PaymentStatus
+  createdAt: any
+  expiresAt: any
+  updatedAt?: any
+  source: "test_checkout" | "mercadopago"
+}
+
+// ─── Legacy center-subcollection booking ─────────────────────────────────────
 export type BookingStatus = "pending" | "confirmed" | "cancelled";
 
 export interface BookingDoc {
