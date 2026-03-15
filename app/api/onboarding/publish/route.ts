@@ -58,17 +58,24 @@ export async function POST(request: Request) {
     const centerRef = adminDb.collection("centers").doc(centerId)
     const legacyCenterRef = adminDb.collection("padel_centers").doc(centerId)
     const userRef = adminDb.collection("users").doc(centerId)
-    const courtsRef = adminDb.collection("centers").doc(centerId).collection("courts")
+    const newCourtsRef = adminDb.collection("centers").doc(centerId).collection("courts")
+    const legacyCourtsRef = adminDb.collection("padel_centers").doc(centerId).collection("courts")
 
-    const [centerSnap, userSnap, courtsSnap] = await Promise.all([
+    const [centerSnap, userSnap, newCourtsSnap, legacyCourtsSnap] = await Promise.all([
       centerRef.get(),
       userRef.get(),
-      courtsRef.get(),
+      newCourtsRef.get(),
+      legacyCourtsRef.get(),
     ])
 
     const center = centerSnap.exists ? (centerSnap.data() as any) : {}
     const user = userSnap.exists ? (userSnap.data() as any) : {}
-    const courts = courtsSnap.docs.map((d) => d.data() as any)
+
+    // Merge both collections — same pattern as the rest of the app
+    const mergedCourts = new Map<string, any>()
+    legacyCourtsSnap.docs.forEach((d) => mergedCourts.set(d.id, d.data()))
+    newCourtsSnap.docs.forEach((d) => mergedCourts.set(d.id, d.data()))
+    const courts = Array.from(mergedCourts.values())
 
     const courtsTotal = courts.length
     const courtsPublished = courts.filter((c) => c.published === true).length
@@ -81,7 +88,7 @@ export async function POST(request: Request) {
     }
 
     const reviewPayload = {
-      published: true,
+      published: false,
       reviewStatus: "pending",
       submittedForReviewAt: new Date(),
       updatedAt: new Date(),

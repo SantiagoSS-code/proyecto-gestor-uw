@@ -51,6 +51,7 @@ type CourtForm = {
 type CourtRow = {
   id: string
   name: string
+  sourceCollection?: "centers" | "padel_centers"
   sport?: SportKey
   indoor?: boolean
   lighting?: boolean
@@ -169,24 +170,56 @@ export function CourtsTab({
     const fetchCourts = async () => {
       if (!resolvedCenterId) return
       try {
+        const centerDocRef = doc(db, FIRESTORE_COLLECTIONS.centers, resolvedCenterId)
+        const legacyCenterDocRef = doc(db, FIRESTORE_COLLECTIONS.legacyCenters, resolvedCenterId)
         const centersRef = collection(db, FIRESTORE_COLLECTIONS.centers, resolvedCenterId, CENTER_SUBCOLLECTIONS.courts)
-        const centersSnapshot = await getDocs(centersRef)
-
-        const usingLegacy = centersSnapshot.empty
         const legacyRef = collection(db, FIRESTORE_COLLECTIONS.legacyCenters, resolvedCenterId, CENTER_SUBCOLLECTIONS.courts)
-        const legacySnapshot = usingLegacy ? await getDocs(legacyRef) : null
 
-        const sourceSnapshot = usingLegacy ? legacySnapshot : centersSnapshot
-        const sourceRootCollection = usingLegacy ? FIRESTORE_COLLECTIONS.legacyCenters : FIRESTORE_COLLECTIONS.centers
-        setCourtsRootCollection(sourceRootCollection)
+        const [centerDocSnap, legacyCenterDocSnap, centersSnapshot, legacySnapshot] = await Promise.all([
+          getDoc(centerDocRef),
+          getDoc(legacyCenterDocRef),
+          getDocs(centersRef),
+          getDocs(legacyRef),
+        ])
 
-        const data = (sourceSnapshot?.docs || []).map((docSnap) => ({ id: docSnap.id, ...(docSnap.data() as any) })) as CourtRow[]
+        const preferredRootCollection = centerDocSnap.exists()
+          ? FIRESTORE_COLLECTIONS.centers
+          : legacyCenterDocSnap.exists()
+            ? FIRESTORE_COLLECTIONS.legacyCenters
+            : FIRESTORE_COLLECTIONS.centers
+        setCourtsRootCollection(preferredRootCollection)
+
+        const mergedCourts = new Map<string, CourtRow>()
+
+        legacySnapshot.docs.forEach((docSnap) => {
+          mergedCourts.set(docSnap.id, {
+            id: docSnap.id,
+            ...(docSnap.data() as any),
+            sourceCollection: FIRESTORE_COLLECTIONS.legacyCenters,
+          })
+        })
+
+        centersSnapshot.docs.forEach((docSnap) => {
+          mergedCourts.set(docSnap.id, {
+            id: docSnap.id,
+            ...(docSnap.data() as any),
+            sourceCollection: FIRESTORE_COLLECTIONS.centers,
+          })
+        })
+
+        const data = Array.from(mergedCourts.values()) as CourtRow[]
         
         // Verificar cuáles tienen schedule
         const courtsWithScheduleInfo = await Promise.all(
           data.map(async (court) => {
             try {
-              const courtRef = doc(db, sourceRootCollection, resolvedCenterId, CENTER_SUBCOLLECTIONS.courts, court.id)
+              const courtRef = doc(
+                db,
+                court.sourceCollection || preferredRootCollection,
+                resolvedCenterId,
+                CENTER_SUBCOLLECTIONS.courts,
+                court.id
+              )
               const courtSnap = await getDoc(courtRef)
               const hasSchedule = courtSnap.exists() && !!courtSnap.data()?.schedule
               return { ...court, hasSchedule }
@@ -299,9 +332,11 @@ export function CourtsTab({
       }
 
       if (editingId) {
-        const courtRef = doc(db, courtsRootCollection, resolvedCenterId, CENTER_SUBCOLLECTIONS.courts, editingId)
+        const existingCourt = courts.find((court) => court.id === editingId)
+        const targetCollection = existingCourt?.sourceCollection || courtsRootCollection
+        const courtRef = doc(db, targetCollection, resolvedCenterId, CENTER_SUBCOLLECTIONS.courts, editingId)
         await updateDoc(courtRef, payload)
-        setCourts((prev) => prev.map((c) => (c.id === editingId ? ({ ...c, ...payload } as any) : c)))
+        setCourts((prev) => prev.map((c) => (c.id === editingId ? ({ ...c, ...payload, sourceCollection: targetCollection } as any) : c)))
         resetForm()
         setIsModalOpen(false)
         showSavePopupAndRefresh("Cancha guardada correctamente.")
@@ -309,7 +344,7 @@ export function CourtsTab({
       } else {
         const courtsRef = collection(db, courtsRootCollection, resolvedCenterId, CENTER_SUBCOLLECTIONS.courts)
         const newDoc = await addDoc(courtsRef, { ...payload, createdAt: serverTimestamp() })
-        const newCourt = { id: newDoc.id, ...(payload as any) }
+        const newCourt = { id: newDoc.id, ...(payload as any), sourceCollection: courtsRootCollection }
         setCourts((prev) => [...prev, newCourt])
         resetForm()
         setIsModalOpen(false)
@@ -332,7 +367,9 @@ export function CourtsTab({
     if (!window.confirm("¿Eliminar esta cancha? Esta acción no se puede deshacer.")) return
 
     try {
-      await deleteDoc(doc(db, courtsRootCollection, resolvedCenterId, CENTER_SUBCOLLECTIONS.courts, courtId))
+      const existingCourt = courts.find((court) => court.id === courtId)
+      const targetCollection = existingCourt?.sourceCollection || courtsRootCollection
+      await deleteDoc(doc(db, targetCollection, resolvedCenterId, CENTER_SUBCOLLECTIONS.courts, courtId))
       setCourts((prev) => prev.filter((court) => court.id !== courtId))
     } catch (error) {
       console.error("Error deleting court:", error)

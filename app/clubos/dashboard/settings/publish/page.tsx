@@ -10,7 +10,7 @@ import { FIRESTORE_COLLECTIONS, CENTER_SUBCOLLECTIONS, CENTER_SETTINGS_DOCS } fr
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog"
-import { Loader2, CheckCircle, AlertCircle, PartyPopper } from "lucide-react"
+import { Loader2, CheckCircle, AlertCircle, PartyPopper, Pencil } from "lucide-react"
 import type { OperationSettings } from "@/lib/types"
 
 type OverviewData = {
@@ -53,7 +53,7 @@ type OverviewData = {
 }
 
 export default function PublishOverviewPage() {
-  const { user, loading: authLoading } = useAuth()
+  const { user, centerId, loading: authLoading } = useAuth()
   const { isOnboarding, completeStep } = useOnboarding()
   const router = useRouter()
 
@@ -61,6 +61,7 @@ export default function PublishOverviewPage() {
   const [submitting, setSubmitting] = useState(false)
   const [publishModalOpen, setPublishModalOpen] = useState(false)
   const [error, setError] = useState<string | null>(null)
+  const [modalError, setModalError] = useState<string | null>(null)
   const [success, setSuccess] = useState<string | null>(null)
   const [data, setData] = useState<OverviewData>({
     profile: { firstName: "", lastName: "", email: "", phone: "" },
@@ -93,33 +94,63 @@ export default function PublishOverviewPage() {
     const load = async () => {
       if (!user) return
       try {
-        const userRef = doc(db, "users", user.uid)
-        const centerRef = doc(db, FIRESTORE_COLLECTIONS.centers, user.uid)
+        const resolvedCenterId = centerId || user.uid
+
+        // Read user profile separately – the `users` collection may not be readable
+        // until Firestore rules are deployed, so we must not let it crash the whole load.
+        let userData: any = {}
+        try {
+          const userSnap = await getDoc(doc(db, "users", user.uid))
+          if (userSnap.exists()) userData = userSnap.data() as any
+        } catch {
+          // Fall back to auth object data below
+        }
+
+        const centerRef = doc(db, FIRESTORE_COLLECTIONS.centers, resolvedCenterId)
+        const legacyCenterRef = doc(db, FIRESTORE_COLLECTIONS.legacyCenters, resolvedCenterId)
         const opsRef = doc(
           db,
           FIRESTORE_COLLECTIONS.centers,
-          user.uid,
+          resolvedCenterId,
           CENTER_SUBCOLLECTIONS.settings,
           CENTER_SETTINGS_DOCS.operations
         )
-        const courtsRef = collection(db, FIRESTORE_COLLECTIONS.centers, user.uid, CENTER_SUBCOLLECTIONS.courts)
+        const legacyOpsRef = doc(
+          db,
+          FIRESTORE_COLLECTIONS.legacyCenters,
+          resolvedCenterId,
+          CENTER_SUBCOLLECTIONS.settings,
+          CENTER_SETTINGS_DOCS.operations
+        )
+        const courtsRef = collection(db, FIRESTORE_COLLECTIONS.centers, resolvedCenterId, CENTER_SUBCOLLECTIONS.courts)
+        const legacyCourtsRef = collection(db, FIRESTORE_COLLECTIONS.legacyCenters, resolvedCenterId, CENTER_SUBCOLLECTIONS.courts)
 
-        const [userSnap, centerSnap, opsSnap, courtsSnap] = await Promise.all([
-          getDoc(userRef),
+        const [centerSnap, legacyCenterSnap, opsSnap, legacyOpsSnap, courtsSnap, legacyCourtsSnap] = await Promise.all([
           getDoc(centerRef),
+          getDoc(legacyCenterRef),
           getDoc(opsRef),
+          getDoc(legacyOpsRef),
           getDocs(courtsRef),
+          getDocs(legacyCourtsRef),
         ])
-
-        const userData = userSnap.exists() ? (userSnap.data() as any) : {}
-        const centerData = centerSnap.exists() ? (centerSnap.data() as any) : {}
-        const operationsData = opsSnap.exists() ? (opsSnap.data() as OperationSettings) : null
-        const courts = courtsSnap.docs.map((d) => ({ id: d.id, ...(d.data() as any) }))
+        const centerData = centerSnap.exists()
+          ? (centerSnap.data() as any)
+          : legacyCenterSnap.exists()
+            ? (legacyCenterSnap.data() as any)
+            : {}
+        const operationsData = opsSnap.exists()
+          ? (opsSnap.data() as OperationSettings)
+          : legacyOpsSnap.exists()
+            ? (legacyOpsSnap.data() as OperationSettings)
+            : null
+        const baseCourts = courtsSnap.docs.map((d) => ({ id: d.id, ...(d.data() as any) }))
+        const legacyCourts = legacyCourtsSnap.docs.map((d) => ({ id: d.id, ...(d.data() as any) }))
+        const courts = baseCourts.length > 0 ? baseCourts : legacyCourts
 
         setData({
           profile: {
-            firstName: userData.firstName || userData.first_name || "",
-            lastName: userData.lastName || userData.last_name || "",
+            firstName: userData.firstName || userData.first_name || user.displayName?.split(" ")[0] || "",
+            lastName: userData.lastName || userData.last_name || user.displayName?.split(" ").slice(1).join(" ") || "",
             email: userData.email || user.email || "",
             phone: userData.phone || "",
           },
@@ -168,7 +199,7 @@ export default function PublishOverviewPage() {
     }
 
     if (user && !authLoading) load()
-  }, [user, authLoading])
+  }, [user, centerId, authLoading])
 
   const checks = useMemo(() => {
     const profileReady =
@@ -210,9 +241,16 @@ export default function PublishOverviewPage() {
     }
   }
 
+  const handleEditClick = (event: React.MouseEvent<HTMLButtonElement>, href: string) => {
+    event.preventDefault()
+    event.stopPropagation()
+    handleSectionNavigate(href)
+  }
+
   const handlePublish = async () => {
     if (!user) return
     setSubmitting(true)
+    setModalError(null)
     setError(null)
     setSuccess(null)
 
@@ -239,10 +277,8 @@ export default function PublishOverviewPage() {
       }
 
       setPublishModalOpen(false)
-      setSuccess("¡Centro enviado a revisión! Te notificaremos cuando esté aprobado.")
-      router.push("/clubos/dashboard")
     } catch (e: any) {
-      setError(e?.message || "No se pudo publicar. Intentá nuevamente.")
+      setModalError(e?.message || "No se pudo publicar. Intentá nuevamente.")
     } finally {
       setSubmitting(false)
     }
@@ -304,7 +340,13 @@ export default function PublishOverviewPage() {
                 <CardTitle>1. Mi cuenta</CardTitle>
                 <CardDescription>Datos personales y de acceso.</CardDescription>
               </div>
-              {sectionStatus(checks.profileReady)}
+              <div className="flex items-center gap-2">
+                {sectionStatus(checks.profileReady)}
+                <Button variant="outline" size="sm" onClick={(event) => handleEditClick(event, "/clubos/dashboard/settings/profile")}>
+                  <Pencil className="w-4 h-4 mr-2" />
+                  Editar
+                </Button>
+              </div>
             </div>
           </CardHeader>
           <CardContent className="text-sm text-slate-700 grid grid-cols-1 md:grid-cols-2 gap-3">
@@ -327,7 +369,13 @@ export default function PublishOverviewPage() {
                 <CardTitle>2. Centro</CardTitle>
                 <CardDescription>Información pública de tu club.</CardDescription>
               </div>
-              {sectionStatus(checks.centerReady)}
+              <div className="flex items-center gap-2">
+                {sectionStatus(checks.centerReady)}
+                <Button variant="outline" size="sm" onClick={(event) => handleEditClick(event, "/clubos/dashboard/settings")}>
+                  <Pencil className="w-4 h-4 mr-2" />
+                  Editar
+                </Button>
+              </div>
             </div>
           </CardHeader>
           <CardContent className="text-sm text-slate-700 space-y-4">
@@ -374,7 +422,13 @@ export default function PublishOverviewPage() {
                 <CardTitle>3. Operación</CardTitle>
                 <CardDescription>Reglas de reserva, cancelación y precios.</CardDescription>
               </div>
-              {sectionStatus(checks.operationsReady)}
+              <div className="flex items-center gap-2">
+                {sectionStatus(checks.operationsReady)}
+                <Button variant="outline" size="sm" onClick={(event) => handleEditClick(event, "/clubos/dashboard/settings/operacion")}>
+                  <Pencil className="w-4 h-4 mr-2" />
+                  Editar
+                </Button>
+              </div>
             </div>
           </CardHeader>
           <CardContent className="text-sm text-slate-700">
@@ -416,7 +470,13 @@ export default function PublishOverviewPage() {
                 <CardTitle>4. Canchas</CardTitle>
                 <CardDescription>Listado completo de canchas cargadas.</CardDescription>
               </div>
-              {sectionStatus(checks.courtsReady)}
+              <div className="flex items-center gap-2">
+                {sectionStatus(checks.courtsReady)}
+                <Button variant="outline" size="sm" onClick={(event) => handleEditClick(event, "/clubos/dashboard/courts")}>
+                  <Pencil className="w-4 h-4 mr-2" />
+                  Editar
+                </Button>
+              </div>
             </div>
           </CardHeader>
           <CardContent className="text-sm text-slate-700 space-y-3">
@@ -469,7 +529,7 @@ export default function PublishOverviewPage() {
         </Button>
       </div>
 
-      <Dialog open={publishModalOpen} onOpenChange={setPublishModalOpen}>
+      <Dialog open={publishModalOpen} onOpenChange={(open) => { if (!open) setModalError(null); setPublishModalOpen(open) }}>
         <DialogContent className="sm:max-w-lg overflow-hidden" showCloseButton={!submitting}>
           <div className="relative">
             <div className="absolute -top-10 -left-8 h-24 w-24 rounded-full bg-blue-200/40 blur-xl animate-pulse" />
@@ -498,6 +558,13 @@ export default function PublishOverviewPage() {
                 Te avisaremos cuando esté aprobado y listo para recibir reservas.
               </p>
             </div>
+
+            {modalError && (
+              <div className="mt-4 flex items-center gap-2 rounded-lg border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-800">
+                <AlertCircle className="w-4 h-4 shrink-0" />
+                {modalError}
+              </div>
+            )}
 
             <DialogFooter className="mt-6 sm:justify-center gap-2">
               <Button variant="outline" onClick={() => setPublishModalOpen(false)} disabled={submitting}>

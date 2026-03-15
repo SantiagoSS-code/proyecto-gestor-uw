@@ -2,12 +2,16 @@
 
 import { useMemo, useState, useEffect } from "react"
 import { useRouter, useSearchParams } from "next/navigation"
+import { collection, getDocs } from "firebase/firestore"
+import { db } from "@/lib/firebaseClient"
+import { useAuth } from "@/lib/auth-context"
 import { CourtsLayout } from "@/components/dashboard/courts-layout"
 import { cn } from "@/lib/utils"
 import { Button } from "@/components/ui/button"
 import { CourtsTab } from "@/components/dashboard/center/courts-tab"
-import { ScheduleTab } from "@/components/dashboard/center/schedule-tab"
+import ScheduleTab from "@/components/dashboard/center/schedule-tab"
 import { useOnboarding } from "@/lib/onboarding"
+import { FIRESTORE_COLLECTIONS, CENTER_SUBCOLLECTIONS } from "@/lib/firestorePaths"
 
 const TABS = [
   { key: "courts", label: "Canchas" },
@@ -20,11 +24,36 @@ export default function CourtsTabsClient() {
   const searchParams = useSearchParams()
   const router = useRouter()
   const { isOnboarding, completeStep } = useOnboarding()
+  const { user, centerId } = useAuth()
+  const resolvedCenterId = centerId || user?.uid || null
   const [justCreatedCourtId, setJustCreatedCourtId] = useState<string | null>(null)
   const [courtsStats, setCourtsStats] = useState<{ total: number; published: number }>({ total: 0, published: 0 })
   const [tab, setTabState] = useState<TabKey>("courts")
   const activeTab: TabKey = useMemo(() => (TABS.some((t) => t.key === tab) ? tab : "courts"), [tab])
   const canAdvanceToPublish = courtsStats.total > 0 && courtsStats.published === courtsStats.total
+
+  // Initialize courts stats from Firestore so the "Siguiente: Publicar" button
+  // works correctly even when the user lands directly on ?tab=schedule.
+  useEffect(() => {
+    const fetchStats = async () => {
+      if (!resolvedCenterId) return
+      try {
+        const newRef = collection(db, FIRESTORE_COLLECTIONS.centers, resolvedCenterId, CENTER_SUBCOLLECTIONS.courts)
+        const legacyRef = collection(db, FIRESTORE_COLLECTIONS.legacyCenters, resolvedCenterId, CENTER_SUBCOLLECTIONS.courts)
+        const [newSnap, legacySnap] = await Promise.all([getDocs(newRef), getDocs(legacyRef)])
+        const merged = new Map<string, any>()
+        legacySnap.docs.forEach((docSnap) => merged.set(docSnap.id, docSnap.data()))
+        newSnap.docs.forEach((docSnap) => merged.set(docSnap.id, docSnap.data()))
+        const courts = Array.from(merged.values())
+        const total = courts.length
+        const published = courts.filter((court) => court?.published === true).length
+        setCourtsStats({ total, published })
+      } catch {
+        // Ignore – stats will be updated via onCourtsStatsChange / onCourtPublishChange
+      }
+    }
+    fetchStats()
+  }, [resolvedCenterId])
 
   useEffect(() => {
     const tabFromParams = (searchParams?.get("tab") as TabKey) || "courts"
@@ -48,6 +77,18 @@ export default function CourtsTabsClient() {
 
     // Auto-switch to schedule tab after creating a court.
     setTab("schedule")
+  }
+
+  const handleCourtPublishChange = (courtId: string, published: boolean) => {
+    setCourtsStats((current) => {
+      const nextPublished = published
+        ? current.published + 1
+        : Math.max(0, current.published - 1)
+      // Ensure total is at least as large as the new published count (safety guard
+      // for when CourtsTab never reported stats because the user landed on ?tab=schedule).
+      const nextTotal = Math.max(current.total, nextPublished)
+      return { total: nextTotal, published: nextPublished }
+    })
   }
 
   const handleNextOnboardingStep = async () => {
@@ -91,7 +132,7 @@ export default function CourtsTabsClient() {
       </div>
 
       {activeTab === "courts" ? <CourtsTab onCourtCreated={handleCourtCreated} onCourtsStatsChange={setCourtsStats} /> : null}
-      {activeTab === "schedule" ? <ScheduleTab autoSelectCourtId={justCreatedCourtId} /> : null}
+      {activeTab === "schedule" ? <ScheduleTab autoSelectCourtId={justCreatedCourtId} onCourtPublishChange={handleCourtPublishChange} /> : null}
 
       {isOnboarding && (
         <div className="mt-6 flex justify-end">
