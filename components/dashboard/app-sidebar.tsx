@@ -10,6 +10,7 @@ import {
   Users,
   Wallet,
   BarChart3,
+  GraduationCap,
   MessageSquare,
   CheckSquare,
   UserCircle2,
@@ -39,6 +40,7 @@ const primaryItems = [
   { icon: Calendar, label: "Reservas", href: "/clubos/dashboard/reservas" },
   { icon: Grid3X3, label: "Canchas", href: "/clubos/dashboard/courts" },
   { icon: Users, label: "Clientes", href: "/clubos/dashboard/customers" },
+  { icon: GraduationCap, label: "Cursos", href: "/clubos/dashboard/cursos" },
   { icon: Wallet, label: "Finanzas", href: "/clubos/dashboard/finanzas" },
   { icon: BarChart3, label: "Reportes", href: "/clubos/dashboard/reportes" },
 ]
