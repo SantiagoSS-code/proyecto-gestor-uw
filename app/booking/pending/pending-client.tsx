@@ -42,7 +42,7 @@ export default function BookingPendingClient() {
             <Link href="/">
               <Button variant="outline">Volver al inicio</Button>
             </Link>
-            <Link href="/clubs">
+            <Link href="/centros">
               <Button>Ver más clubes</Button>
             </Link>
           </div>

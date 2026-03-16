@@ -45,6 +45,7 @@ export async function GET(req: NextRequest) {
         paymentStatus: data.paymentStatus ?? "pending",
         createdAt: data.createdAt?.toDate?.()?.toISOString() ?? null,
         expiresAt: data.expiresAt?.toDate?.()?.toISOString() ?? null,
+        reviewSubmitted: data.reviewSubmitted === true,
       }
     })
 

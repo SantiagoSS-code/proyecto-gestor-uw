@@ -3,9 +3,8 @@ import { Footer } from "@/components/footer"
 import { ClubDetail } from "@/components/clubs/club-detail"
 import { use } from "react"
 
-export default function ClubDetailPage({ params }: { params: Promise<{ slug: string }> }) {
+export default function CentroDetailPage({ params }: { params: Promise<{ slug: string }> }) {
   const { slug } = use(params)
-
   return (
     <main className="min-h-screen bg-background">
       <Header />

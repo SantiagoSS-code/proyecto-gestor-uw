@@ -855,13 +855,13 @@ export function ClubProfileTab() {
                   <RefreshCw className="w-4 h-4" />
                 </Button>
               </div>
-              <div className="text-xs text-black mt-1">URL pública: /clubs/{form.slug || "…"}</div>
+              <div className="text-xs text-black mt-1">URL pública: /centros/{form.slug || "…"}</div>
             </div>
             <div>
               <Label>Publicar</Label>
               <div className="mt-2 flex items-center gap-2 text-sm text-black">
                 <input type="checkbox" checked={!!form.published} onChange={(e) => setForm({ ...form, published: e.target.checked })} />
-                Visible en /clubs
+                Visible en /centros
               </div>
             </div>
           </div>

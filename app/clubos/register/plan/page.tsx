@@ -2,6 +2,7 @@
 
 import { useMemo, useRef, useState } from "react"
 import { useRouter, useSearchParams } from "next/navigation"
+import { Suspense } from "react"
 import { VoydLogo } from "@/components/ui/voyd-logo"
 import { Check, Zap, Building2, Trophy, ChevronLeft, ChevronRight, ArrowRight, RefreshCw } from "lucide-react"
 import { cn } from "@/lib/utils"
@@ -96,7 +97,7 @@ function formatPrice(price: number) {
     .replace("ARS", "$")
 }
 
-export default function ClubOSRegisterPlanPage() {
+function ClubOSRegisterPlanPageInner() {
   const router = useRouter()
   const searchParams = useSearchParams()
   const centerId = useMemo(() => String(searchParams.get("centerId") || ""), [searchParams])
@@ -359,5 +360,13 @@ export default function ClubOSRegisterPlanPage() {
         </p>
       </div>
     </main>
+  )
+}
+
+export default function ClubOSRegisterPlanPage() {
+  return (
+    <Suspense fallback={null}>
+      <ClubOSRegisterPlanPageInner />
+    </Suspense>
   )
 }

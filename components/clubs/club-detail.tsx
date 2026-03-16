@@ -7,7 +7,6 @@ import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import {
-  Building2,
   Calendar,
   ChevronLeft,
   ChevronRight,
@@ -22,7 +21,6 @@ import {
   ShoppingBag,
   Info,
   Star,
-  Clock,
   ArrowLeft,
   X,
 } from "lucide-react"
@@ -34,7 +32,7 @@ import {
   loadActiveBookingsForDate,
   type BookingSlotInfo,
 } from "@/lib/booking-service"
-import { useRouter } from "next/navigation"
+import { useRouter, useSearchParams } from "next/navigation"
 import Link from "next/link"
 
 type CenterResult = { id: string; data: CenterProfile }
@@ -387,6 +385,7 @@ function CalendarDropdown({
 
 export function ClubDetail({ slug }: { slug: string }) {
   const router = useRouter()
+  const searchParams = useSearchParams()
   const [loading, setLoading] = useState(true)
   const [centerId, setCenterId] = useState<string | null>(null)
   const [center, setCenter] = useState<CenterProfile | null>(null)
@@ -394,9 +393,18 @@ export function ClubDetail({ slug }: { slug: string }) {
   const [settings, setSettings] = useState<BookingSettings | null>(null)
   const [operationSettings, setOperationSettings] = useState<OperationSettings | null>(null)
   const [classes, setClasses] = useState<ClassDoc[]>([])
-  const [selectedDate, setSelectedDate] = useState<string>(getDateKeyInTimeZone("America/Argentina/Buenos_Aires"))
+  const [selectedDate, setSelectedDate] = useState<string>(() => {
+    const dateParam = searchParams.get("date")
+    if (dateParam && /^\d{4}-\d{2}-\d{2}$/.test(dateParam)) {
+      const d = new Date(`${dateParam}T00:00:00`)
+      if (!isNaN(d.getTime())) return dateParam
+    }
+    return getDateKeyInTimeZone("America/Argentina/Buenos_Aires")
+  })
   const [selectedSport, setSelectedSport] = useState<SportKey | "">("")
-  const [slotPreview, setSlotPreview] = useState<{ courtId: string; startTime: string; duration: number; anchorTop: number; anchorLeft: number } | null>(null)
+  const [slotPreview, setSlotPreview] = useState<{ courtId: string; startTime: string; duration: number } | null>(null)
+  const [confirmedSlot, setConfirmedSlot] = useState<{ courtId: string; startTime: string; duration: number } | null>(null)
+  const [popoverPos, setPopoverPos] = useState<{ top: number; left: number } | null>(null)
   const [bookings, setBookings] = useState<BookingSlotInfo[]>([])
   const [bookingLoading, setBookingLoading] = useState(false)
   const [activeImageIndex, setActiveImageIndex] = useState(0)
@@ -405,20 +413,70 @@ export function ClubDetail({ slug }: { slug: string }) {
 
   const gridRef = useRef<HTMLDivElement>(null)
   const slotPreviewPopoverRef = useRef<HTMLDivElement>(null)
+  const hasScrolledToTimeRef = useRef(false)
 
   useEffect(() => {
     const load = async () => {
       try {
         const found = await findCenterBySlug(slug)
         if (!found) { setCenter(null); return }
-        setCenterId(found.id)
-        setCenter(found.data)
+
         const [courtsData, bookingSettings, operationsData, classesData] = await Promise.all([
           loadCourts(found.id),
           loadBookingSettings(found.id),
           loadOperationSettings(found.id),
           loadClasses(found.id),
         ])
+
+        // Restore slot draft saved before login redirect
+        const draftRaw = typeof window !== "undefined" ? sessionStorage.getItem("voyd_slot_draft") : null
+        if (draftRaw) {
+          try {
+            const draft = JSON.parse(draftRaw)
+            if (draft.slug === slug) {
+              sessionStorage.removeItem("voyd_slot_draft")
+
+              // Auto-checkout: user was redirected to login, now they're back — skip the center page
+              if (draft.autoCheckout && draft.courtId && draft.startTime && draft.duration) {
+                const user = auth.currentUser
+                const court = courtsData.find((c) => c.id === draft.courtId)
+                if (user && court) {
+                  const durationMinutes = Math.round(draft.duration * 60)
+                  const price = court.data.pricePerHour ?? null
+                  const currency = court.data.currency || "ARS"
+                  const totalPrice = typeof price === "number" ? price * draft.duration : null
+                  const bookingId = await createPendingBooking({
+                    clubId: found.id,
+                    clubName: found.data.name,
+                    courtId: draft.courtId,
+                    courtName: court.data.name,
+                    sport: court.data.sport || draft.sport || "padel",
+                    userId: user.uid,
+                    userName: user.displayName || "Jugador",
+                    userEmail: user.email || "",
+                    date: draft.date,
+                    startTime: draft.startTime,
+                    durationMinutes,
+                    price: totalPrice,
+                    currency,
+                  })
+                  window.location.href = `/checkout/test/${bookingId}`
+                  return
+                }
+              }
+
+              // Fallback: just restore selection on the center page
+              if (draft.date) setSelectedDate(draft.date)
+              if (draft.sport) setSelectedSport(draft.sport as SportKey)
+              if (draft.courtId && draft.startTime && draft.duration) {
+                setConfirmedSlot({ courtId: draft.courtId, startTime: draft.startTime, duration: draft.duration })
+              }
+            }
+          } catch { /* ignore corrupt draft */ }
+        }
+
+        setCenterId(found.id)
+        setCenter(found.data)
         setCourts(courtsData)
         setClasses(classesData)
         setOperationSettings(operationsData)
@@ -447,6 +505,29 @@ export function ClubDetail({ slug }: { slug: string }) {
     document.addEventListener("mousedown", handleOutsideClick)
     return () => document.removeEventListener("mousedown", handleOutsideClick)
   }, [slotPreview])
+
+  /* Recompute popover position from the live DOM element whenever the selected slot or courts change */
+  useEffect(() => {
+    if (!slotPreview) { setPopoverPos(null); return }
+    const { courtId, startTime } = slotPreview
+    const compute = () => {
+      const el = document.querySelector<HTMLElement>(
+        `[data-court-id="${courtId}"][data-slot-time="${startTime}"]`
+      )
+      if (!el) return
+      const rect = el.getBoundingClientRect()
+      const popoverWidth = 256
+      const top = rect.bottom + window.scrollY + 8
+      const left = Math.max(8, Math.min(rect.left + window.scrollX - popoverWidth / 4, window.innerWidth + window.scrollX - popoverWidth - 8))
+      setPopoverPos({ top, left })
+    }
+    requestAnimationFrame(compute)
+    const grid = gridRef.current
+    const onGridScroll = () => requestAnimationFrame(compute)
+    grid?.addEventListener("scroll", onGridScroll)
+    return () => grid?.removeEventListener("scroll", onGridScroll)
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [slotPreview?.courtId, slotPreview?.startTime, courts])
 
   const gallery = useMemo(() => (center ? getGallery(center) : []), [center])
   const placeId = center?.placeId?.trim() || center?.googlePlaceId?.trim() || null
@@ -512,6 +593,22 @@ export function ClubDetail({ slug }: { slug: string }) {
     if (effectiveDayConfig.closed) return [] as string[]
     return buildTimeSlots(effectiveDayConfig.open, effectiveDayConfig.close, GRID_INTERVAL_MINUTES)
   }, [effectiveDayConfig])
+
+  /* Auto-scroll grid to requested time on first render */
+  useEffect(() => {
+    const timeParam = searchParams.get("time")
+    if (!timeParam || hasScrolledToTimeRef.current || loading || !slots.length || !gridRef.current) return
+    const match = timeParam.match(/^(\d{1,2}):(\d{2})$/)
+    if (!match) return
+    const targetMinutes = parseInt(match[1]) * 60 + parseInt(match[2])
+    const openMinutes = timeToMinutes(slots[0])
+    const offsetMinutes = targetMinutes - openMinutes
+    if (offsetMinutes > 0) {
+      // w-28 = 112px per full hour in the grid
+      gridRef.current.scrollLeft = Math.floor((offsetMinutes / 60) * 112)
+    }
+    hasScrolledToTimeRef.current = true
+  }, [loading, slots, searchParams])
 
   const timeZone = settings?.timezone || "America/Argentina/Buenos_Aires"
   const todayKey = getDateKeyInTimeZone(timeZone)
@@ -595,16 +692,22 @@ export function ClubDetail({ slug }: { slug: string }) {
 
   /* ---- Computed page data ---- */
 
-  const locationAddress = center.location?.fullAddress || [center.address, center.city, center.country].filter(Boolean).join(", ")
+  const locationAddress = (() => {
+    if (center.location?.fullAddress) return center.location.fullAddress
+    const parts = [center.address, center.city, center.country].filter(Boolean) as string[]
+    // Deduplicate consecutive identical parts (handles "Buenos Aires, Buenos Aires, Argentina, Buenos Aires, Argentina")
+    const deduped = parts.filter((p, i) => parts.indexOf(p) === i)
+    return deduped.join(", ")
+  })()
   const mapLink = hasPlaceId ? `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(locationAddress)}&query_place_id=${placeId}` : null
   const mapSrc = hasPlaceId ? `https://www.google.com/maps/embed/v1/place?key=${process.env.NEXT_PUBLIC_GOOGLE_MAPS_API_KEY}&q=place_id:${placeId}&zoom=16` : null
   const amenities = (center.amenities || []).filter((a) => a in amenityMeta)
   const heroCover = getCenterCover(center)
 
-  const selectedCourt = slotPreview ? courts.find((c) => c.id === slotPreview.courtId) : null
+  const selectedCourt = confirmedSlot ? courts.find((c) => c.id === confirmedSlot.courtId) : null
   const selectedPrice = selectedCourt?.data.pricePerHour
   const selectedCurrency = selectedCourt?.data.currency || "ARS"
-  const selectedDurationHours = slotPreview?.duration || defaultDurationHours
+  const selectedDurationHours = confirmedSlot?.duration || defaultDurationHours
   const totalPrice = typeof selectedPrice === "number" ? selectedPrice * selectedDurationHours : null
 
   const formatPriceNumber = (value: number | null | undefined) => {
@@ -615,19 +718,32 @@ export function ClubDetail({ slug }: { slug: string }) {
   /* ---- Booking action ---- */
 
   const handleReservar = async () => {
-    if (!slotPreview || !selectedCourt || !centerId || !center) return
+    if (!confirmedSlot || !selectedCourt || !centerId || !center) return
     const user = auth.currentUser
     if (!user) {
       const currentPath = `${window.location.pathname}${window.location.search}`
+      // Persist slot selection so it can be restored after the user logs in and returns
+      sessionStorage.setItem(
+        "voyd_slot_draft",
+        JSON.stringify({
+          slug,
+          courtId: confirmedSlot.courtId,
+          startTime: confirmedSlot.startTime,
+          duration: confirmedSlot.duration,
+          date: selectedDate,
+          sport: selectedSport,
+          autoCheckout: true,
+        })
+      )
       window.location.href = `/players/login?next=${encodeURIComponent(currentPath)}`
       return
     }
 
     // Check slot is still free
-    const slotStartMin = timeToMinutes(slotPreview.startTime)
-    const slotEndMin = slotStartMin + Math.round(slotPreview.duration * 60)
+    const slotStartMin = timeToMinutes(confirmedSlot.startTime)
+    const slotEndMin = slotStartMin + Math.round(confirmedSlot.duration * 60)
     const hasConflict = bookings.some((b) => {
-      if (b.courtId !== slotPreview.courtId) return false
+      if (b.courtId !== confirmedSlot.courtId) return false
       const bStart = timeToMinutes(b.startTime)
       const bEnd = timeToMinutes(b.endTime)
       return bStart < slotEndMin && bEnd > slotStartMin
@@ -640,18 +756,18 @@ export function ClubDetail({ slug }: { slug: string }) {
     setCheckoutLoading(true)
     setCheckoutError(null)
     try {
-      const durationMinutes = Math.round(slotPreview.duration * 60)
+      const durationMinutes = Math.round(confirmedSlot.duration * 60)
       const bookingId = await createPendingBooking({
         clubId: centerId,
         clubName: center.name,
-        courtId: slotPreview.courtId,
+        courtId: confirmedSlot.courtId,
         courtName: selectedCourt.data.name,
         sport: selectedCourt.data.sport || selectedSport || "padel",
         userId: user.uid,
         userName: user.displayName || "Jugador",
         userEmail: user.email || "",
         date: selectedDate,
-        startTime: slotPreview.startTime,
+        startTime: confirmedSlot.startTime,
         durationMinutes,
         price: totalPrice,
         currency: selectedCurrency,
@@ -734,85 +850,66 @@ export function ClubDetail({ slug }: { slug: string }) {
               </div>
             )}
 
-            {center.rating && (
-              <div className="absolute top-4 right-4 flex items-center gap-1 bg-background/90 backdrop-blur-sm px-2.5 py-1 rounded-full">
-                <Star className="w-3.5 h-3.5 text-primary fill-primary" />
-                <span className="text-sm font-medium text-foreground">{typeof center.rating === "number" ? center.rating.toFixed(1) : center.rating}</span>
-              </div>
-            )}
           </div>
 
           {/* Info Card */}
-          <div className="flex flex-col gap-4">
+          <div className="flex flex-col gap-5">
+
+            {/* Name + rating */}
             <div>
-              <h1 className="text-3xl font-bold text-foreground">{center.name}</h1>
-              <div className="mt-3 space-y-2">
-                <div className="flex items-start gap-2">
-                  <MapPin className="w-4 h-4 text-primary mt-0.5 shrink-0" />
-                  {mapLink ? (
-                    <a href={mapLink} target="_blank" rel="noreferrer" className="text-sm text-primary hover:underline leading-relaxed">
-                      {locationAddress || "Ubicaci\u00f3n por definir"}
-                    </a>
-                  ) : (
-                    <span className="text-sm text-muted-foreground leading-relaxed">{locationAddress || "Ubicaci\u00f3n por definir"}</span>
-                  )}
-                </div>
-                <div className="flex items-center gap-2">
-                  <Building2 className="w-4 h-4 text-primary" />
-                  <span className="text-sm text-muted-foreground">{courts.length} cancha{courts.length !== 1 ? "s" : ""}</span>
-                </div>
-                {settings?.timezone && (
-                  <div className="flex items-center gap-2">
-                    <Clock className="w-4 h-4 text-primary" />
-                    <span className="text-sm text-muted-foreground">{settings.timezone}</span>
+              <div className="flex items-start justify-between gap-3">
+                <h1 className="text-3xl font-bold text-foreground leading-tight">{center.name}</h1>
+                {center.rating && (
+                  <div className="flex items-center gap-1 shrink-0 mt-1">
+                    <Star className="w-4 h-4 text-amber-400 fill-amber-400" />
+                    <span className="text-base font-semibold text-foreground">{typeof center.rating === "number" ? center.rating.toFixed(1) : center.rating}</span>
                   </div>
+                )}
+              </div>
+
+              {/* Address */}
+              <div className="mt-2 flex items-start gap-2">
+                <MapPin className="w-4 h-4 text-muted-foreground mt-0.5 shrink-0" />
+                {mapLink ? (
+                  <a href={mapLink} target="_blank" rel="noreferrer" className="text-sm text-primary hover:underline leading-relaxed">
+                    {locationAddress || "Ubicaci\u00f3n por definir"}
+                  </a>
+                ) : (
+                  <span className="text-sm text-muted-foreground leading-relaxed">{locationAddress || "Ubicaci\u00f3n por definir"}</span>
                 )}
               </div>
             </div>
 
+            {/* Sport chips — prominent, no section label */}
             {availableSports.length > 0 && (
-              <div>
-                <p className="text-xs font-medium text-muted-foreground uppercase tracking-wider mb-2">Deportes</p>
-                <div className="flex flex-wrap gap-2">
-                  {availableSports.map((s) => (
-                    <span key={s} className="inline-flex items-center rounded-full bg-primary/10 text-primary px-3 py-1 text-xs font-medium">
-                      {sportLabels[s as SportKey] || s}
-                    </span>
-                  ))}
-                </div>
+              <div className="flex flex-wrap gap-2">
+                {availableSports.map((s) => (
+                  <span key={s} className="inline-flex items-center rounded-full border border-border bg-secondary text-foreground px-3 py-1 text-sm font-medium">
+                    {sportLabels[s as SportKey] || s}
+                  </span>
+                ))}
               </div>
             )}
 
+            {/* Amenities — single scrollable row of icon+label pills */}
             {amenities.length > 0 && (
               <div>
                 <p className="text-xs font-medium text-muted-foreground uppercase tracking-wider mb-2">Amenities</p>
-                <div className="grid grid-cols-2 gap-1.5">
+                <div className="flex flex-wrap gap-2">
                   {amenities.map((a) => {
                     const meta = amenityMeta[a as AmenityKey]
                     const Icon = meta.Icon
                     return (
-                      <div key={a} className="flex items-center gap-2 text-sm text-foreground">
-                        <Icon className="w-3.5 h-3.5 text-primary" />
-                        <span>{meta.label}</span>
-                      </div>
+                      <span key={a} className="inline-flex items-center gap-1.5 rounded-full border border-border/60 bg-secondary/50 px-3 py-1 text-xs text-foreground">
+                        <Icon className="w-3 h-3 text-muted-foreground" />
+                        {meta.label}
+                      </span>
                     )
                   })}
                 </div>
               </div>
             )}
 
-            {slots.length > 0 && (
-              <div className="mt-auto grid grid-cols-2 gap-2">
-                <div className="rounded-xl bg-emerald-50 dark:bg-emerald-950/30 border border-emerald-200/50 p-3 text-center">
-                  <p className="text-xl font-bold text-emerald-700 dark:text-emerald-400">{freeSlots}</p>
-                  <p className="text-xs text-emerald-600 dark:text-emerald-500">Disponibles</p>
-                </div>
-                <div className="rounded-xl bg-secondary border border-border/50 p-3 text-center">
-                  <p className="text-xl font-bold text-foreground">{bookedSlots}</p>
-                  <p className="text-xs text-muted-foreground">Ocupados</p>
-                </div>
-              </div>
-            )}
           </div>
         </div>
 
@@ -823,13 +920,11 @@ export function ClubDetail({ slug }: { slug: string }) {
               <div className="flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
                 <div>
                   <CardTitle className="text-lg font-semibold text-slate-900">Disponibilidad de canchas</CardTitle>
-                  <p className="text-sm text-slate-600 mt-1">
-                    Vista de reservas y cupos disponibles por horario
-                  </p>
+                  <p className="text-sm text-slate-500 mt-1">Seleccioná un horario para reservar</p>
                 </div>
                 <div className="flex flex-wrap items-center gap-3">
                   {availableSports.length > 1 && (
-                    <Select value={selectedSport} onValueChange={(v) => { setSelectedSport(v as SportKey); setSlotPreview(null) }}>
+                    <Select value={selectedSport} onValueChange={(v) => { setSelectedSport(v as SportKey); setSlotPreview(null); setConfirmedSlot(null) }}>
                       <SelectTrigger className="w-[150px] border-slate-300">
                         <SelectValue placeholder="Deporte" />
                       </SelectTrigger>
@@ -844,23 +939,19 @@ export function ClubDetail({ slug }: { slug: string }) {
                   <div className="flex items-center gap-1">
                     <button
                       className="h-9 w-9 rounded border border-slate-300 flex items-center justify-center hover:bg-slate-100 transition-colors"
-                      onClick={() => { setSelectedDate((d) => addDays(d, -1)); setSlotPreview(null) }}
+                      onClick={() => { setSelectedDate((d) => addDays(d, -1)); setSlotPreview(null); setConfirmedSlot(null) }}
                       aria-label="D\u00eda anterior"
                     >
                       <ChevronLeft className="h-4 w-4" />
                     </button>
-                    <CalendarDropdown selectedDate={selectedDate} onSelect={(d) => { setSelectedDate(d); setSlotPreview(null) }} />
+                    <CalendarDropdown selectedDate={selectedDate} onSelect={(d) => { setSelectedDate(d); setSlotPreview(null); setConfirmedSlot(null) }} />
                     <button
                       className="h-9 w-9 rounded border border-slate-300 flex items-center justify-center hover:bg-slate-100 transition-colors"
-                      onClick={() => { setSelectedDate((d) => addDays(d, 1)); setSlotPreview(null) }}
+                      onClick={() => { setSelectedDate((d) => addDays(d, 1)); setSlotPreview(null); setConfirmedSlot(null) }}
                       aria-label="D\u00eda siguiente"
                     >
                       <ChevronRight className="h-4 w-4" />
                     </button>
-                  </div>
-
-                  <div className="text-xs text-slate-500 hidden md:block">
-                    {weekdayByIndex[Number(dayIndex)]?.label}
                   </div>
 
                   {bookingLoading && (
@@ -947,28 +1038,37 @@ export function ClubDetail({ slug }: { slug: string }) {
                                 const slotStartingBookings = courtBookingsForDay.filter(startsInThisSlot)
                                 const slotHasAnyBooking = courtBookingsForDay.some(intersectsThisSlot)
 
-                                // Preview logic (matches dashboard)
+                                // Confirmed selection logic
+                                const isCoveredByConfirmed = confirmedSlot?.courtId === court.id && (() => {
+                                  const cs = timeToDecimal(confirmedSlot!.startTime)
+                                  const ce = cs + confirmedSlot!.duration
+                                  return slotStartDec >= cs && slotStartDec < ce
+                                })()
+                                const confirmedStartsHere = confirmedSlot?.courtId === court.id && confirmedSlot?.startTime === slot
+
+                                // Preview logic (popover open)
                                 const isCoveredByPreview = slotPreview?.courtId === court.id && (() => {
                                   const ps = timeToDecimal(slotPreview!.startTime)
                                   const pe = ps + slotPreview!.duration
                                   return slotStartDec >= ps && slotStartDec < pe
                                 })()
                                 const previewStartsHere = slotPreview?.courtId === court.id && slotPreview?.startTime === slot
-                                const isFree = !slotHasAnyBooking && !isCoveredByPreview
+                                const isFree = !slotHasAnyBooking && !isCoveredByPreview && !isCoveredByConfirmed
 
                                 return (
                                   <div
                                     key={`${court.id}-${slot}`}
                                     data-slot-cell="true"
-                                    onClick={(e) => {
-                                      if (slotHasAnyBooking || !isStartAllowed || isPastSlot || effectiveDayConfig.closed) return
-                                      const rect = e.currentTarget.getBoundingClientRect()
+                                    data-court-id={court.id}
+                                    data-slot-time={slot}
+                                    onClick={() => {
+                                      if (slotHasAnyBooking || isPastSlot || effectiveDayConfig.closed) return
+                                      if (isCoveredByConfirmed && !confirmedStartsHere) return
+                                      if (!isStartAllowed && !confirmedStartsHere) return
                                       setSlotPreview({
                                         courtId: court.id,
                                         startTime: slot,
-                                        duration: defaultDurationHours,
-                                        anchorTop: rect.bottom,
-                                        anchorLeft: rect.left,
+                                        duration: confirmedStartsHere ? confirmedSlot!.duration : defaultDurationHours,
                                       })
                                     }}
                                     className={`w-14 flex-shrink-0 h-14 flex items-center justify-center text-[11px] relative transition-colors ${
@@ -976,17 +1076,21 @@ export function ClubDetail({ slug }: { slug: string }) {
                                         ? "border-l border-dashed border-slate-100"
                                         : slotIndex === 0 ? "" : "border-l border-slate-200"
                                     } ${
-                                      isFree && isStartAllowed && !isPastSlot
-                                        ? "cursor-pointer hover:bg-blue-50/60 group/slot"
-                                        : isFree && isPastSlot
-                                          ? "bg-slate-50 text-slate-300 cursor-not-allowed"
-                                        : isFree && !isStartAllowed
-                                          ? "bg-slate-50 text-slate-300 cursor-default"
-                                          : isCoveredByPreview && !previewStartsHere
-                                            ? "bg-blue-50/20"
-                                            : slotHasAnyBooking
-                                              ? "cursor-default"
-                                              : ""
+                                      confirmedStartsHere
+                                        ? "cursor-pointer hover:bg-blue-50"
+                                        : isCoveredByConfirmed
+                                          ? "cursor-default"
+                                          : isFree && isStartAllowed && !isPastSlot
+                                            ? "cursor-pointer hover:bg-blue-50/60 group/slot"
+                                            : isFree && isPastSlot
+                                              ? "bg-slate-50 text-slate-300 cursor-not-allowed"
+                                              : isFree && !isStartAllowed
+                                                ? "bg-slate-50 text-slate-300 cursor-default"
+                                                : isCoveredByPreview && !previewStartsHere
+                                                  ? "bg-blue-50/20"
+                                                  : slotHasAnyBooking
+                                                    ? "cursor-default"
+                                                    : ""
                                     }`}
                                   >
                                     {isFree && isStartAllowed && !isPastSlot && (
@@ -995,26 +1099,19 @@ export function ClubDetail({ slug }: { slug: string }) {
                                       </span>
                                     )}
 
-                                    {/* Booking blocks */}
+                                    {/* Booking blocks — shown as plain occupied to players */}
                                     {slotStartingBookings.map((reservation, idx) => {
                                       const bookingHours = (timeToMinutes(reservation.endTime) - timeToMinutes(reservation.startTime)) / 60
-                                      const isConfirmed = reservation.bookingStatus === "confirmed"
                                       return (
                                         <div
                                           key={`${reservation.courtId}-${reservation.startTime}-${idx}`}
-                                          className={`absolute top-0.5 bottom-0.5 left-0 z-20 rounded-md pointer-events-none flex items-center px-2 text-xs font-medium border shadow-sm ${
-                                            isConfirmed
-                                              ? "bg-emerald-100 text-emerald-800 border-emerald-200"
-                                              : "bg-amber-50 text-amber-800 border-amber-200"
-                                          }`}
+                                          className="absolute top-0.5 bottom-0.5 left-0 z-20 rounded-md pointer-events-none flex items-center px-2 text-xs font-medium bg-slate-200 text-slate-500 border border-slate-300"
                                           style={{
                                             width: `calc(${bookingHours} * 7rem - 2px)`,
                                             minWidth: "3rem",
                                           }}
                                         >
-                                          <span className="truncate w-full">
-                                            {isConfirmed ? "\u2713 Confirmada" : "\u23f1 Pendiente"}
-                                          </span>
+                                          <span className="truncate w-full text-center">Ocupado</span>
                                         </div>
                                       )
                                     })}
@@ -1049,6 +1146,21 @@ export function ClubDetail({ slug }: { slug: string }) {
                                         </div>
                                       )
                                     })()}
+
+                                    {/* Confirmed selection block */}
+                                    {confirmedStartsHere && confirmedSlot && !previewStartsHere && (
+                                      <div
+                                        className="absolute top-0.5 bottom-0.5 left-0 z-[18] rounded-md pointer-events-none flex items-center px-2 text-xs font-medium bg-blue-500 text-white border-2 border-blue-600"
+                                        style={{
+                                          width: `calc(${confirmedSlot.duration} * 7rem - 2px)`,
+                                          minWidth: "3rem",
+                                        }}
+                                      >
+                                        <span className="truncate w-full text-center">
+                                          {formatDurationHours(confirmedSlot.duration)}
+                                        </span>
+                                      </div>
+                                    )}
                                   </div>
                                 )
                               })}
@@ -1066,16 +1178,12 @@ export function ClubDetail({ slug }: { slug: string }) {
                       <span className="text-[11px] text-slate-400">Disponible</span>
                     </div>
                     <div className="flex items-center gap-1.5">
-                      <div className="w-3 h-3 rounded-sm bg-emerald-100 border border-emerald-200"></div>
-                      <span className="text-[11px] text-slate-400">Confirmada</span>
+                      <div className="w-3 h-3 rounded-sm bg-slate-200 border border-slate-300"></div>
+                      <span className="text-[11px] text-slate-400">Ocupado</span>
                     </div>
                     <div className="flex items-center gap-1.5">
-                      <div className="w-3 h-3 rounded-sm bg-amber-50 border border-amber-200"></div>
-                      <span className="text-[11px] text-slate-400">Pendiente</span>
-                    </div>
-                    <div className="flex items-center gap-1.5">
-                      <div className="w-3 h-3 rounded-sm bg-blue-100/60 border-2 border-dashed border-blue-400"></div>
-                      <span className="text-[11px] text-slate-400">Tu reserva</span>
+                      <div className="w-3 h-3 rounded-sm bg-blue-500 border-2 border-blue-600"></div>
+                      <span className="text-[11px] text-slate-400">Seleccionado</span>
                     </div>
                   </div>
                 </>
@@ -1156,7 +1264,7 @@ export function ClubDetail({ slug }: { slug: string }) {
                 <CardTitle className="text-lg">Resumen de reserva</CardTitle>
               </CardHeader>
               <CardContent className="pt-4 space-y-4">
-                {slotPreview && selectedCourt ? (
+                {confirmedSlot && selectedCourt ? (
                   <>
                     <div className="space-y-3">
                       <div className="flex items-center justify-between">
@@ -1172,12 +1280,12 @@ export function ClubDetail({ slug }: { slug: string }) {
                       <div className="flex items-center justify-between">
                         <span className="text-sm text-muted-foreground">Horario</span>
                         <span className="text-sm font-medium text-foreground">
-                          {slotPreview.startTime} &ndash; {addTime(slotPreview.startTime, slotPreview.duration)}
+                          {confirmedSlot.startTime} &ndash; {addTime(confirmedSlot.startTime, confirmedSlot.duration)}
                         </span>
                       </div>
                       <div className="flex items-center justify-between">
                         <span className="text-sm text-muted-foreground">Duraci&oacute;n</span>
-                        <span className="text-sm font-medium text-foreground">{formatDurationHours(slotPreview.duration)}</span>
+                        <span className="text-sm font-medium text-foreground">{formatDurationHours(confirmedSlot.duration)}</span>
                       </div>
                       {selectedCourt.data.sport && (
                         <div className="flex items-center justify-between">
@@ -1212,7 +1320,7 @@ export function ClubDetail({ slug }: { slug: string }) {
 
                 <Button
                   className="w-full h-11 bg-primary hover:bg-primary/90 text-primary-foreground font-medium"
-                  disabled={!slotPreview || !selectedCourt || checkoutLoading}
+                  disabled={!confirmedSlot || !selectedCourt || checkoutLoading}
                   onClick={handleReservar}
                 >
                   {checkoutLoading ? (
@@ -1252,14 +1360,13 @@ export function ClubDetail({ slug }: { slug: string }) {
           return pStart < resEnd && pEnd > resStart
         })
         const errorMsg = hasConflict ? "Conflicto con reserva existente" : null
-        const popoverWidth = 256
-        const top = slotPreview.anchorTop + 8
-        const left = Math.max(8, Math.min(slotPreview.anchorLeft - popoverWidth / 4, (typeof window !== "undefined" ? window.innerWidth : 1200) - popoverWidth - 8))
+        if (!popoverPos) return null
+        const { top, left } = popoverPos
 
         return (
           <div
             ref={slotPreviewPopoverRef}
-            className="fixed z-[60] bg-white rounded-xl shadow-2xl border border-slate-200 p-4 w-64 animate-in fade-in slide-in-from-top-2 duration-150"
+            className="absolute z-[60] bg-white rounded-xl shadow-2xl border border-slate-200 p-4 w-64 animate-in fade-in slide-in-from-top-2 duration-150"
             style={{ top, left }}
           >
             <div className="flex items-center justify-between mb-3">
@@ -1302,11 +1409,11 @@ export function ClubDetail({ slug }: { slug: string }) {
                 </div>
               )}
 
-              {typeof selectedPrice === "number" && (
+              {typeof court?.data.pricePerHour === "number" && (
                 <div className="flex justify-between text-sm">
                   <span className="text-slate-500">Precio</span>
                   <span className="font-semibold text-emerald-600">
-                    {selectedCurrency} {formatPriceNumber(selectedPrice * slotPreview.duration)}
+                    {court?.data.currency || "ARS"} {formatPriceNumber(court!.data.pricePerHour * slotPreview.duration)}
                   </span>
                 </div>
               )}
@@ -1322,22 +1429,66 @@ export function ClubDetail({ slug }: { slug: string }) {
               <Button
                 size="sm"
                 className="w-full text-xs bg-blue-600 hover:bg-blue-700"
-                disabled={!!errorMsg || checkoutLoading}
-                onClick={handleReservar}
+                disabled={!!errorMsg}
+                onClick={() => {
+                  setConfirmedSlot({ courtId: slotPreview.courtId, startTime: slotPreview.startTime, duration: slotPreview.duration })
+                  setSlotPreview(null)
+                }}
               >
-                {checkoutLoading ? (
-                  <div className="flex items-center gap-2">
-                    <div className="w-3 h-3 border-2 border-white border-t-transparent rounded-full animate-spin" />
-                    Creando&hellip;
-                  </div>
-                ) : (
-                  <>Reservar {slotPreview.startTime} &ndash; {addTime(slotPreview.startTime, slotPreview.duration)}</>
-                )}
+                Confirmar {slotPreview.startTime} &ndash; {addTime(slotPreview.startTime, slotPreview.duration)}
               </Button>
+              <p className="mt-2 text-center text-[11px] text-slate-400">Confirmá y luego presioná Reservar en el resumen</p>
             </div>
           </div>
         )
       })()}
+
+      {/* Sticky bottom booking bar — visible when a slot is confirmed (sidebar may be off-screen on mobile) */}
+      {confirmedSlot && selectedCourt && (
+        <div className="fixed bottom-0 left-0 right-0 z-50 bg-white border-t-2 border-blue-100 shadow-[0_-8px_40px_rgba(0,0,0,0.14)] px-4 py-4 sm:py-5">
+          <div className="max-w-6xl mx-auto flex items-center justify-between gap-4">
+            <div className="flex items-center gap-3.5 min-w-0">
+              <div className="w-11 h-11 rounded-xl bg-blue-50 flex items-center justify-center shrink-0 text-lg">
+                🎾
+              </div>
+              <div className="min-w-0">
+                <p className="text-[15px] font-bold text-slate-900 truncate leading-tight">
+                  {selectedCourt.data.name}
+                  <span className="font-semibold text-blue-600">
+                    {" "}&middot;{" "}{confirmedSlot.startTime}&ndash;{addTime(confirmedSlot.startTime, confirmedSlot.duration)}
+                  </span>
+                </p>
+                <p className="text-xs text-slate-500 mt-0.5">
+                  {parseDateKey(selectedDate).toLocaleDateString("es-AR", { weekday: "short", day: "numeric", month: "short" })}
+                  {typeof totalPrice === "number" ? (
+                    <span className="font-semibold text-slate-700 ml-1.5">{selectedCurrency} {formatPriceNumber(totalPrice)}</span>
+                  ) : null}
+                </p>
+              </div>
+            </div>
+            <div className="flex items-center gap-3 shrink-0">
+              <button
+                onClick={() => setConfirmedSlot(null)}
+                className="text-xs text-slate-400 hover:text-slate-600 px-3 py-2 rounded-xl hover:bg-slate-100 transition-colors"
+              >
+                Cancelar
+              </button>
+              <Button
+                className="h-11 px-7 bg-blue-600 hover:bg-blue-700 text-white font-semibold text-sm rounded-xl shadow-sm transition-all"
+                disabled={checkoutLoading}
+                onClick={handleReservar}
+              >
+                {checkoutLoading ? (
+                  <span className="flex items-center gap-2">
+                    <div className="w-4 h-4 border-2 border-white/40 border-t-white rounded-full animate-spin" />
+                    Creando&hellip;
+                  </span>
+                ) : "Reservar"}
+              </Button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   )
 }

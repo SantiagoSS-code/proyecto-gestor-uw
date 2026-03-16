@@ -1016,7 +1016,7 @@ export default function SettingsPage() {
 														<span className="text-sm">— canchas publicadas</span>
 													</div>
 													<div className="text-xs text-slate-500">
-														Slug público: /clubs/{slugPreview || "centro-codigo"}
+														Slug público: /centros/{slugPreview || "centro-codigo"}
 													</div>
 												</div>
 
@@ -1099,7 +1099,7 @@ export default function SettingsPage() {
 								</div>
 							))}
 							<div className="pt-2 border-t border-slate-100 space-y-2 text-xs text-slate-500">
-								<div>URL pública: /clubs/{slugPreview || "centro-codigo"}</div>
+								<div>URL pública: /centros/{slugPreview || "centro-codigo"}</div>
 								<div>Código único: <span className="font-mono text-slate-700">{centerCode || "------"}</span></div>
 							</div>
 						</CardContent>

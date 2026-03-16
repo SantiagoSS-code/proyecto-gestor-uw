@@ -82,7 +82,7 @@ async function sendBookingConfirmationEmail(params: {
             <p style="margin: 0; white-space: pre-line; color: #1e293b;">${params.remainingInstructions || "El club se contactará para indicarte cómo abonar el saldo pendiente."}</p>
           </div>
         </div>
-      ",
+      `,
     }),
   }).catch((err) => {
     console.error("[Courtly] Error sending booking confirmation email:", err)

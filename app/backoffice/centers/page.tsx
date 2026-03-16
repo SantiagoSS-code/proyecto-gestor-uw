@@ -147,7 +147,7 @@ export default function BackofficeCentersPage() {
                       </Link>
                       {c.slug && (
                         <a
-                          href={`/clubs/${c.slug}`}
+                          href={`/centros/${c.slug}`}
                           target="_blank"
                           rel="noopener noreferrer"
                           className="rounded-lg border border-slate-200 bg-white px-2.5 py-1 text-xs font-medium text-slate-600 hover:bg-slate-50 hover:text-blue-600 transition-colors"

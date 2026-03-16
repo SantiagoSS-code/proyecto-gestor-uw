@@ -3,7 +3,7 @@
 import { useEffect, useMemo, useState } from "react"
 import { usePathname, useRouter, useSearchParams } from "next/navigation"
 import Link from "next/link"
-import { collection, getDocs, query as firestoreQuery, where } from "firebase/firestore"
+import { collection, getDocs, query as firestoreQuery, where, doc, getDoc } from "firebase/firestore"
 import { db } from "@/lib/firebaseClient"
 import { Card } from "@/components/ui/card"
 import { Input } from "@/components/ui/input"
@@ -28,6 +28,12 @@ const SORT_OPTIONS: Array<{ value: SortBy; label: string }> = [
   { value: "rating-asc", label: "Valoración (menor a mayor)" },
 ]
 
+interface OpeningHoursDay {
+  open: string
+  close: string
+  closed: boolean
+}
+
 interface Center {
   id: string
   name: string
@@ -38,6 +44,24 @@ interface Center {
   country?: string
   coverImageUrl?: string | null
   galleryImageUrls?: string[]
+  openingHours?: Record<string, OpeningHoursDay> | null
+  sports?: string[]
+}
+
+const SPORT_LABELS: Record<string, string> = {
+  padel: "Padel",
+  tennis: "Tennis",
+  futbol: "Fútbol",
+  pickleball: "Pickleball",
+  squash: "Squash",
+}
+
+const SPORT_EMOJIS: Record<string, string> = {
+  padel: "🎾",
+  tennis: "🎾",
+  futbol: "⚽",
+  pickleball: "🏓",
+  squash: "🏸",
 }
 
 function getCover(center: Center) {
@@ -94,6 +118,7 @@ export default function CentersClient() {
   const [selectedDate, setSelectedDate] = useState<Date | undefined>(undefined)
   const [selectedTime, setSelectedTime] = useState<string>(getTimePlusHours(3))
   const [sortBy, setSortBy] = useState<SortBy>("relevance")
+  const [selectedSport, setSelectedSport] = useState<string>("")
   const [centers, setCenters] = useState<Center[]>([])
   const [loading, setLoading] = useState(true)
   const timeOptions = useMemo(() => buildTimeOptions(30), [])
@@ -106,6 +131,10 @@ export default function CentersClient() {
     const maybeSort = (searchParams?.get("sort") || "relevance") as SortBy
     const validSort: SortBy[] = ["relevance", "name-asc", "name-desc", "rating-desc", "rating-asc"]
     setSortBy(validSort.includes(maybeSort) ? maybeSort : "relevance")
+
+    const maybeSport = searchParams?.get("sport") || ""
+    const validSports = Object.keys(SPORT_LABELS)
+    setSelectedSport(validSports.includes(maybeSport) ? maybeSport : "")
   }, [searchParams])
 
   useEffect(() => {
@@ -115,7 +144,22 @@ export default function CentersClient() {
         const q = firestoreQuery(centersRef, where("published", "==", true))
         const snapshot = await getDocs(q)
         const data = snapshot.docs.map((docSnap) => ({ id: docSnap.id, ...(docSnap.data() as Omit<Center, "id">) }))
-        setCenters(data)
+
+        // Batch-load opening hours for each center in parallel
+        const settingsResults = await Promise.all(
+          data.map(async (center) => {
+            try {
+              const settingsRef = doc(db, "centers", center.id, "settings", "booking")
+              const snap = await getDoc(settingsRef)
+              if (snap.exists()) {
+                return { id: center.id, openingHours: (snap.data().openingHours as Record<string, OpeningHoursDay>) || null }
+              }
+            } catch {}
+            return { id: center.id, openingHours: null }
+          })
+        )
+        const openingHoursMap = new Map(settingsResults.map((r) => [r.id, r.openingHours]))
+        setCenters(data.map((c) => ({ ...c, openingHours: openingHoursMap.get(c.id) ?? null })))
       } catch (error) {
         console.error("Error loading centers:", error)
       } finally {
@@ -126,13 +170,40 @@ export default function CentersClient() {
     fetchCenters()
   }, [])
 
+  const availableSports = useMemo(() => {
+    const sportsSet = new Set<string>()
+    centers.forEach((c) => (c.sports || []).forEach((s) => sportsSet.add(s)))
+    return Object.keys(SPORT_LABELS).filter((s) => sportsSet.has(s))
+  }, [centers])
+
   const filteredAndSorted = useMemo(() => {
     const term = locationQuery.trim().toLowerCase()
 
     const base = centers.filter((center) => {
       const haystack = `${center.name} ${center.address || ""} ${center.city || ""} ${center.country || ""}`.toLowerCase()
       const matchesSearch = !term || haystack.includes(term)
-      return matchesSearch
+      if (!matchesSearch) return false
+
+      // Sport filter
+      if (selectedSport && !(center.sports || []).includes(selectedSport)) return false
+
+      // Opening hours filter: only apply when time is selected and center has hours configured
+      if (selectedTime && selectedDate && center.openingHours) {
+        const dayIndex = selectedDate.getDay().toString()
+        const dayConfig = center.openingHours[dayIndex]
+        if (dayConfig) {
+          if (dayConfig.closed) return false
+          const [sh, sm] = selectedTime.split(":").map(Number)
+          const [oh, om] = dayConfig.open.split(":").map(Number)
+          const [ch, cm] = dayConfig.close.split(":").map(Number)
+          const timeMin = sh * 60 + sm
+          const openMin = oh * 60 + om
+          const closeMin = ch * 60 + cm
+          if (timeMin < openMin || timeMin >= closeMin) return false
+        }
+      }
+
+      return true
     })
 
     const sorted = [...base]
@@ -154,7 +225,7 @@ export default function CentersClient() {
     }
 
     return sorted
-  }, [centers, locationQuery, sortBy])
+  }, [centers, locationQuery, sortBy, selectedTime, selectedDate, selectedSport])
 
   const handleBack = () => {
     if (window.history.length > 1) {
@@ -177,6 +248,9 @@ export default function CentersClient() {
 
     if (sortBy !== "relevance") params.set("sort", sortBy)
     else params.delete("sort")
+
+    if (selectedSport) params.set("sport", selectedSport)
+    else params.delete("sport")
 
     const queryString = params.toString()
     router.replace(queryString ? `${pathname}?${queryString}` : pathname)
@@ -320,6 +394,52 @@ export default function CentersClient() {
           </div>
         </div>
 
+        {/* Sport filter pills */}
+        {!loading && availableSports.length > 0 && (
+          <div className="mb-6 flex flex-wrap gap-2">
+            <button
+              type="button"
+              onClick={() => {
+                setSelectedSport("")
+                const params = new URLSearchParams(searchParams?.toString() || "")
+                params.delete("sport")
+                const qs = params.toString()
+                router.replace(qs ? `${pathname}?${qs}` : pathname)
+              }}
+              className={`inline-flex items-center gap-1.5 px-4 py-1.5 rounded-full text-sm font-medium transition-colors border ${
+                !selectedSport
+                  ? "bg-foreground text-background border-foreground"
+                  : "bg-secondary/50 text-muted-foreground border-border/50 hover:bg-secondary hover:text-foreground"
+              }`}
+            >
+              Todos
+            </button>
+            {availableSports.map((sport) => (
+              <button
+                key={sport}
+                type="button"
+                onClick={() => {
+                  const next = selectedSport === sport ? "" : sport
+                  setSelectedSport(next)
+                  const params = new URLSearchParams(searchParams?.toString() || "")
+                  if (next) params.set("sport", next)
+                  else params.delete("sport")
+                  const qs = params.toString()
+                  router.replace(qs ? `${pathname}?${qs}` : pathname)
+                }}
+                className={`inline-flex items-center gap-1.5 px-4 py-1.5 rounded-full text-sm font-medium transition-colors border ${
+                  selectedSport === sport
+                    ? "bg-foreground text-background border-foreground"
+                    : "bg-secondary/50 text-muted-foreground border-border/50 hover:bg-secondary hover:text-foreground"
+                }`}
+              >
+                <span aria-hidden>{SPORT_EMOJIS[sport] ?? "🏅"}</span>
+                {SPORT_LABELS[sport] ?? sport}
+              </button>
+            ))}
+          </div>
+        )}
+
         {loading ? (
           <div className="text-muted-foreground">Cargando centros...</div>
         ) : filteredAndSorted.length === 0 ? (
@@ -334,6 +454,7 @@ export default function CentersClient() {
                   setSelectedDate(getTodayDate())
                   setSelectedTime(getTimePlusHours(3))
                   setSortBy("relevance")
+                  setSelectedSport("")
                   router.replace(pathname)
                 }}
               >
@@ -349,8 +470,9 @@ export default function CentersClient() {
               if (selectedDate) centerParams.set("date", format(selectedDate, "yyyy-MM-dd"))
               if (selectedTime) centerParams.set("time", selectedTime)
               if (sortBy !== "relevance") centerParams.set("sort", sortBy)
+              if (selectedSport) centerParams.set("sport", selectedSport)
 
-              const detailHref = `/clubs/${center.slug || center.id}${centerParams.toString() ? `?${centerParams.toString()}` : ""}`
+              const detailHref = `/centros/${center.slug || center.id}${centerParams.toString() ? `?${centerParams.toString()}` : ""}`
               const ratingValue = typeof center.rating === "number" ? center.rating.toFixed(1) : "4.8"
 
               return (

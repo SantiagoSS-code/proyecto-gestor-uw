@@ -130,6 +130,8 @@ export interface CenterProfile {
   classesEnabled?: boolean;
   featuredRank?: number | null;
   topSearchedRank?: number | null;
+  rating?: number;
+  reviewCount?: number;
   createdAt?: any;
   updatedAt?: any;
 }

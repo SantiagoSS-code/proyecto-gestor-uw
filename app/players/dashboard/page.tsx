@@ -1,12 +1,13 @@
 "use client"
 
-import { useEffect, useMemo, useState, useCallback } from "react"
+import { useEffect, useMemo, useState, useCallback, useRef } from "react"
 import Link from "next/link"
 import Image from "next/image"
 import { useAuth } from "@/lib/auth-context"
 import { auth } from "@/lib/firebaseClient"
 import { Button } from "@/components/ui/button"
 import { VoydLogo } from "@/components/ui/voyd-logo"
+import { ReviewModal, type ReviewBooking } from "@/components/players/review-modal"
 import {
   AlertTriangle,
   Bell,
@@ -61,6 +62,7 @@ interface PlayerBooking {
   bookingStatus: BookingStatus
   paymentStatus: string
   createdAt: string | null
+  reviewSubmitted?: boolean
 }
 
 interface FavoriteClub {
@@ -346,51 +348,49 @@ function PlayerHeader({
 
 // ─── 2. QUICK ACTIONS ─────────────────────────────────────────────────────────
 
-const ACTIONS = [
-  {
-    title: "Reservar",
-    desc: "Encontrá disponibilidad ahora",
-    href: "/clubs",
-    Icon: Zap,
-    bg: "bg-blue-50",
-    color: "text-blue-600",
-  },
-  {
-    title: "Reservas",
-    desc: "Ver próximas y pendientes",
-    href: "#mis-reservas",
-    Icon: CalendarClock,
-    bg: "bg-violet-50",
-    color: "text-violet-600",
-  },
-  {
-    title: "Explorar",
-    desc: "Descubrí nuevos lugares",
-    href: "/clubs",
-    Icon: MapPin,
-    bg: "bg-emerald-50",
-    color: "text-emerald-600",
-  },
-]
-
 function QuickActions() {
   return (
-    <div className="grid grid-cols-3 gap-3">
-      {ACTIONS.map(({ title, desc, href, Icon, bg, color }) => (
+    <div className="space-y-3">
+      {/* Hero CTA */}
+      <Link
+        href="/centros"
+        className="group flex items-center justify-between rounded-2xl bg-gradient-to-r from-blue-600 to-blue-500 px-5 py-4 shadow-sm hover:shadow-md hover:from-blue-700 hover:to-blue-600 transition-all duration-200 hover:-translate-y-0.5"
+      >
+        <div>
+          <p className="text-xs font-medium text-blue-200 leading-none mb-1">¿Listo para jugar?</p>
+          <p className="text-lg font-bold text-white leading-tight">Buscar cancha</p>
+        </div>
+        <div className="w-12 h-12 rounded-xl bg-white/20 flex items-center justify-center group-hover:bg-white/30 transition-colors">
+          <Zap className="w-6 h-6 text-white" />
+        </div>
+      </Link>
+      {/* Secondary actions */}
+      <div className="grid grid-cols-2 gap-3">
         <Link
-          key={title}
-          href={href}
-          className="group flex flex-col gap-3 rounded-2xl bg-white border border-slate-100 p-4 shadow-sm transition-all duration-200 hover:-translate-y-0.5 hover:shadow-md hover:border-slate-200"
+          href="#mis-reservas"
+          className="group flex flex-col gap-2.5 rounded-2xl bg-white border border-slate-100 p-4 shadow-sm transition-all duration-200 hover:-translate-y-0.5 hover:shadow-md hover:border-slate-200"
         >
-          <div className={`w-9 h-9 rounded-xl flex items-center justify-center ${bg}`}>
-            <Icon className={`w-4 h-4 ${color}`} />
+          <div className="w-9 h-9 rounded-xl flex items-center justify-center bg-violet-50">
+            <CalendarClock className="w-4 h-4 text-violet-600" />
           </div>
           <div>
-            <p className="text-sm font-semibold text-slate-900 leading-tight">{title}</p>
-            <p className="text-xs text-slate-400 mt-0.5 hidden sm:block">{desc}</p>
+            <p className="text-sm font-semibold text-slate-900 leading-tight">Mis reservas</p>
+            <p className="text-xs text-slate-400 mt-0.5 hidden sm:block">Próximas y pendientes</p>
           </div>
         </Link>
-      ))}
+        <Link
+          href="/centros"
+          className="group flex flex-col gap-2.5 rounded-2xl bg-white border border-slate-100 p-4 shadow-sm transition-all duration-200 hover:-translate-y-0.5 hover:shadow-md hover:border-slate-200"
+        >
+          <div className="w-9 h-9 rounded-xl flex items-center justify-center bg-emerald-50">
+            <MapPin className="w-4 h-4 text-emerald-600" />
+          </div>
+          <div>
+            <p className="text-sm font-semibold text-slate-900 leading-tight">Explorar</p>
+            <p className="text-xs text-slate-400 mt-0.5 hidden sm:block">Descubrí nuevos lugares</p>
+          </div>
+        </Link>
+      </div>
     </div>
   )
 }
@@ -401,62 +401,79 @@ function UpcomingCard({ b }: { b: PlayerBooking }) {
   const day = getDayLabel(b.date)
   const [y, m, d] = b.date.split("-").map(Number)
   const dt = new Date(y, m - 1, d)
+  const isPending = b.bookingStatus === "pending_payment"
 
   return (
-    <div className="flex flex-col sm:flex-row sm:items-center gap-4 rounded-2xl border border-slate-100 bg-white p-4 sm:p-5 shadow-sm hover:shadow-md hover:border-slate-200 transition-all duration-200">
-      {/* Date pill */}
-      <div className={`shrink-0 w-12 rounded-xl p-2 text-center ${day.urgent ? "bg-blue-600" : "bg-slate-100"}`}>
-        <p className={`text-[9px] font-bold uppercase ${day.urgent ? "text-blue-200" : "text-slate-400"}`}>
-          {dt.toLocaleDateString("es-AR", { month: "short" })}
-        </p>
-        <p className={`text-lg font-bold leading-none ${day.urgent ? "text-white" : "text-slate-900"}`}>
-          {String(d).padStart(2, "0")}
-        </p>
-      </div>
-
-      {/* Info */}
-      <div className="flex-1 min-w-0">
-        <div className="flex items-center gap-2 flex-wrap">
-          <span className="font-semibold text-slate-900 text-sm">{b.clubName}</span>
-          <StatusBadge status={b.bookingStatus} />
+    <div className={`rounded-2xl border bg-white shadow-sm overflow-hidden transition-all duration-200 hover:shadow-md ${
+      isPending ? "border-amber-200" : "border-slate-100 hover:border-slate-200"
+    }`}>
+      <div className={`flex flex-col sm:flex-row sm:items-center gap-4 p-4 sm:p-5 ${
+        isPending ? "bg-amber-50/30" : ""
+      }`}>
+        {/* Date pill */}
+        <div className={`shrink-0 w-12 rounded-xl p-2 text-center ${day.urgent ? "bg-blue-600" : "bg-slate-100"}`}>
+          <p className={`text-[9px] font-bold uppercase ${day.urgent ? "text-blue-200" : "text-slate-400"}`}>
+            {dt.toLocaleDateString("es-AR", { month: "short" })}
+          </p>
+          <p className={`text-lg font-bold leading-none ${day.urgent ? "text-white" : "text-slate-900"}`}>
+            {String(d).padStart(2, "0")}
+          </p>
         </div>
-        <p className="text-xs text-slate-500 mt-0.5">
-          {b.courtName}
-          {b.sport ? ` · ${SPORT_LABEL[b.sport] || b.sport}` : ""}
-        </p>
-        <div className="flex items-center gap-3 mt-1.5 text-xs text-slate-400">
-          {day.urgent && (
-            <span className={`font-semibold ${day.color}`}>{day.label}</span>
-          )}
-          <span className="flex items-center gap-1">
-            <Clock className="w-3 h-3" />
-            {b.startTime} – {b.endTime}
-          </span>
-          {b.price != null && (
-            <span className="font-medium text-slate-600 ml-auto">
-              {formatCurrency(b.price, b.currency)}
+
+        {/* Info */}
+        <div className="flex-1 min-w-0">
+          <div className="flex items-center gap-2 flex-wrap">
+            <span className="font-semibold text-slate-900 text-sm">{b.clubName}</span>
+            {!isPending && <StatusBadge status={b.bookingStatus} />}
+          </div>
+          <p className="text-xs text-slate-500 mt-0.5">
+            {b.courtName}
+            {b.sport ? ` · ${SPORT_LABEL[b.sport] || b.sport}` : ""}
+          </p>
+          <div className="flex items-center gap-3 mt-1.5 text-xs text-slate-400">
+            {day.urgent && (
+              <span className={`font-semibold ${day.color}`}>{day.label}</span>
+            )}
+            <span className="flex items-center gap-1">
+              <Clock className="w-3 h-3" />
+              {b.startTime} – {b.endTime}
             </span>
-          )}
+            {b.price != null && (
+              <span className="font-medium text-slate-600 ml-auto">
+                {formatCurrency(b.price, b.currency)}
+              </span>
+            )}
+          </div>
         </div>
+
+        {/* CTA for confirmed only */}
+        {!isPending && (
+          <div className="flex items-center gap-2 shrink-0">
+            <Link
+              href={`/centros/${b.clubId}`}
+              className="rounded-full border border-slate-200 bg-white hover:bg-slate-50 text-slate-600 text-xs font-medium px-3 py-1.5 transition-colors"
+            >
+              Ver club
+            </Link>
+          </div>
+        )}
       </div>
 
-      {/* CTAs */}
-      <div className="flex items-center gap-2 shrink-0">
-        {b.bookingStatus === "pending_payment" && (
+      {/* Pending payment bottom action bar */}
+      {isPending && (
+        <div className="flex items-center justify-between border-t border-amber-200 bg-amber-50 px-4 py-3">
+          <div className="flex items-center gap-2">
+            <Timer className="w-3.5 h-3.5 text-amber-600" />
+            <span className="text-xs font-medium text-amber-700">Pago pendiente</span>
+          </div>
           <Link
             href={`/checkout/test/${b.id}`}
-            className="rounded-full bg-amber-500 hover:bg-amber-600 text-white text-xs font-semibold px-3 py-1.5 transition-colors"
+            className="rounded-full bg-amber-500 hover:bg-amber-600 text-white text-xs font-semibold px-4 py-1.5 transition-colors shadow-sm"
           >
-            Continuar pago
+            Completar pago →
           </Link>
-        )}
-        <Link
-          href={`/clubs/${b.clubId}`}
-          className="rounded-full border border-slate-200 bg-white hover:bg-slate-50 text-slate-600 text-xs font-medium px-3 py-1.5 transition-colors"
-        >
-          Ver club
-        </Link>
-      </div>
+        </div>
+      )}
     </div>
   )
 }
@@ -471,7 +488,7 @@ function UpcomingBookings({
   error: string | null
 }) {
   return (
-    <Section id="mis-reservas" title="Próximas reservas" action="/clubs" actionLabel="+ Nueva reserva">
+    <Section id="mis-reservas" title="Próximas reservas" action="/centros" actionLabel="+ Nueva reserva">
       {loading ? (
         <div className="space-y-3">
           {[1, 2].map((i) => <Sk key={i} className="h-24 w-full" />)}
@@ -484,7 +501,7 @@ function UpcomingBookings({
           <p className="text-sm font-semibold text-slate-700">Sin próximas reservas</p>
           <p className="text-xs text-slate-400 mt-1">Reservá una cancha y aparecerá aquí.</p>
           <Button asChild size="sm" className="mt-4 rounded-full">
-            <Link href="/clubs">Reservar ahora</Link>
+            <Link href="/centros">Reservar ahora</Link>
           </Button>
         </div>
       ) : (
@@ -522,6 +539,10 @@ function StatCard({
 
 function PlayerStats({ bookings, loading }: { bookings: PlayerBooking[]; loading: boolean }) {
   const s = useMemo(() => computeStats(bookings), [bookings])
+
+  // Don't show until loaded; hide entirely when there's no confirmed-booking data yet
+  if (!loading && s.total === 0) return null
+
   const items = [
     { label: "Totales", value: s.total.toString(), Icon: Trophy },
     { label: "Próximas", value: s.upcoming.toString(), Icon: CalendarClock },
@@ -598,25 +619,15 @@ function deriveNotifications(bookings: PlayerBooking[]): DerivedNotif[] {
     if (out.length >= 5) break
   }
 
-  if (out.length === 0) {
-    out.push({
-      id: "base_1",
-      title: "Reservá tu próximo turno",
-      message: "Los fines de semana se llenan rápido. Asegurate tu horario.",
-      time: "Ahora",
-      unread: false,
-      Icon: CalendarClock,
-      iconBg: "bg-blue-50",
-      iconColor: "text-blue-500",
-    })
-  }
-
   return out
 }
 
 function Notifications({ bookings, loading }: { bookings: PlayerBooking[]; loading: boolean }) {
   const notifs = useMemo(() => deriveNotifications(bookings), [bookings])
   const unreadCount = notifs.filter((n) => n.unread).length
+
+  // Hide section entirely when there's nothing real to show
+  if (!loading && notifs.length === 0) return null
 
   return (
     <Section title="Notificaciones">
@@ -684,7 +695,7 @@ function HistoryRow({ b }: { b: PlayerBooking }) {
           </span>
         )}
         <Link
-          href={`/clubs/${b.clubId}`}
+          href={`/centros/${b.clubId}`}
           className="text-slate-400 hover:text-blue-600 transition-colors"
           title="Ver club"
         >
@@ -768,10 +779,10 @@ function FavClubCard({ club, onRemove }: { club: FavoriteClub; onRemove: (id: st
         ) : null}
         <div className="flex gap-2 mt-3">
           <Button asChild size="sm" className="flex-1 rounded-full text-xs h-7 px-3">
-            <Link href={`/clubs/${club.slug || club.clubId}`}>Reservar</Link>
+            <Link href={`/centros/${club.slug || club.clubId}`}>Reservar</Link>
           </Button>
           <Button asChild variant="outline" size="sm" className="flex-1 rounded-full text-xs h-7 px-3">
-            <Link href={`/clubs/${club.slug || club.clubId}`}>Ver club</Link>
+            <Link href={`/centros/${club.slug || club.clubId}`}>Ver club</Link>
           </Button>
         </div>
       </div>
@@ -789,7 +800,7 @@ function FavoritesSection({
   onRemove: (id: string) => void
 }) {
   return (
-    <Section title="Mis favoritos" action="/clubs" actionLabel="Explorar más">
+    <Section title="Mis favoritos" action="/centros" actionLabel="Explorar más">
       {loading ? (
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
           {[1, 2].map((i) => <Sk key={i} className="h-52 w-full" />)}
@@ -800,7 +811,7 @@ function FavoritesSection({
           <p className="text-sm font-semibold text-slate-600">Sin clubes favoritos</p>
           <p className="text-xs text-slate-400 mt-1">Guardá tus preferidos para acceder rápido.</p>
           <Button asChild variant="outline" size="sm" className="mt-4 rounded-full">
-            <Link href="/clubs">Explorar clubes</Link>
+            <Link href="/centros">Explorar clubes</Link>
           </Button>
         </div>
       ) : (
@@ -828,6 +839,11 @@ export default function PlayerDashboardPage() {
 
   const [favorites, setFavorites] = useState<FavoriteClub[]>([])
   const [favLoading, setFavLoading] = useState(true)
+
+  // Review popup state
+  const [pendingReviews, setPendingReviews] = useState<ReviewBooking[]>([])
+  const [skippedReviews, setSkippedReviews] = useState<Set<string>>(new Set())
+  const notifyFiredRef = useRef(false)
 
   const apiFetch = useCallback(async (url: string) => {
     const token = await auth.currentUser?.getIdToken()
@@ -861,6 +877,19 @@ export default function PlayerDashboardPage() {
       .finally(() => setFavLoading(false))
   }, [user, apiFetch])
 
+  // Trigger review notification emails once per session (lazy email sender)
+  useEffect(() => {
+    if (!user || notifyFiredRef.current) return
+    notifyFiredRef.current = true
+    auth.currentUser?.getIdToken().then((token: string) => {
+      if (!token) return
+      fetch("/api/reviews/notify", {
+        method: "POST",
+        headers: { Authorization: `Bearer ${token}` },
+      }).catch(() => {/* silent */})
+    })
+  }, [user])
+
   const today = getToday()
 
   const upcomingBookings = useMemo(
@@ -888,6 +917,45 @@ export default function PlayerDashboardPage() {
     [bookings, today],
   )
 
+  // Compute bookings that need a review (confirmed, ended, not yet reviewed)
+  useEffect(() => {
+    if (bookingsLoading) return
+    const now = new Date()
+    const pending = bookings
+      .filter((b) => {
+        if (b.bookingStatus !== "confirmed") return false
+        if (b.reviewSubmitted) return false
+        const [y, m, d] = b.date.split("-").map(Number)
+        const [eh, em] = (b.endTime || "23:59").split(":").map(Number)
+        const endDt = new Date(y, m - 1, d, eh, em)
+        return endDt < now
+      })
+      .map((b) => ({
+        id: b.id,
+        clubId: b.clubId,
+        clubName: b.clubName,
+        date: b.date,
+        startTime: b.startTime,
+        endTime: b.endTime,
+      }))
+    setPendingReviews(pending)
+  }, [bookings, bookingsLoading])
+
+  // The first non-skipped pending review to show
+  const activeReview = pendingReviews.find((r) => !skippedReviews.has(r.id)) ?? null
+
+  const handleReviewSubmitted = useCallback(() => {
+    if (!activeReview) return
+    // Remove from pending and mark booking locally as reviewed
+    setBookings((prev) => prev.map((b) => b.id === activeReview.id ? { ...b, reviewSubmitted: true } : b))
+    setPendingReviews((prev) => prev.filter((r) => r.id !== activeReview.id))
+  }, [activeReview])
+
+  const handleReviewSkip = useCallback(() => {
+    if (!activeReview) return
+    setSkippedReviews((prev) => new Set([...prev, activeReview.id]))
+  }, [activeReview])
+
   const handleRemoveFavorite = useCallback(
     async (clubId: string) => {
       setFavorites((prev) => prev.filter((f) => f.clubId !== clubId))
@@ -904,8 +972,24 @@ export default function PlayerDashboardPage() {
     [],
   )
 
+  const userDisplayName = profile
+    ? [profile.firstName, profile.lastName].filter(Boolean).join(" ") || profile.email || "Jugador"
+    : "Jugador"
+
   return (
     <main className="min-h-screen bg-slate-50">
+      {/* Review popup */}
+      {activeReview && auth.currentUser && (
+        <ReviewModal
+          booking={activeReview}
+          userName={userDisplayName}
+          token=""
+          onSubmitted={handleReviewSubmitted}
+          onSkip={handleReviewSkip}
+          getToken={() => auth.currentUser!.getIdToken()}
+        />
+      )}
+
       {/* Top bar */}
       <div className="sticky top-0 z-20 bg-white/80 backdrop-blur-xl border-b border-slate-100">
         <div className="mx-auto max-w-4xl px-4 sm:px-6">

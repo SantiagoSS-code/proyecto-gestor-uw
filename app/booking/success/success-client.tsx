@@ -102,7 +102,7 @@ export default function BookingSuccessClient() {
         <Card className="w-full max-w-md border-0 shadow-lg">
           <CardContent className="pt-8 pb-6 text-center space-y-4">
             <p className="text-slate-700">{error || "Reserva no encontrada."}</p>
-            <Link href="/clubs"><Button variant="outline">Ver clubes</Button></Link>
+            <Link href="/centros"><Button variant="outline">Ver clubes</Button></Link>
           </CardContent>
         </Card>
       </main>
@@ -203,7 +203,7 @@ export default function BookingSuccessClient() {
               <ArrowRight className="w-4 h-4" />
             </Button>
           </Link>
-          <Link href="/clubs" className="flex-1">
+          <Link href="/centros" className="flex-1">
             <Button variant="outline" className="w-full">
               Explorar otros clubes
             </Button>

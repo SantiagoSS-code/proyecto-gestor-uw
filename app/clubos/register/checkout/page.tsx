@@ -1,6 +1,6 @@
 "use client"
 
-import { useMemo, useState, useEffect } from "react"
+import { useMemo, useState, useEffect, Suspense } from "react"
 import { useRouter, useSearchParams } from "next/navigation"
 import { VoydLogo } from "@/components/ui/voyd-logo"
 import { Check, Lock, ArrowLeft, Zap, Building2, Trophy, CreditCard } from "lucide-react"
@@ -149,7 +149,7 @@ function SuccessScreen({ planName, onContinue }: { planName: string; onContinue:
 }
 
 // Main page
-export default function ClubOSCheckoutPage() {
+function ClubOSCheckoutPageInner() {
   const router = useRouter()
   const searchParams = useSearchParams()
   const centerId = useMemo(() => String(searchParams.get("centerId") || ""), [searchParams])
@@ -366,5 +366,13 @@ export default function ClubOSCheckoutPage() {
         </div>
       </div>
     </main>
+  )
+}
+
+export default function ClubOSCheckoutPage() {
+  return (
+    <Suspense fallback={null}>
+      <ClubOSCheckoutPageInner />
+    </Suspense>
   )
 }

@@ -2,16 +2,12 @@
 
 import { useEffect, useRef, useState } from "react"
 import { useParams, useRouter } from "next/navigation"
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import {
   CheckCircle2,
   XCircle,
   Clock,
   Calendar,
-  Building2,
-  User,
-  CreditCard,
   AlertTriangle,
   ArrowLeft,
 } from "lucide-react"
@@ -21,55 +17,9 @@ import {
   failBooking,
   expireBooking,
 } from "@/lib/booking-service"
-import type { PlayerBookingDoc, PlayerBookingStatus, PaymentStatus } from "@/lib/types"
+import type { PlayerBookingDoc, PlayerBookingStatus } from "@/lib/types"
 
-// ─── Badge component ──────────────────────────────────────────────────────────
-const STATUS_CONFIG: Record<
-  PlayerBookingStatus,
-  { label: string; className: string; Icon: React.ElementType }
-> = {
-  pending_payment: {
-    label: "Pago pendiente",
-    className: "bg-amber-50 text-amber-700 border border-amber-200",
-    Icon: Clock,
-  },
-  confirmed: {
-    label: "Confirmada",
-    className: "bg-emerald-50 text-emerald-700 border border-emerald-200",
-    Icon: CheckCircle2,
-  },
-  cancelled: {
-    label: "Cancelada",
-    className: "bg-red-50 text-red-700 border border-red-200",
-    Icon: XCircle,
-  },
-  expired: {
-    label: "Expirada",
-    className: "bg-slate-100 text-slate-600 border border-slate-200",
-    Icon: AlertTriangle,
-  },
-}
-
-function StatusBadge({ status }: { status: PlayerBookingStatus }) {
-  const cfg = STATUS_CONFIG[status]
-  const Icon = cfg.Icon
-  return (
-    <span
-      className={`inline-flex items-center gap-1.5 rounded-full px-3 py-1 text-sm font-medium ${cfg.className}`}
-    >
-      <Icon className="w-4 h-4" />
-      {cfg.label}
-    </span>
-  )
-}
-
-const PAYMENT_LABEL: Record<PaymentStatus, string> = {
-  pending: "Pendiente",
-  approved: "Aprobado ✓",
-  failed: "Fallido ✗",
-}
-
-// ─── Sport labels ─────────────────────────────────────────────────────────────
+// ─── Helpers ──────────────────────────────────────────────────────────────────
 const SPORT_LABEL: Record<string, string> = {
   padel: "Pádel",
   tennis: "Tennis",
@@ -78,7 +28,6 @@ const SPORT_LABEL: Record<string, string> = {
   squash: "Squash",
 }
 
-// ─── Helpers ──────────────────────────────────────────────────────────────────
 function formatDate(dateKey: string) {
   const [y, m, d] = dateKey.split("-").map(Number)
   return new Date(y, m - 1, d).toLocaleDateString("es-AR", {
@@ -89,12 +38,13 @@ function formatDate(dateKey: string) {
   })
 }
 
-function formatCurrency(amount: number | null, currency: string) {
-  if (amount == null) return "Consultar"
+function formatCurrency(amount: number | null, currency = "ARS") {
+  if (amount == null) return "Consultar precio"
   return new Intl.NumberFormat("es-AR", {
     style: "currency",
     currency: currency === "ARS" ? "ARS" : "USD",
-    minimumFractionDigits: 2,
+    minimumFractionDigits: 0,
+    maximumFractionDigits: 0,
   }).format(amount)
 }
 
@@ -118,7 +68,7 @@ export default function CheckoutTestClient() {
 
   const [booking, setBooking] = useState<BookingWithId | null>(null)
   const [loading, setLoading] = useState(true)
-  const [actionLoading, setActionLoading] = useState<string | null>(null) // "confirm" | "fail"
+  const [actionLoading, setActionLoading] = useState<"confirm" | "fail" | null>(null)
   const [error, setError] = useState<string | null>(null)
   const [msLeft, setMsLeft] = useState<number | null>(null)
   const expiredRef = useRef(false)
@@ -127,7 +77,6 @@ export default function CheckoutTestClient() {
   useEffect(() => {
     if (!bookingId) return
     let cancelled = false
-
     ;(async () => {
       try {
         const b = await getBookingById(bookingId)
@@ -135,9 +84,9 @@ export default function CheckoutTestClient() {
           setBooking(b)
           if (b?.expiresAt) {
             const expiry: number =
-              typeof b.expiresAt?.toDate === "function"
-                ? b.expiresAt.toDate().getTime()
-                : new Date(b.expiresAt).getTime()
+              typeof (b.expiresAt as any)?.toDate === "function"
+                ? (b.expiresAt as any).toDate().getTime()
+                : new Date(b.expiresAt as any).getTime()
             setMsLeft(Math.max(0, expiry - Date.now()))
           }
         }
@@ -147,28 +96,20 @@ export default function CheckoutTestClient() {
         if (!cancelled) setLoading(false)
       }
     })()
-
-    return () => {
-      cancelled = true
-    }
+    return () => { cancelled = true }
   }, [bookingId])
 
   // ── Countdown + auto-expire ───────────────────────────────────────────────
   useEffect(() => {
-    if (msLeft === null) return
-    if (booking?.bookingStatus !== "pending_payment") return
-
-    const tick = setInterval(async () => {
+    if (msLeft === null || booking?.bookingStatus !== "pending_payment") return
+    const tick = setInterval(() => {
       setMsLeft((prev) => {
         if (prev === null) return null
         const next = prev - 1000
         if (next <= 0 && !expiredRef.current) {
           expiredRef.current = true
-          // Fire-and-forget: mark expired in Firestore, then refresh state
           expireBooking(bookingId).then(() => {
-            setBooking((b) =>
-              b ? { ...b, bookingStatus: "expired", paymentStatus: "pending" } : b,
-            )
+            setBooking((b) => b ? { ...b, bookingStatus: "expired" } : b)
           })
           clearInterval(tick)
           return 0
@@ -176,7 +117,6 @@ export default function CheckoutTestClient() {
         return Math.max(0, next)
       })
     }, 1000)
-
     return () => clearInterval(tick)
   }, [msLeft, booking?.bookingStatus, bookingId])
 
@@ -187,12 +127,11 @@ export default function CheckoutTestClient() {
     setError(null)
     try {
       await confirmBooking(bookingId)
-      // Fire-and-forget emails (don't block redirect on email failure)
       fetch("/api/booking/notify", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ bookingId }),
-      }).catch(() => {}) // silent fail — booking is already confirmed
+      }).catch(() => {})
       router.push(`/booking/success?bookingId=${encodeURIComponent(bookingId)}&source=test`)
     } catch {
       setError("No se pudo confirmar el pago. Intentá de nuevo.")
@@ -213,196 +152,257 @@ export default function CheckoutTestClient() {
     }
   }
 
-  // ── Render states ─────────────────────────────────────────────────────────
+  // ── Loading ───────────────────────────────────────────────────────────────
   if (loading) {
     return (
-      <div className="min-h-screen bg-slate-50 flex items-center justify-center">
-        <div className="text-slate-500 animate-pulse">Cargando reserva…</div>
+      <div className="min-h-screen flex items-center justify-center bg-slate-50">
+        <div className="flex flex-col items-center gap-3 text-slate-400">
+          <div className="w-8 h-8 border-2 border-slate-300 border-t-slate-600 rounded-full animate-spin" />
+          <p className="text-sm">Cargando reserva…</p>
+        </div>
       </div>
     )
   }
 
   if (!booking) {
     return (
-      <div className="min-h-screen bg-slate-50 flex items-center justify-center">
-        <Card className="w-full max-w-md border-border/50">
-          <CardContent className="pt-6 text-center space-y-4">
-            <XCircle className="w-12 h-12 text-red-400 mx-auto" />
-            <p className="text-slate-700 font-medium">Reserva no encontrada</p>
-            <Button variant="outline" onClick={() => router.push("/")}>
-              Volver al inicio
-            </Button>
-          </CardContent>
-        </Card>
+      <div className="min-h-screen flex items-center justify-center bg-slate-50 px-4">
+        <div className="text-center space-y-4">
+          <XCircle className="w-12 h-12 text-red-300 mx-auto" />
+          <p className="font-medium text-slate-700">Reserva no encontrada</p>
+          <button
+            onClick={() => router.push("/centros")}
+            className="text-sm text-slate-500 hover:text-slate-700 underline underline-offset-2"
+          >
+            Ver centros disponibles
+          </button>
+        </div>
       </div>
     )
   }
 
-  const isActionable = booking.bookingStatus === "pending_payment" && (msLeft ?? 1) > 0
-  const isExpired = booking.bookingStatus === "expired" || (msLeft !== null && msLeft <= 0 && booking.bookingStatus === "pending_payment")
+  const effectiveStatus: PlayerBookingStatus =
+    (msLeft !== null && msLeft <= 0 && booking.bookingStatus === "pending_payment")
+      ? "expired"
+      : booking.bookingStatus
+
+  const isActionable = effectiveStatus === "pending_payment"
+  const isExpired    = effectiveStatus === "expired"
+  const isConfirmed  = effectiveStatus === "confirmed"
+  const isCancelled  = effectiveStatus === "cancelled"
+  const isUrgent     = isActionable && msLeft !== null && msLeft < 60_000
 
   return (
-    <div className="min-h-screen bg-slate-50 pt-24 pb-16">
-      <div className="container mx-auto px-4 max-w-lg">
+    <div className="min-h-screen bg-slate-50">
 
-        {/* Test mode banner */}
-        <div className="mb-4 rounded-xl bg-amber-50 border border-amber-200 px-4 py-3 flex items-start gap-3">
-          <AlertTriangle className="w-4 h-4 text-amber-600 mt-0.5 shrink-0" />
-          <p className="text-sm text-amber-700">
-            <span className="font-semibold">Modo de prueba.</span> Este checkout simula el flujo de pago.
-            Será reemplazado por Mercado Pago.
-          </p>
-        </div>
+      {/* ── Top nav ─────────────────────────────────────────────────────── */}
+      <div className="sticky top-0 z-10 bg-white border-b border-slate-200 px-4 py-3 flex items-center gap-3">
+        <button
+          onClick={() => router.back()}
+          className="rounded-full p-1.5 hover:bg-slate-100 text-slate-500 transition-colors"
+          aria-label="Volver"
+        >
+          <ArrowLeft className="w-4 h-4" />
+        </button>
+        <span className="font-semibold text-slate-800 text-sm">Finalizar reserva</span>
 
-        <Card className="border border-border/50 shadow-sm">
-          <CardHeader className="pb-4">
-            <div className="flex items-center justify-between">
-              <CardTitle className="text-xl">Checkout</CardTitle>
-              <StatusBadge status={isExpired && booking.bookingStatus !== "expired" ? "expired" : booking.bookingStatus} />
+        {/* Test badge */}
+        <span className="ml-auto text-[11px] font-medium bg-amber-100 text-amber-700 border border-amber-200 px-2 py-0.5 rounded-full">
+          Modo prueba
+        </span>
+      </div>
+
+      <div className="max-w-md mx-auto px-4 py-8 space-y-5">
+
+        {/* ── Confirmed / cancelled / expired banners ──────────────────── */}
+        {isConfirmed && (
+          <div className="rounded-2xl bg-emerald-50 border border-emerald-200 px-5 py-5 flex items-start gap-4">
+            <CheckCircle2 className="w-6 h-6 text-emerald-600 shrink-0 mt-0.5" />
+            <div>
+              <p className="font-semibold text-emerald-800">¡Reserva confirmada!</p>
+              <p className="text-sm text-emerald-700 mt-0.5">Nos vemos en la cancha.</p>
             </div>
-          </CardHeader>
-
-          <CardContent className="space-y-6">
-
-            {/* Booking summary */}
-            <div className="rounded-xl border border-slate-200 bg-slate-50 p-4 space-y-3">
-              <div className="flex items-center gap-2 text-slate-800">
-                <Building2 className="w-4 h-4 text-blue-600 shrink-0" />
-                <span className="font-semibold">{booking.clubName}</span>
-              </div>
-              <div className="flex items-center gap-2 text-slate-700">
-                <div className="w-4 h-4 shrink-0 text-blue-600 flex items-center justify-center text-xs font-bold">◈</div>
-                <span>
-                  {booking.courtName}
-                  {booking.sport ? ` · ${SPORT_LABEL[booking.sport] || booking.sport}` : ""}
-                </span>
-              </div>
-              <div className="flex items-center gap-2 text-slate-700">
-                <Calendar className="w-4 h-4 text-blue-600 shrink-0" />
-                <span className="capitalize">{formatDate(booking.date)}</span>
-              </div>
-              <div className="flex items-center gap-2 text-slate-700">
-                <Clock className="w-4 h-4 text-blue-600 shrink-0" />
-                <span>
-                  {booking.startTime} – {booking.endTime}
-                  <span className="text-slate-400 ml-2">({booking.durationMinutes} min)</span>
-                </span>
-              </div>
-              <div className="flex items-center gap-2 text-slate-700">
-                <User className="w-4 h-4 text-blue-600 shrink-0" />
-                <span>{booking.userName}</span>
-              </div>
+          </div>
+        )}
+        {isCancelled && (
+          <div className="rounded-2xl bg-red-50 border border-red-200 px-5 py-5 flex items-start gap-4">
+            <XCircle className="w-6 h-6 text-red-500 shrink-0 mt-0.5" />
+            <div>
+              <p className="font-semibold text-red-700">Reserva cancelada</p>
+              <p className="text-sm text-red-600 mt-0.5">El pago no pudo procesarse.</p>
             </div>
+          </div>
+        )}
+        {isExpired && (
+          <div className="rounded-2xl bg-slate-100 border border-slate-300 px-5 py-5 flex items-start gap-4">
+            <AlertTriangle className="w-6 h-6 text-slate-500 shrink-0 mt-0.5" />
+            <div>
+              <p className="font-semibold text-slate-700">Reserva expirada</p>
+              <p className="text-sm text-slate-500 mt-0.5">El tiempo límite venció y el turno quedó liberado.</p>
+            </div>
+          </div>
+        )}
 
-            {/* Price */}
-            <div className="flex items-center justify-between rounded-xl border border-slate-200 px-4 py-3">
-              <div className="flex items-center gap-2 text-slate-600">
-                <CreditCard className="w-4 h-4" />
-                <span className="text-sm">Total a pagar</span>
-              </div>
-              <span className="font-bold text-slate-900 text-lg">
-                {formatCurrency(booking.price, booking.currency)}
+        {/* ── Booking details card ─────────────────────────────────────── */}
+        <div className="bg-white rounded-2xl border border-slate-200 overflow-hidden">
+          {/* Center header */}
+          <div className="px-5 pt-5 pb-4 border-b border-slate-100">
+            <p className="text-xs font-medium text-slate-400 uppercase tracking-wider mb-1">Centro</p>
+            <div className="flex items-start justify-between gap-2">
+              <h2 className="text-lg font-bold text-slate-900 leading-tight">{booking.clubName}</h2>
+              {/* Status pill */}
+              <span className={`shrink-0 inline-flex items-center gap-1 rounded-full px-2.5 py-0.5 text-xs font-medium ${
+                isConfirmed ? "bg-emerald-100 text-emerald-700" :
+                isCancelled ? "bg-red-100 text-red-700" :
+                isExpired   ? "bg-slate-200 text-slate-600" :
+                               "bg-amber-100 text-amber-700"
+              }`}>
+                {isConfirmed ? <CheckCircle2 className="w-3 h-3" /> :
+                 isCancelled ? <XCircle className="w-3 h-3" /> :
+                 isExpired   ? <AlertTriangle className="w-3 h-3" /> :
+                               <Clock className="w-3 h-3" />}
+                {isConfirmed ? "Confirmada" :
+                 isCancelled ? "Cancelada"  :
+                 isExpired   ? "Expirada"   :
+                               "Pendiente"}
               </span>
             </div>
+          </div>
 
-            {/* Countdown (only while pending) */}
-            {isActionable && msLeft !== null && (
-              <div className="flex items-center justify-between text-sm">
-                <span className="text-slate-500">Tiempo para confirmar</span>
-                <span
-                  className={`font-mono font-semibold ${
-                    msLeft < 60_000 ? "text-red-600" : "text-amber-600"
-                  }`}
-                >
-                  {formatCountdown(msLeft)}
+          {/* Details rows */}
+          <div className="px-5 py-4 space-y-3.5">
+            {/* Court + sport */}
+            <div className="flex items-center gap-3">
+              <div className="w-8 h-8 rounded-xl bg-slate-100 flex items-center justify-center shrink-0 text-slate-500">
+                🎾
+              </div>
+              <div>
+                <p className="text-sm font-medium text-slate-800">{booking.courtName}</p>
+                {booking.sport && (
+                  <p className="text-xs text-slate-400">{SPORT_LABEL[booking.sport] ?? booking.sport}</p>
+                )}
+              </div>
+            </div>
+
+            {/* Date */}
+            <div className="flex items-center gap-3">
+              <div className="w-8 h-8 rounded-xl bg-slate-100 flex items-center justify-center shrink-0">
+                <Calendar className="w-4 h-4 text-slate-500" />
+              </div>
+              <p className="text-sm font-medium text-slate-800 capitalize">{formatDate(booking.date)}</p>
+            </div>
+
+            {/* Time */}
+            <div className="flex items-center gap-3">
+              <div className="w-8 h-8 rounded-xl bg-slate-100 flex items-center justify-center shrink-0">
+                <Clock className="w-4 h-4 text-slate-500" />
+              </div>
+              <div>
+                <p className="text-sm font-medium text-slate-800">
+                  {booking.startTime} – {booking.endTime}
+                </p>
+                <p className="text-xs text-slate-400">{booking.durationMinutes} minutos</p>
+              </div>
+            </div>
+
+            {/* Divider */}
+            <div className="border-t border-slate-100 pt-3">
+              <div className="flex items-center justify-between">
+                <span className="text-sm text-slate-500">Total</span>
+                <span className="text-2xl font-bold text-slate-900">
+                  {formatCurrency(booking.price, booking.currency)}
                 </span>
               </div>
-            )}
+            </div>
+          </div>
+        </div>
 
-            {/* Expired state */}
-            {isExpired && (
-              <div className="rounded-xl bg-slate-100 border border-slate-200 px-4 py-3 text-center text-slate-600 text-sm">
-                Esta reserva expiró. El turno quedó liberado.
-              </div>
-            )}
+        {/* ── Countdown bar ────────────────────────────────────────────── */}
+        {isActionable && msLeft !== null && (
+          <div className={`rounded-2xl border px-5 py-4 flex items-center justify-between ${
+            isUrgent
+              ? "bg-red-50 border-red-200"
+              : "bg-amber-50 border-amber-200"
+          }`}>
+            <div className="flex items-center gap-2">
+              <Clock className={`w-4 h-4 ${isUrgent ? "text-red-500" : "text-amber-600"}`} />
+              <span className={`text-sm font-medium ${isUrgent ? "text-red-700" : "text-amber-700"}`}>
+                {isUrgent ? "¡Quedan pocos segundos!" : "Tiempo para confirmar"}
+              </span>
+            </div>
+            <span className={`font-mono text-lg font-bold tabular-nums ${
+              isUrgent ? "text-red-600" : "text-amber-700"
+            }`}>
+              {formatCountdown(msLeft)}
+            </span>
+          </div>
+        )}
 
-            {/* Error message */}
-            {error && (
-              <div className="rounded-lg bg-red-50 border border-red-200 px-3 py-2 text-sm text-red-700">
-                {error}
-              </div>
-            )}
+        {/* ── Error ───────────────────────────────────────────────────── */}
+        {error && (
+          <div className="rounded-xl bg-red-50 border border-red-200 px-4 py-3 text-sm text-red-700 flex items-start gap-2">
+            <AlertTriangle className="w-4 h-4 shrink-0 mt-0.5" />
+            {error}
+          </div>
+        )}
 
-            {/* Actions */}
-            {isActionable ? (
-              <div className="space-y-3">
-                <Button
-                  className="w-full bg-emerald-600 hover:bg-emerald-700 text-white gap-2"
-                  onClick={handleConfirm}
-                  disabled={!!actionLoading}
-                >
-                  <CheckCircle2 className="w-4 h-4" />
-                  {actionLoading === "confirm" ? "Confirmando…" : "Confirmar pago"}
-                </Button>
+        {/* ── CTA area ─────────────────────────────────────────────────── */}
+        {isActionable && (
+          <div className="space-y-3 pt-1">
+            <Button
+              className="w-full h-13 text-base font-semibold bg-emerald-600 hover:bg-emerald-700 text-white rounded-2xl shadow-sm transition-all"
+              onClick={handleConfirm}
+              disabled={!!actionLoading}
+            >
+              {actionLoading === "confirm" ? (
+                <span className="flex items-center gap-2">
+                  <div className="w-4 h-4 border-2 border-white/40 border-t-white rounded-full animate-spin" />
+                  Confirmando…
+                </span>
+              ) : (
+                <span className="flex items-center gap-2">
+                  <CheckCircle2 className="w-5 h-5" />
+                  Confirmar pago
+                </span>
+              )}
+            </Button>
 
-                <Button
-                  variant="outline"
-                  className="w-full border-red-200 text-red-600 hover:bg-red-50 gap-2"
-                  onClick={handleFail}
-                  disabled={!!actionLoading}
-                >
-                  <XCircle className="w-4 h-4" />
-                  {actionLoading === "fail" ? "Procesando…" : "Simular fallo de pago"}
-                </Button>
+            <button
+              onClick={handleFail}
+              disabled={!!actionLoading}
+              className="w-full text-center text-xs text-slate-400 hover:text-slate-600 py-1 transition-colors disabled:opacity-50"
+            >
+              {actionLoading === "fail" ? "Procesando…" : "Simular fallo de pago"}
+            </button>
+          </div>
+        )}
 
-                <Button
-                  variant="ghost"
-                  className="w-full text-slate-500 gap-2"
-                  onClick={() => router.back()}
-                  disabled={!!actionLoading}
-                >
-                  <ArrowLeft className="w-4 h-4" />
-                  Volver (dejar pendiente)
-                </Button>
-              </div>
-            ) : !isExpired ? (
-              // Already resolved state (confirmed / cancelled shown after redirect, 
-              // but just in case user navigates back)
-              <div className="space-y-3">
-                <div className="text-center text-sm text-slate-500 py-2">
-                  {booking.bookingStatus === "confirmed"
-                    ? "✅ Reserva confirmada. ¡Nos vemos en la cancha!"
-                    : "❌ Esta reserva fue cancelada."}
-                  <span className="block text-xs mt-1">
-                    Pago: {PAYMENT_LABEL[booking.paymentStatus]}
-                  </span>
-                </div>
-                <Button
-                  variant="outline"
-                  className="w-full gap-2"
-                  onClick={() => router.push("/clubs")}
-                >
-                  <ArrowLeft className="w-4 h-4" />
-                  Ver otros clubes
-                </Button>
-              </div>
-            ) : (
-              <Button
-                variant="outline"
-                className="w-full gap-2"
-                onClick={() => router.back()}
-              >
-                <ArrowLeft className="w-4 h-4" />
-                Volver y elegir otro turno
-              </Button>
-            )}
+        {(isExpired || isCancelled) && (
+          <Button
+            variant="outline"
+            className="w-full rounded-2xl h-12"
+            onClick={() => router.back()}
+          >
+            <ArrowLeft className="w-4 h-4 mr-2" />
+            Volver y elegir otro turno
+          </Button>
+        )}
 
-            {/* Footer note */}
-            <p className="text-center text-xs text-slate-400 pt-2">
-              ID de reserva: <span className="font-mono">{bookingId}</span>
-            </p>
-          </CardContent>
-        </Card>
+        {isConfirmed && (
+          <Button
+            variant="outline"
+            className="w-full rounded-2xl h-12"
+            onClick={() => router.push("/centros")}
+          >
+            Ver otros centros
+          </Button>
+        )}
+
+        {/* ── Test mode footnote ───────────────────────────────────────── */}
+        <p className="text-center text-[11px] text-slate-300 pb-2">
+          Reserva #{bookingId.slice(0, 8)}…
+        </p>
+
       </div>
     </div>
   )

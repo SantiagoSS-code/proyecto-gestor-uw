@@ -1,5 +1,19 @@
 /** @type {import('next').NextConfig} */
 const nextConfig = {
+  async redirects() {
+    return [
+      {
+        source: "/clubs",
+        destination: "/centros",
+        permanent: true,
+      },
+      {
+        source: "/clubs/:slug*",
+        destination: "/centros/:slug*",
+        permanent: true,
+      },
+    ]
+  },
   typescript: {
     ignoreBuildErrors: true,
   },

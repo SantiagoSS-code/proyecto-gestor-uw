@@ -3,7 +3,7 @@
 import Link from "next/link"
 import { useRouter } from "next/navigation"
 import { useSearchParams } from "next/navigation"
-import { useEffect, useMemo, useState } from "react"
+import { useEffect, useMemo, useState, Suspense } from "react"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Input } from "@/components/ui/input"
@@ -22,7 +22,7 @@ type InvitePayload = {
   expiresAt: string | null
 }
 
-export default function ClubOSRegisterPage() {
+function ClubOSRegisterPageInner() {
   const searchParams = useSearchParams()
   const router = useRouter()
   const token = useMemo(() => String(searchParams.get("token") || "").trim(), [searchParams])
@@ -167,5 +167,13 @@ export default function ClubOSRegisterPage() {
         </CardContent>
       </Card>
     </main>
+  )
+}
+
+export default function ClubOSRegisterPage() {
+  return (
+    <Suspense fallback={null}>
+      <ClubOSRegisterPageInner />
+    </Suspense>
   )
 }
