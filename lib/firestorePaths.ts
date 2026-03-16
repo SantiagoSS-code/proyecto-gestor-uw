@@ -10,6 +10,10 @@ export const CENTER_SUBCOLLECTIONS = {
   classes: "classes",
   availabilityRules: "availabilityRules",
   legacyAvailability: "availability",
+  // Entrenadores module
+  trainers: "trainers",
+  classSessions: "classSessions",
+  trainerSettlements: "trainerSettlements",
 } as const
 
 export const CENTER_SETTINGS_DOCS = {

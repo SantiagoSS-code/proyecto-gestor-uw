@@ -11,6 +11,7 @@ import {
   Wallet,
   BarChart3,
   GraduationCap,
+  Dumbbell,
   MessageSquare,
   CheckSquare,
   UserCircle2,
@@ -36,13 +37,14 @@ import { useAuth } from "@/lib/auth-context"
 import { useOnboarding, ONBOARDING_STEPS } from "@/lib/onboarding"
 
 const primaryItems = [
-  { icon: LayoutDashboard, label: "Panel", href: "/clubos/dashboard" },
-  { icon: Calendar, label: "Reservas", href: "/clubos/dashboard/reservas" },
-  { icon: Grid3X3, label: "Canchas", href: "/clubos/dashboard/courts" },
-  { icon: Users, label: "Clientes", href: "/clubos/dashboard/customers" },
-  { icon: GraduationCap, label: "Cursos", href: "/clubos/dashboard/cursos" },
-  { icon: Wallet, label: "Finanzas", href: "/clubos/dashboard/finanzas" },
-  { icon: BarChart3, label: "Reportes", href: "/clubos/dashboard/reportes" },
+  { icon: LayoutDashboard, label: "Panel",         href: "/clubos/dashboard" },
+  { icon: Calendar,        label: "Reservas",      href: "/clubos/dashboard/reservas" },
+  { icon: Grid3X3,         label: "Canchas",       href: "/clubos/dashboard/courts" },
+  { icon: Users,           label: "Clientes",      href: "/clubos/dashboard/customers" },
+  { icon: GraduationCap,   label: "Cursos",        href: "/clubos/dashboard/cursos" },
+  { icon: Dumbbell,        label: "Entrenadores",  href: "/clubos/dashboard/trainers" },
+  { icon: Wallet,          label: "Finanzas",      href: "/clubos/dashboard/finanzas" },
+  { icon: BarChart3,       label: "Reportes",      href: "/clubos/dashboard/reportes" },
 ]
 
 const gestionItems = [
