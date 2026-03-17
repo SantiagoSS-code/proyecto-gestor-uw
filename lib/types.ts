@@ -257,3 +257,401 @@ export interface ClassDoc {
   createdAt?: any;
   updatedAt?: any;
 }
+
+// ─── Promotions module ────────────────────────────────────────────────────────
+
+export type DiscountType = "percentage" | "fixed" | "special_price"
+export type DiscountStatus = "draft" | "active" | "paused" | "expired"
+export type AudienceType = "all" | "selected" | "segment"
+export type CampaignObjective = "reactivation" | "loyalty" | "valley_hours" | "promotion"
+export type CampaignStatus = "draft" | "active" | "paused" | "ended"
+
+export interface DiscountAppliesTo {
+  sports?: string[]          // [] means all
+  courtIds?: string[]        // [] means all
+  weekdays?: number[]        // 0=Sun … 6=Sat, [] means all
+  timeFrom?: string          // "HH:MM" or undefined
+  timeTo?: string            // "HH:MM" or undefined
+  minBookingAmount?: number
+  firstBookingOnly?: boolean
+}
+
+export interface DiscountDoc {
+  id?: string
+  clubId: string
+  name: string
+  code: string               // uppercase coupon code
+  description?: string
+  type: DiscountType
+  value: number              // % or ARS depending on type
+  appliesTo: DiscountAppliesTo
+  usageLimitTotal?: number   // undefined = unlimited
+  usageLimitPerUser?: number // undefined = unlimited
+  usageCount?: number        // running total
+  audienceType: AudienceType
+  audienceSegmentId?: string // when audienceType === "segment"
+  visibleInCheckout: boolean
+  startAt: any               // Timestamp
+  endAt?: any                // Timestamp or undefined = no expiry
+  status: DiscountStatus
+  createdAt?: any
+  updatedAt?: any
+}
+
+export interface DiscountRedemptionDoc {
+  id?: string
+  discountId: string
+  clubId: string
+  userId: string
+  bookingId: string
+  originalAmount: number
+  discountAmount: number
+  finalAmount: number
+  redeemedAt: any
+}
+
+export interface DiscountAssignmentDoc {
+  id?: string
+  discountId: string
+  clubId: string
+  userId: string
+  assignedAt: any
+  usedAt?: any
+}
+
+export interface CampaignDoc {
+  id?: string
+  clubId: string
+  name: string
+  objective: CampaignObjective
+  discountId: string
+  segmentId?: string
+  startAt: any
+  endAt?: any
+  status: CampaignStatus
+  messageTemplate?: string
+  metrics?: {
+    playersTargeted: number
+    couponsClaimed: number
+    bookingsGenerated: number
+    revenueGenerated: number
+  }
+  createdAt?: any
+  updatedAt?: any
+}
+
+export interface SegmentDoc {
+  id?: string
+  clubId: string
+  name: string
+  filters: SegmentFilters
+  createdAt?: any
+  updatedAt?: any
+}
+
+export interface SegmentFilters {
+  inactivityDays?: number
+  minBookings?: number
+  favoriteSport?: string
+  preferredTimeFrom?: string
+  preferredTimeTo?: string
+  spendingThreshold?: number
+  firstTimeOnly?: boolean
+}
+
+export interface AiRecommendationDoc {
+  id?: string
+  clubId: string
+  userId: string
+  userName: string
+  userEmail?: string
+  reason: string
+  recommendationType: "churn_risk" | "inactive" | "valley_hours" | "abandoned_checkout" | "loyal"
+  suggestedDiscountId?: string
+  probabilityScore: number   // 0–1
+  status: "pending" | "acted" | "dismissed"
+  createdAt?: any
+}
+
+/** Fields added to PlayerBookingDoc when a discount is applied (optional layer) */
+export interface BookingDiscountMeta {
+  discountId?: string
+  couponCode?: string
+  discountAmount?: number       // ARS off
+  originalAmount?: number
+}
+
+// ─── Memberships module ───────────────────────────────────────────────────────
+
+export type MembershipPlanStatus = "draft" | "active" | "paused" | "archived"
+export type MembershipBillingCycle = "monthly" | "quarterly" | "yearly"
+export type MembershipSubscriptionStatus = "active" | "paused" | "canceled" | "past_due" | "trial"
+export type MembershipBenefitType =
+  | "discount_percentage"
+  | "fixed_discount"
+  | "special_price"
+  | "priority_booking"
+  | "waitlist_priority"
+  | "free_class"
+  | "free_reservation"
+  | "exclusive_access"
+export type MembershipRuleTrigger = "frequency" | "tenure" | "low_occupancy" | "loyalty"
+export type MembershipEventType =
+  | "renewal"
+  | "cancellation"
+  | "pause"
+  | "reactivation"
+  | "upgrade"
+  | "downgrade"
+  | "benefit_applied"
+
+export interface MembershipTimeRange {
+  from: string   // "HH:MM"
+  to: string     // "HH:MM"
+}
+
+export interface MembershipPlanDoc {
+  id?: string
+  clubId: string
+  name: string
+  description?: string
+  billingCycle: MembershipBillingCycle
+  price: number
+  trialDays?: number
+  signupFee?: number
+  status: MembershipPlanStatus
+  // Inclusions
+  includedReservationsPerMonth?: number   // undefined = unlimited
+  includedClassesPerMonth?: number
+  includedSports?: string[]              // [] = all
+  includedCourtIds?: string[]            // [] = all
+  bookingPriorityHours?: string[]        // e.g. ["18:00","19:00"]
+  waitlistPriority?: boolean
+  // Restrictions
+  maxActiveBookings?: number
+  validWeekdays?: number[]               // 0=Sun … 6=Sat, [] = all
+  validTimeRanges?: MembershipTimeRange[]
+  createdAt?: any
+  updatedAt?: any
+}
+
+export interface MembershipBenefitDoc {
+  id?: string
+  clubId: string
+  planId: string
+  name: string
+  type: MembershipBenefitType
+  value?: number                         // % or ARS depending on type
+  appliesTo?: {
+    sports?: string[]
+    courtIds?: string[]
+    weekdays?: number[]
+    timeRanges?: MembershipTimeRange[]
+  }
+  status: "active" | "inactive"
+  createdAt?: any
+}
+
+export interface MembershipRuleCondition {
+  metric: string                         // e.g. "bookings_per_month"
+  operator: ">=" | "<=" | "==" | ">"
+  value: number
+}
+
+export interface MembershipRuleAction {
+  type: "add_discount" | "free_reservation" | "unlock_priority" | "unlock_waitlist" | "add_free_class"
+  value?: number
+}
+
+export interface MembershipRuleDoc {
+  id?: string
+  clubId: string
+  planId: string
+  name: string
+  triggerType: MembershipRuleTrigger
+  condition: MembershipRuleCondition
+  action: MembershipRuleAction
+  status: "active" | "inactive"
+  createdAt?: any
+}
+
+export interface MembershipSubscriptionDoc {
+  id?: string
+  clubId: string
+  userId: string
+  userEmail?: string
+  userName?: string
+  planId: string
+  planName?: string
+  status: MembershipSubscriptionStatus
+  startedAt: any
+  renewsAt?: any
+  canceledAt?: any
+  billingStatus?: "current" | "overdue" | "free_trial"
+  createdAt?: any
+  updatedAt?: any
+}
+
+export interface MembershipUsageDoc {
+  id?: string
+  clubId: string
+  subscriptionId: string
+  userId: string
+  monthKey: string                       // "YYYY-MM"
+  reservationsUsed: number
+  classesUsed: number
+  discountsUsed: number
+  savingsAmount: number
+  updatedAt?: any
+}
+
+export interface MembershipEventDoc {
+  id?: string
+  clubId: string
+  subscriptionId: string
+  type: MembershipEventType
+  payload?: Record<string, any>
+  createdAt?: any
+}
+
+/** Fields optionally added to a booking when membership benefit is applied */
+export interface BookingMembershipMeta {
+  membershipSubscriptionId?: string
+  membershipPlanId?: string
+  membershipBenefitId?: string
+  membershipDiscountAmount?: number
+  membershipApplied?: boolean
+}
+
+// ─── Tournaments module ───────────────────────────────────────────────────────
+
+export type TournamentStatus =
+  | "draft"
+  | "published"
+  | "registration_closed"
+  | "in_progress"
+  | "finished"
+  | "archived"
+
+export type TournamentFormat =
+  | "single_elimination"
+  | "round_robin"
+  | "groups_playoff"
+
+export type TournamentParticipationType = "individual" | "doubles" | "teams"
+
+export type TournamentRegistrationStatus =
+  | "pending"
+  | "approved"
+  | "paid"
+  | "cancelled"
+  | "waitlist"
+
+export type TournamentPaymentStatus =
+  | "not_required"
+  | "pending"
+  | "approved"
+  | "failed"
+
+export type TournamentMatchStatus =
+  | "scheduled"
+  | "in_progress"
+  | "completed"
+  | "cancelled"
+
+export interface TournamentDoc {
+  id?: string
+  clubId: string
+  clubSlug?: string
+  name: string
+  slug: string
+  sport: string
+  category?: string
+  description?: string
+  bannerImageUrl?: string
+  format: TournamentFormat
+  participationType: TournamentParticipationType
+  maxParticipants?: number
+  minParticipants?: number
+  entryFee?: number
+  currency?: string
+  isFree: boolean
+  registrationOpenAt?: any
+  registrationDeadline?: any
+  tournamentStartAt?: any
+  tournamentEndAt?: any
+  rulesText?: string
+  matchFormat?: string
+  scoringSystem?: string
+  guaranteedMatches?: number
+  status: TournamentStatus
+  visibility: "public" | "private"
+  approvalRequired: boolean
+  waitlistEnabled: boolean
+  selfRegister: boolean
+  createdAt?: any
+  updatedAt?: any
+}
+
+export interface TournamentRegistrationDoc {
+  id?: string
+  tournamentId: string
+  clubId: string
+  userId: string
+  userName?: string
+  userEmail?: string
+  partnerUserId?: string
+  partnerName?: string
+  teamName?: string
+  registrationStatus: TournamentRegistrationStatus
+  paymentStatus: TournamentPaymentStatus
+  notes?: string
+  createdAt?: any
+  updatedAt?: any
+}
+
+export interface TournamentMatchDoc {
+  id?: string
+  tournamentId: string
+  clubId: string
+  round: number
+  roundLabel?: string          // "Cuartos de Final", "Semifinal", etc.
+  groupName?: string
+  participantA?: TournamentParticipant
+  participantB?: TournamentParticipant
+  courtId?: string
+  courtName?: string
+  scheduledAt?: any
+  status: TournamentMatchStatus
+  scoreA?: string
+  scoreB?: string
+  winnerId?: string
+  walkoverId?: string          // walkover/forfeit
+  notes?: string
+  createdAt?: any
+  updatedAt?: any
+}
+
+export interface TournamentParticipant {
+  registrationId: string
+  userId: string
+  displayName: string
+}
+
+export interface TournamentStandingDoc {
+  id?: string
+  tournamentId: string
+  clubId: string
+  registrationId: string
+  participantId: string
+  participantName: string
+  groupName?: string
+  played: number
+  won: number
+  lost: number
+  drawn: number
+  points: number
+  scoreFor: number
+  scoreAgainst: number
+  updatedAt?: any
+}

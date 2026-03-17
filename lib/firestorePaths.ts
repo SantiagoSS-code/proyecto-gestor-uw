@@ -16,6 +16,34 @@ export const CENTER_SUBCOLLECTIONS = {
   trainerSettlements: "trainerSettlements",
 } as const
 
+// ── Promotions module – top-level collections ──────────────────────────────
+export const PROMOTIONS_COLLECTIONS = {
+  discounts: "discounts",
+  campaigns: "campaigns",
+  segments: "segments",
+  discountAssignments: "discount_assignments",
+  discountRedemptions: "discount_redemptions",
+  aiRecommendations: "ai_recommendations",
+} as const
+
+// ── Memberships module – top-level collections ─────────────────────────────
+export const MEMBERSHIPS_COLLECTIONS = {
+  plans:         "membership_plans",
+  benefits:      "membership_benefits",
+  rules:         "membership_rules",
+  subscriptions: "membership_subscriptions",
+  usage:         "membership_usage",
+  events:        "membership_events",
+} as const
+
+// ── Tournaments module – top-level collections ─────────────────────────────
+export const TOURNAMENTS_COLLECTIONS = {
+  tournaments:    "tournaments",
+  registrations:  "tournament_registrations",
+  matches:        "tournament_matches",
+  standings:      "tournament_standings",
+} as const
+
 export const CENTER_SETTINGS_DOCS = {
   booking: "booking",
   operations: "operations",

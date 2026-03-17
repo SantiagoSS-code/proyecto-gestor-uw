@@ -8,6 +8,8 @@ import { auth } from "@/lib/firebaseClient"
 import { Button } from "@/components/ui/button"
 import { VoydLogo } from "@/components/ui/voyd-logo"
 import { ReviewModal, type ReviewBooking } from "@/components/players/review-modal"
+import { getMyRegistrations, getTournamentById } from "@/lib/tournaments"
+import type { TournamentDoc, TournamentRegistrationDoc } from "@/lib/types"
 import {
   AlertTriangle,
   Bell,
@@ -825,6 +827,71 @@ function FavoritesSection({
   )
 }
 
+// ─── My Tournaments ─────────────────────────────────────────────────────────
+
+const TREG_STATUS_COLORS: Record<string, string> = {
+  pending: "bg-amber-50 text-amber-700 border-amber-200",
+  approved: "bg-emerald-50 text-emerald-700 border-emerald-200",
+  paid: "bg-blue-50 text-blue-700 border-blue-200",
+  cancelled: "bg-red-50 text-red-600 border-red-200",
+  waitlist: "bg-purple-50 text-purple-700 border-purple-200",
+}
+const TREG_STATUS_LABELS: Record<string, string> = {
+  pending: "Pendiente", approved: "Aprobado", paid: "Pagado",
+  cancelled: "Cancelado", waitlist: "Lista espera",
+}
+
+function MyTournamentsSection({
+  registrations, tournaments, loading,
+}: {
+  registrations: TournamentRegistrationDoc[]
+  tournaments: TournamentDoc[]
+  loading: boolean
+}) {
+  return (
+    <Section title="Mis torneos">
+      {loading ? (
+        <div className="flex flex-col gap-3">
+          {[1, 2].map((i) => <Sk key={i} className="h-20 w-full" />)}
+        </div>
+      ) : registrations.length === 0 ? (
+        <div className="rounded-3xl border border-dashed border-slate-200 bg-white p-8 text-center">
+          <Trophy className="w-8 h-8 mx-auto text-slate-300 mb-3" />
+          <p className="text-sm font-semibold text-slate-600">Sin torneos</p>
+          <p className="text-xs text-slate-400 mt-1">Anotate a un torneo desde la página de tu club favorito.</p>
+          <Button asChild variant="outline" size="sm" className="mt-4 rounded-full">
+            <Link href="/centros">Explorar clubes</Link>
+          </Button>
+        </div>
+      ) : (
+        <div className="flex flex-col gap-3">
+          {registrations.map((r) => {
+            const t = tournaments.find((x) => x.id === r.tournamentId)
+            return (
+              <div key={r.id} className="rounded-2xl border border-slate-100 bg-white px-4 py-3 flex items-center gap-4">
+                <div className="flex-1 min-w-0">
+                  <p className="font-semibold text-sm truncate">{t?.name ?? r.tournamentId}</p>
+                  <p className="text-xs text-slate-400 mt-0.5">
+                    {t?.sport}{t?.category ? ` · ${t.category}` : ""}
+                  </p>
+                </div>
+                <span className={`text-xs border rounded-full px-2.5 py-0.5 font-medium shrink-0 ${TREG_STATUS_COLORS[r.registrationStatus] ?? ""}`}>
+                  {TREG_STATUS_LABELS[r.registrationStatus] ?? r.registrationStatus}
+                </span>
+                {t?.clubSlug && (
+                  <Link href={`/centros/${t.clubSlug}/torneos/${t.slug}`} className="shrink-0">
+                    <ExternalLink className="size-3.5 text-slate-400 hover:text-slate-700" />
+                  </Link>
+                )}
+              </div>
+            )
+          })}
+        </div>
+      )}
+    </Section>
+  )
+}
+
 // ─── MAIN PAGE ────────────────────────────────────────────────────────────────
 
 export default function PlayerDashboardPage() {
@@ -839,6 +906,10 @@ export default function PlayerDashboardPage() {
 
   const [favorites, setFavorites] = useState<FavoriteClub[]>([])
   const [favLoading, setFavLoading] = useState(true)
+
+  const [tournamentRegs, setTournamentRegs] = useState<TournamentRegistrationDoc[]>([])
+  const [myTournaments, setMyTournaments] = useState<TournamentDoc[]>([])
+  const [tournamentsLoading, setTournamentsLoading] = useState(true)
 
   // Review popup state
   const [pendingReviews, setPendingReviews] = useState<ReviewBooking[]>([])
@@ -876,6 +947,19 @@ export default function PlayerDashboardPage() {
       .catch(() => setFavorites([]))
       .finally(() => setFavLoading(false))
   }, [user, apiFetch])
+
+  useEffect(() => {
+    if (!user?.uid) return
+    getMyRegistrations(user.uid)
+      .then(async (regs) => {
+        setTournamentRegs(regs)
+        const ids = Array.from(new Set(regs.map((r) => r.tournamentId)))
+        const ts = await Promise.all(ids.map((id) => getTournamentById(id)))
+        setMyTournaments(ts.filter(Boolean) as TournamentDoc[])
+      })
+      .catch(() => {})
+      .finally(() => setTournamentsLoading(false))
+  }, [user?.uid])
 
   // Trigger review notification emails once per session (lazy email sender)
   useEffect(() => {
@@ -1010,6 +1094,7 @@ export default function PlayerDashboardPage() {
         <Notifications bookings={bookings} loading={bookingsLoading} />
         <BookingHistory bookings={pastBookings} loading={bookingsLoading} />
         <FavoritesSection favorites={favorites} loading={favLoading} onRemove={handleRemoveFavorite} />
+        <MyTournamentsSection registrations={tournamentRegs} tournaments={myTournaments} loading={tournamentsLoading} />
       </div>
     </main>
   )

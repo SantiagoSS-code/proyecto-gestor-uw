@@ -23,6 +23,7 @@ import {
   BarChart3, Activity, Target, Zap, Crown, AlertTriangle, ChevronDown,
   Clock, CheckCircle2, AlertCircle, Lightbulb, Trophy, Percent,
 } from "lucide-react"
+import { PlayerRetention } from "@/components/dashboard/player-retention"
 
 // ─────────────────────────────────────────────────────────────────────────────
 // Types
@@ -1177,6 +1178,13 @@ export function ReportsContent() {
             </CardContent>
           </Card>
         </div>
+      </section>
+
+      {/* SECTION — Player Retention */}
+      <section>
+        <SectionHeader icon={Users} title="Player Retention"
+          description="Retención, churn y frecuencia de tus jugadores" />
+        <PlayerRetention bookings={bookings} loading={loading} />
       </section>
 
       {/* SECTION 9 — Business Intelligence Insights */}

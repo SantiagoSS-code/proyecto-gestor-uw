@@ -31,9 +31,12 @@ import {
   Phone,
   Mail,
   User,
+  Trophy,
 } from "lucide-react"
 import { FIRESTORE_COLLECTIONS, CENTER_SETTINGS_DOCS, CENTER_SUBCOLLECTIONS, LEGACY_AVAILABILITY_DOCS } from "@/lib/firestorePaths"
 import type { AmenityKey, BookingSettings, CenterProfile, CourtDoc, SportKey, ClassDoc, ClassScheduleSlot, OperationSettings } from "@/lib/types"
+import type { TournamentDoc } from "@/lib/types"
+import { getPublicTournaments } from "@/lib/tournaments"
 import type { Course } from "@/lib/courses-types"
 import { minutesToTime, timeToMinutes } from "@/lib/utils"
 import {
@@ -403,6 +406,7 @@ export function ClubDetail({ slug }: { slug: string }) {
   const [operationSettings, setOperationSettings] = useState<OperationSettings | null>(null)
   const [classes, setClasses] = useState<ClassDoc[]>([])
   const [courses, setCourses] = useState<Course[]>([])
+  const [tournaments, setTournaments] = useState<TournamentDoc[]>([])
   const [selectedDate, setSelectedDate] = useState<string>(() => {
     const dateParam = searchParams.get("date")
     if (dateParam && /^\d{4}-\d{2}-\d{2}$/.test(dateParam)) {
@@ -571,6 +575,8 @@ export function ClubDetail({ slug }: { slug: string }) {
           .sort((a, b) => (a.publicOrder ?? 999) - (b.publicOrder ?? 999))
         setCourses(coursesData)
         setOperationSettings(operationsData)
+        // Load public tournaments
+        getPublicTournaments(found.id).then(setTournaments).catch(() => {})
         if (bookingSettings) setSettings(bookingSettings)
         else { const legacy = await loadLegacyAvailability(found.id); setSettings(legacy) }
       } catch (e) {
@@ -1566,7 +1572,73 @@ export function ClubDetail({ slug }: { slug: string }) {
 
       </div>
 
-      {/* Course enrollment modal */}
+      {/* Tournaments Section */}
+      {tournaments.length > 0 && (
+        <div className="mt-10">
+          <div className="flex items-center gap-3 mb-5">
+            <div className="flex items-center justify-center w-9 h-9 rounded-xl bg-amber-100">
+              <Trophy className="w-5 h-5 text-amber-600" />
+            </div>
+            <div>
+              <h2 className="text-xl font-bold text-slate-900">Torneos</h2>
+              <p className="text-sm text-slate-500">{tournaments.length} torneo{tournaments.length !== 1 ? "s" : ""} disponible{tournaments.length !== 1 ? "s" : ""}</p>
+            </div>
+          </div>
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-5">
+            {tournaments.map((t) => {
+              const startFmt = t.tournamentStartAt
+                ? (typeof (t.tournamentStartAt as any).toDate === "function"
+                    ? (t.tournamentStartAt as any).toDate()
+                    : new Date(t.tournamentStartAt as any)
+                  ).toLocaleDateString("es-AR", { day: "numeric", month: "short", year: "numeric" })
+                : null
+              return (
+                <div key={t.id} className="group flex flex-col rounded-2xl border border-slate-200 bg-white shadow-sm hover:shadow-md transition-shadow overflow-hidden">
+                  <div className="relative h-28 bg-gradient-to-br from-amber-400 to-orange-500 flex items-center justify-center">
+                    {t.bannerImageUrl ? (
+                      <img src={t.bannerImageUrl} alt={t.name} className="absolute inset-0 w-full h-full object-cover" />
+                    ) : (
+                      <Trophy className="w-8 h-8 text-white/50" />
+                    )}
+                    <div className="absolute top-2 left-2">
+                      <span className="inline-flex items-center rounded-full bg-white/90 backdrop-blur-sm px-2.5 py-0.5 text-[11px] font-semibold text-amber-700">
+                        {t.sport}
+                      </span>
+                    </div>
+                  </div>
+                  <div className="flex flex-col flex-1 p-4 gap-2">
+                    <h3 className="font-bold text-slate-900 text-base leading-snug">{t.name}</h3>
+                    {t.category && <p className="text-xs text-slate-500">{t.category}</p>}
+                    <div className="flex flex-col gap-1 text-xs text-slate-500">
+                      {startFmt && (
+                        <div className="flex items-center gap-1.5">
+                          <Calendar className="w-3.5 h-3.5" />
+                          <span>Inicio: <span className="font-medium text-slate-700">{startFmt}</span></span>
+                        </div>
+                      )}
+                      <div className="flex items-center gap-1.5">
+                        <Users className="w-3.5 h-3.5" />
+                        <span>{t.participationType} · {t.format}</span>
+                      </div>
+                    </div>
+                    <div className="mt-auto pt-3 border-t border-slate-100 flex items-center justify-between">
+                      <p className="font-bold text-slate-900">
+                        {t.isFree ? "Gratuito" : `$${t.entryFee?.toLocaleString("es-AR")} ${t.currency ?? "ARS"}`}
+                      </p>
+                      {t.clubSlug && t.slug && (
+                        <Link href={`/centros/${t.clubSlug}/torneos/${t.slug}`} className="inline-flex items-center rounded-full px-3 py-1 text-xs font-semibold bg-amber-100 text-amber-700 hover:bg-amber-200 transition-colors">
+                          Ver torneo
+                        </Link>
+                      )}
+                    </div>
+                  </div>
+                </div>
+              )
+            })}
+          </div>
+        </div>
+      )}
+
       {enrollCourse && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 px-4" onClick={(e) => { if (e.target === e.currentTarget) setEnrollCourse(null) }}>
           <div className="bg-white rounded-2xl shadow-2xl w-full max-w-md overflow-hidden">
