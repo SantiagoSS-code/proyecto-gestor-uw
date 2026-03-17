@@ -6,7 +6,7 @@ import { Button } from "@/components/ui/button"
 import { Calendar as CalendarPicker } from "@/components/ui/calendar"
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
-import { MapPin, Calendar, Clock, Search, Sparkles } from "lucide-react"
+import { MapPin, Calendar, Clock, Search, Sparkles, Dumbbell } from "lucide-react"
 import { format } from "date-fns"
 import { es } from "date-fns/locale"
 
@@ -15,26 +15,28 @@ const backgroundImages = [
   "/images/futbol-gestor.jpg",
 ]
 
+const SPORT_LABELS: Record<string, string> = {
+  padel: "Padel",
+  tennis: "Tennis",
+  futbol: "Fútbol",
+  pickleball: "Pickleball",
+  squash: "Squash",
+}
+
 function getTodayDate() {
   const now = new Date()
   return new Date(now.getFullYear(), now.getMonth(), now.getDate())
 }
 
-function roundToStep(date: Date, stepMinutes: number) {
-  const rounded = new Date(date)
-  const minutes = rounded.getMinutes()
-  const remainder = minutes % stepMinutes
-  const delta = remainder >= stepMinutes / 2 ? stepMinutes - remainder : -remainder
-  rounded.setMinutes(minutes + delta, 0, 0)
-  return rounded
-}
-
-function getTimePlusHours(hours: number, stepMinutes = 30) {
+function getNextTimeSlot(stepMinutes = 30) {
   const now = new Date()
-  now.setHours(now.getHours() + hours)
-  const rounded = roundToStep(now, stepMinutes)
-  const h = String(rounded.getHours()).padStart(2, "0")
-  const m = String(rounded.getMinutes()).padStart(2, "0")
+  const minutes = now.getMinutes()
+  const remainder = minutes % stepMinutes
+  const minutesToAdd = remainder === 0 ? stepMinutes : stepMinutes - remainder
+  const next = new Date(now)
+  next.setMinutes(minutes + minutesToAdd, 0, 0)
+  const h = String(next.getHours()).padStart(2, "0")
+  const m = String(next.getMinutes()).padStart(2, "0")
   return `${h}:${m}`
 }
 
@@ -53,8 +55,9 @@ function buildTimeOptions(stepMinutes = 30) {
 export function HeroSection() {
   const router = useRouter()
   const [location, setLocation] = useState("")
+  const [sport, setSport] = useState<string>("")
   const [date, setDate] = useState<Date | undefined>(undefined)
-  const [time, setTime] = useState<string>(() => getTimePlusHours(3))
+  const [time, setTime] = useState<string>(() => getNextTimeSlot())
   const [currentImageIndex, setCurrentImageIndex] = useState(0)
 
   const timeOptions = useMemo(() => buildTimeOptions(30), [])
@@ -66,6 +69,7 @@ export function HeroSection() {
   const handleSearch = () => {
     const params = new URLSearchParams()
     if (location.trim()) params.set("query", location.trim())
+    if (sport && sport !== "all") params.set("sport", sport)
     if (date) params.set("date", format(date, "yyyy-MM-dd"))
     if (time) params.set("time", time)
     router.push(`/centros?${params.toString()}`)
@@ -116,82 +120,80 @@ export function HeroSection() {
           </h1>
         </div>
 
-        <div className="w-full max-w-3xl mx-auto">
+        <div className="w-full max-w-5xl mx-auto">
           <div className="bg-card/80 backdrop-blur-xl rounded-2xl border border-border/50 p-2 shadow-2xl shadow-black/20">
             <form
-              className="flex flex-col md:flex-row gap-2"
+              className="flex flex-col md:flex-row md:items-center gap-2"
               onSubmit={(e) => {
                 e.preventDefault()
                 handleSearch()
               }}
             >
               {/* Location Field */}
-              <div className="flex-1 h-12 px-4 rounded-xl bg-secondary/50 group hover:bg-secondary transition-colors flex items-center">
-                <div className="flex items-center gap-3 w-full">
-                  <MapPin className="w-5 h-5 text-primary shrink-0" />
-                  <input
-                    type="text"
-                    placeholder="¿Dónde quieres jugar?"
-                    value={location}
-                    onChange={(e) => setLocation(e.target.value)}
-                    className="w-full h-full bg-transparent text-foreground placeholder:text-muted-foreground focus:outline-none text-sm leading-none"
-                  />
-                </div>
+              <div className="flex-[2] h-14 px-4 rounded-xl bg-secondary/50 group hover:bg-secondary transition-colors flex items-center gap-3">
+                <MapPin className="w-5 h-5 text-primary shrink-0" />
+                <input
+                  type="text"
+                  placeholder="¿Dónde quieres jugar?"
+                  value={location}
+                  onChange={(e) => setLocation(e.target.value)}
+                  className="w-full h-full bg-transparent text-foreground placeholder:text-muted-foreground focus:outline-none text-sm leading-none"
+                />
               </div>
+
+              {/* Sport Field */}
+              <Select value={sport} onValueChange={setSport}>
+                <SelectTrigger className="flex-1 h-14 data-[size=default]:h-14 px-4 rounded-xl bg-secondary/50 hover:bg-secondary transition-colors border-0 shadow-none gap-3 focus:ring-0 focus-visible:ring-0">
+                  <Dumbbell className="w-5 h-5 text-primary shrink-0" />
+                  <SelectValue placeholder="Deporte" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="all">Todos los deportes</SelectItem>
+                  {Object.entries(SPORT_LABELS).map(([key, label]) => (
+                    <SelectItem key={key} value={key}>{label}</SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
 
               {/* Date Field */}
-              <div className="flex-1 h-12 px-4 rounded-xl bg-secondary/50 group hover:bg-secondary transition-colors flex items-center">
-                <div className="flex items-center gap-3 w-full">
-                  <Calendar className="w-5 h-5 text-primary shrink-0" />
-                  <Popover>
-                    <PopoverTrigger asChild>
-                      <Button
-                        variant="ghost"
-                        className="h-full w-full justify-start px-0 py-0 text-left text-sm font-normal leading-none text-foreground"
-                      >
-                        {date ? (
-                          format(date, "PPP", { locale: es })
-                        ) : (
-                          <span className="text-muted-foreground">Seleccionar fecha</span>
-                        )}
-                      </Button>
-                    </PopoverTrigger>
-                    <PopoverContent align="start" className="w-auto p-0">
-                      <CalendarPicker
-                        mode="single"
-                        selected={date}
-                        onSelect={setDate}
-                        locale={es}
-                        initialFocus
-                      />
-                    </PopoverContent>
-                  </Popover>
-                </div>
-              </div>
+              <Popover>
+                <PopoverTrigger asChild>
+                  <div className="flex-1 h-14 px-4 rounded-xl bg-secondary/50 hover:bg-secondary transition-colors flex items-center gap-3 cursor-pointer">
+                    <Calendar className="w-5 h-5 text-primary shrink-0" />
+                    <span className="text-sm text-foreground leading-none whitespace-nowrap">
+                      {date ? format(date, "d MMM yyyy", { locale: es }) : <span className="text-muted-foreground">Fecha</span>}
+                    </span>
+                  </div>
+                </PopoverTrigger>
+                <PopoverContent align="start" className="w-auto p-0">
+                  <CalendarPicker
+                    mode="single"
+                    selected={date}
+                    onSelect={setDate}
+                    locale={es}
+                    initialFocus
+                    disabled={(d) => d < getTodayDate()}
+                  />
+                </PopoverContent>
+              </Popover>
 
               {/* Time Field */}
-              <div className="flex-1 h-12 px-4 rounded-xl bg-secondary/50 group hover:bg-secondary transition-colors flex items-center">
-                <div className="flex items-center gap-3 w-full">
+              <Select value={time} onValueChange={setTime}>
+                <SelectTrigger className="flex-1 h-14 data-[size=default]:h-14 px-4 rounded-xl bg-secondary/50 hover:bg-secondary transition-colors border-0 shadow-none gap-3 focus:ring-0 focus-visible:ring-0">
                   <Clock className="w-5 h-5 text-primary shrink-0" />
-                  <Select value={time} onValueChange={setTime}>
-                    <SelectTrigger className="w-full bg-transparent border-0 px-0 py-0 h-full shadow-none">
-                      <SelectValue className="text-sm leading-none" placeholder={time || "Seleccionar hora"} />
-                    </SelectTrigger>
-                    <SelectContent>
-                      {timeOptions.map((t) => (
-                        <SelectItem key={t} value={t}>
-                          {t}
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
-                </div>
-              </div>
+                  <SelectValue placeholder="Seleccionar hora" />
+                </SelectTrigger>
+                <SelectContent>
+                  {timeOptions.map((t) => (
+                    <SelectItem key={t} value={t}>{t}</SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
 
               {/* Search Button */}
               <Button
                 type="submit"
-                className="bg-primary text-primary-foreground hover:bg-primary/90 hover:text-primary-foreground h-12 px-6 rounded-xl flex items-center gap-2"
+                className="bg-primary text-primary-foreground hover:bg-primary/90 hover:text-primary-foreground h-14 px-6 rounded-xl flex items-center gap-2 shrink-0"
               >
                 <Search className="w-5 h-5" />
                 <span className="font-medium">Buscar</span>

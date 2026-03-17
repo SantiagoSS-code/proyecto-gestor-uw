@@ -13,7 +13,7 @@ import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { Header } from "@/components/header"
 import { Footer } from "@/components/footer"
-import { MapPin, Calendar, Clock, Search, ArrowLeft, Home, Star, SlidersHorizontal, Check } from "lucide-react"
+import { MapPin, Calendar, Clock, Search, ArrowLeft, Home, Star, SlidersHorizontal, Check, Dumbbell } from "lucide-react"
 import { FIRESTORE_COLLECTIONS } from "@/lib/firestorePaths"
 import { format } from "date-fns"
 import { es } from "date-fns/locale"
@@ -73,21 +73,15 @@ function getTodayDate() {
   return new Date(now.getFullYear(), now.getMonth(), now.getDate())
 }
 
-function roundToStep(date: Date, stepMinutes: number) {
-  const rounded = new Date(date)
-  const minutes = rounded.getMinutes()
-  const remainder = minutes % stepMinutes
-  const delta = remainder >= stepMinutes / 2 ? stepMinutes - remainder : -remainder
-  rounded.setMinutes(minutes + delta, 0, 0)
-  return rounded
-}
-
-function getTimePlusHours(hours: number, stepMinutes = 30) {
+function getNextTimeSlot(stepMinutes = 30) {
   const now = new Date()
-  now.setHours(now.getHours() + hours)
-  const rounded = roundToStep(now, stepMinutes)
-  const h = String(rounded.getHours()).padStart(2, "0")
-  const m = String(rounded.getMinutes()).padStart(2, "0")
+  const minutes = now.getMinutes()
+  const remainder = minutes % stepMinutes
+  const minutesToAdd = remainder === 0 ? stepMinutes : stepMinutes - remainder
+  const next = new Date(now)
+  next.setMinutes(minutes + minutesToAdd, 0, 0)
+  const h = String(next.getHours()).padStart(2, "0")
+  const m = String(next.getMinutes()).padStart(2, "0")
   return `${h}:${m}`
 }
 
@@ -116,7 +110,7 @@ export default function CentersClient() {
   const searchParams = useSearchParams()
   const [locationQuery, setLocationQuery] = useState("")
   const [selectedDate, setSelectedDate] = useState<Date | undefined>(undefined)
-  const [selectedTime, setSelectedTime] = useState<string>(getTimePlusHours(3))
+  const [selectedTime, setSelectedTime] = useState<string>(getNextTimeSlot())
   const [sortBy, setSortBy] = useState<SortBy>("relevance")
   const [selectedSport, setSelectedSport] = useState<string>("")
   const [centers, setCenters] = useState<Center[]>([])
@@ -126,7 +120,7 @@ export default function CentersClient() {
   useEffect(() => {
     setLocationQuery(searchParams?.get("query") || "")
     setSelectedDate(parseDateParam(searchParams?.get("date") || null) || getTodayDate())
-    setSelectedTime(searchParams?.get("time") || getTimePlusHours(3))
+    setSelectedTime(searchParams?.get("time") || getNextTimeSlot())
 
     const maybeSort = (searchParams?.get("sort") || "relevance") as SortBy
     const validSort: SortBy[] = ["relevance", "name-asc", "name-desc", "rating-desc", "rating-asc"]
@@ -185,7 +179,7 @@ export default function CentersClient() {
       if (!matchesSearch) return false
 
       // Sport filter
-      if (selectedSport && !(center.sports || []).includes(selectedSport)) return false
+      if (selectedSport && selectedSport !== "all" && !(center.sports || []).includes(selectedSport)) return false
 
       // Opening hours filter: only apply when time is selected and center has hours configured
       if (selectedTime && selectedDate && center.openingHours) {
@@ -249,7 +243,7 @@ export default function CentersClient() {
     if (sortBy !== "relevance") params.set("sort", sortBy)
     else params.delete("sort")
 
-    if (selectedSport) params.set("sport", selectedSport)
+    if (selectedSport && selectedSport !== "all") params.set("sport", selectedSport)
     else params.delete("sport")
 
     const queryString = params.toString()
@@ -327,65 +321,66 @@ export default function CentersClient() {
         <div className="mb-8 w-full max-w-6xl mx-auto">
           <div className="bg-card/80 backdrop-blur-xl rounded-2xl border border-border/50 p-2 shadow-lg shadow-black/5">
           <form
-            className="flex flex-col md:flex-row gap-2"
+            className="flex flex-col md:flex-row md:items-center gap-2"
             onSubmit={(e) => {
               e.preventDefault()
               applySearchToUrl()
             }}
           >
-            <div className="flex-1 h-12 px-4 rounded-xl bg-secondary/50 group hover:bg-secondary transition-colors flex items-center">
-              <div className="flex items-center gap-3 w-full">
-                <MapPin className="w-5 h-5 text-primary shrink-0" />
-                <Input
-                  value={locationQuery}
-                  onChange={(e) => setLocationQuery(e.target.value)}
-                  placeholder="¿Dónde quieres jugar?"
-                  className="w-full h-full bg-transparent border-0 shadow-none px-0 text-foreground placeholder:text-muted-foreground focus-visible:ring-0"
-                  aria-label="Ubicación"
-                />
-              </div>
+            <div className="flex-[2] h-14 px-4 rounded-xl bg-secondary/50 group hover:bg-secondary transition-colors flex items-center gap-3">
+              <MapPin className="w-5 h-5 text-primary shrink-0" />
+              <Input
+                value={locationQuery}
+                onChange={(e) => setLocationQuery(e.target.value)}
+                placeholder="¿Dónde quieres jugar?"
+                className="w-full h-full bg-transparent border-0 shadow-none px-0 text-foreground placeholder:text-muted-foreground focus-visible:ring-0"
+                aria-label="Ubicación"
+              />
             </div>
 
-            <div className="flex-1 h-12 px-4 rounded-xl bg-secondary/50 group hover:bg-secondary transition-colors flex items-center">
-              <div className="flex items-center gap-3 w-full">
-                <Calendar className="w-5 h-5 text-primary shrink-0" />
-                <Popover>
-                  <PopoverTrigger asChild>
-                    <Button
-                      variant="ghost"
-                      className="h-full w-full justify-start px-0 py-0 text-left text-sm font-normal leading-none text-foreground"
-                    >
-                      {selectedDate ? format(selectedDate, "PPP", { locale: es }) : <span className="text-muted-foreground">Seleccionar fecha</span>}
-                    </Button>
-                  </PopoverTrigger>
-                  <PopoverContent align="start" className="w-auto p-0">
-                    <CalendarPicker mode="single" selected={selectedDate} onSelect={setSelectedDate} locale={es} initialFocus />
-                  </PopoverContent>
-                </Popover>
-              </div>
-            </div>
+            {/* Sport Field */}
+            <Select value={selectedSport} onValueChange={setSelectedSport}>
+              <SelectTrigger className="flex-1 h-14 data-[size=default]:h-14 px-4 rounded-xl bg-secondary/50 hover:bg-secondary transition-colors border-0 shadow-none gap-3 focus:ring-0 focus-visible:ring-0">
+                <Dumbbell className="w-5 h-5 text-primary shrink-0" />
+                <SelectValue placeholder="Deporte" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="all">Todos los deportes</SelectItem>
+                {Object.entries(SPORT_LABELS).map(([key, label]) => (
+                  <SelectItem key={key} value={key}>{label}</SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
 
-            <div className="flex-1 h-12 px-4 rounded-xl bg-secondary/50 group hover:bg-secondary transition-colors flex items-center">
-              <div className="flex items-center gap-3 w-full">
+            <Popover>
+              <PopoverTrigger asChild>
+                <div className="flex-1 h-14 px-4 rounded-xl bg-secondary/50 hover:bg-secondary transition-colors flex items-center gap-3 cursor-pointer">
+                  <Calendar className="w-5 h-5 text-primary shrink-0" />
+                  <span className="text-sm text-foreground leading-none whitespace-nowrap">
+                    {selectedDate ? format(selectedDate, "d MMM yyyy", { locale: es }) : <span className="text-muted-foreground">Fecha</span>}
+                  </span>
+                </div>
+              </PopoverTrigger>
+              <PopoverContent align="start" className="w-auto p-0">
+                <CalendarPicker mode="single" selected={selectedDate} onSelect={setSelectedDate} locale={es} initialFocus disabled={(d) => d < getTodayDate()} />
+              </PopoverContent>
+            </Popover>
+
+            <Select value={selectedTime} onValueChange={setSelectedTime}>
+              <SelectTrigger className="flex-1 h-14 data-[size=default]:h-14 px-4 rounded-xl bg-secondary/50 hover:bg-secondary transition-colors border-0 shadow-none gap-3 focus:ring-0 focus-visible:ring-0">
                 <Clock className="w-5 h-5 text-primary shrink-0" />
-                <Select value={selectedTime} onValueChange={setSelectedTime}>
-                  <SelectTrigger className="w-full bg-transparent border-0 px-0 py-0 h-full shadow-none">
-                    <SelectValue className="text-sm leading-none" placeholder={selectedTime || "Seleccionar hora"} />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {timeOptions.map((t) => (
-                      <SelectItem key={t} value={t}>
-                        {t}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-              </div>
-            </div>
+                <SelectValue placeholder="Seleccionar hora" />
+              </SelectTrigger>
+              <SelectContent>
+                {timeOptions.map((t) => (
+                  <SelectItem key={t} value={t}>{t}</SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
 
             <Button
               type="submit"
-              className="bg-primary text-primary-foreground hover:bg-primary/90 hover:text-primary-foreground h-12 px-6 rounded-xl flex items-center gap-2"
+              className="bg-primary text-primary-foreground hover:bg-primary/90 hover:text-primary-foreground h-14 px-6 rounded-xl flex items-center gap-2 shrink-0"
             >
               <Search className="w-5 h-5" />
               <span className="font-medium">Buscar</span>

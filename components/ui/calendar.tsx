@@ -37,7 +37,7 @@ function Calendar({
         day: `${defaultClassNames.day} h-9 w-9 text-center text-sm p-0`,
         day_button: `${defaultClassNames.day_button} h-9 w-9 p-0 font-normal rounded-lg hover:bg-muted`,
         selected: `${defaultClassNames.selected} bg-primary text-primary-foreground hover:bg-primary hover:text-primary-foreground rounded-lg`,
-        today: `${defaultClassNames.today} bg-muted font-medium`,
+        today: `${defaultClassNames.today} font-bold text-primary`,
         outside: `${defaultClassNames.outside} text-muted-foreground/50`,
         disabled: `${defaultClassNames.disabled} text-muted-foreground/50`,
         hidden: `${defaultClassNames.hidden} invisible`,
