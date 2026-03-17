@@ -27,6 +27,7 @@ import {
   FolderKanban,
   Lock,
   Check,
+  Tag,
 } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { VoydLogo } from "@/components/ui/voyd-logo"
@@ -43,6 +44,7 @@ const primaryItems = [
   { icon: Users,           label: "Clientes",      href: "/clubos/dashboard/customers" },
   { icon: GraduationCap,   label: "Cursos",        href: "/clubos/dashboard/cursos" },
   { icon: Dumbbell,        label: "Entrenadores",  href: "/clubos/dashboard/trainers" },
+  { icon: Tag,            label: "Promociones",   href: "/clubos/dashboard/promotions" },
   { icon: Wallet,          label: "Finanzas",      href: "/clubos/dashboard/finanzas" },
   { icon: BarChart3,       label: "Reportes",      href: "/clubos/dashboard/reportes" },
 ]

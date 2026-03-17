@@ -18,6 +18,9 @@ import {
   expireBooking,
 } from "@/lib/booking-service"
 import type { PlayerBookingDoc, PlayerBookingStatus } from "@/lib/types"
+import { recordRedemption, type CouponValidationResult } from "@/lib/promotions"
+import { CouponInput } from "@/components/players/coupon-input"
+import { auth } from "@/lib/firebaseClient"
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 const SPORT_LABEL: Record<string, string> = {
@@ -72,6 +75,7 @@ export default function CheckoutTestClient() {
   const [error, setError] = useState<string | null>(null)
   const [msLeft, setMsLeft] = useState<number | null>(null)
   const expiredRef = useRef(false)
+  const [appliedCoupon, setAppliedCoupon] = useState<CouponValidationResult | null>(null)
 
   // ── Load booking ──────────────────────────────────────────────────────────
   useEffect(() => {
@@ -127,6 +131,19 @@ export default function CheckoutTestClient() {
     setError(null)
     try {
       await confirmBooking(bookingId)
+      // Record coupon redemption if one was applied
+      if (appliedCoupon?.valid && appliedCoupon.discount?.id) {
+        const userId = auth.currentUser?.uid ?? booking.userId
+        await recordRedemption({
+          discountId: appliedCoupon.discount.id,
+          clubId: booking.clubId,
+          userId,
+          bookingId,
+          originalAmount: booking.price ?? 0,
+          discountAmount: appliedCoupon.discountAmount,
+          finalAmount: appliedCoupon.finalAmount,
+        }).catch((e) => console.warn("[checkout] redemption record failed", e?.code ?? e?.message))
+      }
       fetch("/api/booking/notify", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
@@ -306,16 +323,47 @@ export default function CheckoutTestClient() {
             </div>
 
             {/* Divider */}
-            <div className="border-t border-slate-100 pt-3">
+            <div className="border-t border-slate-100 pt-3 space-y-1">
+              {appliedCoupon?.valid && appliedCoupon.discountAmount > 0 && (
+                <>
+                  <div className="flex items-center justify-between text-sm">
+                    <span className="text-slate-500">Subtotal</span>
+                    <span className="text-slate-500">{formatCurrency(booking.price, booking.currency)}</span>
+                  </div>
+                  <div className="flex items-center justify-between text-sm">
+                    <span className="text-emerald-600">Descuento ({appliedCoupon.discount?.code})</span>
+                    <span className="text-emerald-600 font-medium">-{formatCurrency(appliedCoupon.discountAmount, booking.currency)}</span>
+                  </div>
+                </>
+              )}
               <div className="flex items-center justify-between">
                 <span className="text-sm text-slate-500">Total</span>
                 <span className="text-2xl font-bold text-slate-900">
-                  {formatCurrency(booking.price, booking.currency)}
+                  {formatCurrency(
+                    appliedCoupon?.valid ? appliedCoupon.finalAmount : (booking.price ?? null),
+                    booking.currency,
+                  )}
                 </span>
               </div>
             </div>
           </div>
         </div>
+
+        {/* ── Coupon input (only while actionable) ─────────────────────── */}
+        {isActionable && booking.clubId && (
+          <CouponInput
+            clubId={booking.clubId}
+            userId={auth.currentUser?.uid ?? booking.userId}
+            sport={booking.sport}
+            courtId={booking.courtId}
+            startTime={booking.startTime}
+            weekday={new Date(`${booking.date}T00:00:00`).getDay()}
+            originalAmount={booking.price ?? 0}
+            applied={appliedCoupon}
+            onApply={(result) => setAppliedCoupon(result)}
+            onRemove={() => setAppliedCoupon(null)}
+          />
+        )}
 
         {/* ── Countdown bar ────────────────────────────────────────────── */}
         {isActionable && msLeft !== null && (

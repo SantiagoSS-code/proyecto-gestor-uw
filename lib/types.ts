@@ -257,3 +257,126 @@ export interface ClassDoc {
   createdAt?: any;
   updatedAt?: any;
 }
+
+// ─── Promotions module ────────────────────────────────────────────────────────
+
+export type DiscountType = "percentage" | "fixed" | "special_price"
+export type DiscountStatus = "draft" | "active" | "paused" | "expired"
+export type AudienceType = "all" | "selected" | "segment"
+export type CampaignObjective = "reactivation" | "loyalty" | "valley_hours" | "promotion"
+export type CampaignStatus = "draft" | "active" | "paused" | "ended"
+
+export interface DiscountAppliesTo {
+  sports?: string[]          // [] means all
+  courtIds?: string[]        // [] means all
+  weekdays?: number[]        // 0=Sun … 6=Sat, [] means all
+  timeFrom?: string          // "HH:MM" or undefined
+  timeTo?: string            // "HH:MM" or undefined
+  minBookingAmount?: number
+  firstBookingOnly?: boolean
+}
+
+export interface DiscountDoc {
+  id?: string
+  clubId: string
+  name: string
+  code: string               // uppercase coupon code
+  description?: string
+  type: DiscountType
+  value: number              // % or ARS depending on type
+  appliesTo: DiscountAppliesTo
+  usageLimitTotal?: number   // undefined = unlimited
+  usageLimitPerUser?: number // undefined = unlimited
+  usageCount?: number        // running total
+  audienceType: AudienceType
+  audienceSegmentId?: string // when audienceType === "segment"
+  visibleInCheckout: boolean
+  startAt: any               // Timestamp
+  endAt?: any                // Timestamp or undefined = no expiry
+  status: DiscountStatus
+  createdAt?: any
+  updatedAt?: any
+}
+
+export interface DiscountRedemptionDoc {
+  id?: string
+  discountId: string
+  clubId: string
+  userId: string
+  bookingId: string
+  originalAmount: number
+  discountAmount: number
+  finalAmount: number
+  redeemedAt: any
+}
+
+export interface DiscountAssignmentDoc {
+  id?: string
+  discountId: string
+  clubId: string
+  userId: string
+  assignedAt: any
+  usedAt?: any
+}
+
+export interface CampaignDoc {
+  id?: string
+  clubId: string
+  name: string
+  objective: CampaignObjective
+  discountId: string
+  segmentId?: string
+  startAt: any
+  endAt?: any
+  status: CampaignStatus
+  messageTemplate?: string
+  metrics?: {
+    playersTargeted: number
+    couponsClaimed: number
+    bookingsGenerated: number
+    revenueGenerated: number
+  }
+  createdAt?: any
+  updatedAt?: any
+}
+
+export interface SegmentDoc {
+  id?: string
+  clubId: string
+  name: string
+  filters: SegmentFilters
+  createdAt?: any
+  updatedAt?: any
+}
+
+export interface SegmentFilters {
+  inactivityDays?: number
+  minBookings?: number
+  favoriteSport?: string
+  preferredTimeFrom?: string
+  preferredTimeTo?: string
+  spendingThreshold?: number
+  firstTimeOnly?: boolean
+}
+
+export interface AiRecommendationDoc {
+  id?: string
+  clubId: string
+  userId: string
+  userName: string
+  userEmail?: string
+  reason: string
+  recommendationType: "churn_risk" | "inactive" | "valley_hours" | "abandoned_checkout" | "loyal"
+  suggestedDiscountId?: string
+  probabilityScore: number   // 0–1
+  status: "pending" | "acted" | "dismissed"
+  createdAt?: any
+}
+
+/** Fields added to PlayerBookingDoc when a discount is applied (optional layer) */
+export interface BookingDiscountMeta {
+  discountId?: string
+  couponCode?: string
+  discountAmount?: number       // ARS off
+  originalAmount?: number
+}

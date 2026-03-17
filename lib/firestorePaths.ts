@@ -16,6 +16,16 @@ export const CENTER_SUBCOLLECTIONS = {
   trainerSettlements: "trainerSettlements",
 } as const
 
+// ── Promotions module – top-level collections ──────────────────────────────
+export const PROMOTIONS_COLLECTIONS = {
+  discounts: "discounts",
+  campaigns: "campaigns",
+  segments: "segments",
+  discountAssignments: "discount_assignments",
+  discountRedemptions: "discount_redemptions",
+  aiRecommendations: "ai_recommendations",
+} as const
+
 export const CENTER_SETTINGS_DOCS = {
   booking: "booking",
   operations: "operations",
