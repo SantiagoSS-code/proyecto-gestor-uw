@@ -230,5 +230,48 @@ service cloud.firestore {
       allow create: if request.auth != null;
       allow update, delete: if false;
     }
+
+    // ── Tournaments module ────────────────────────────────────────────────
+
+    // tournaments – club admin CRUD; authenticated players can read public ones
+    match /tournaments/{tournamentId} {
+      allow read, write: if request.auth != null
+        && request.auth.uid == resource.data.clubId;
+      allow read: if request.auth != null
+        && resource.data.visibility == "public"
+        && resource.data.status != "draft";
+      allow create: if request.auth != null
+        && request.auth.uid == request.resource.data.clubId;
+    }
+
+    // tournament_registrations – club admin CRUD; player can create/read own
+    match /tournament_registrations/{regId} {
+      allow read, write: if request.auth != null
+        && request.auth.uid == resource.data.clubId;
+      allow read: if request.auth != null
+        && request.auth.uid == resource.data.userId;
+      allow create: if request.auth != null
+        && request.auth.uid == request.resource.data.userId;
+      allow update: if request.auth != null
+        && request.auth.uid == resource.data.clubId;
+    }
+
+    // tournament_matches – club admin CRUD; authenticated players can read (public brackets)
+    match /tournament_matches/{matchId} {
+      allow read, write: if request.auth != null
+        && request.auth.uid == resource.data.clubId;
+      allow read: if request.auth != null;
+      allow create: if request.auth != null
+        && request.auth.uid == request.resource.data.clubId;
+    }
+
+    // tournament_standings – club admin CRUD; authenticated players can read
+    match /tournament_standings/{standingId} {
+      allow read, write: if request.auth != null
+        && request.auth.uid == resource.data.clubId;
+      allow read: if request.auth != null;
+      allow create: if request.auth != null
+        && request.auth.uid == request.resource.data.clubId;
+    }
   }
 }

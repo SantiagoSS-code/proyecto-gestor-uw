@@ -29,6 +29,7 @@ import {
   Check,
   Tag,
   CreditCard,
+  Trophy,
 } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { VoydLogo } from "@/components/ui/voyd-logo"
@@ -47,6 +48,7 @@ const primaryItems = [
   { icon: Dumbbell,        label: "Entrenadores",  href: "/clubos/dashboard/trainers" },
   { icon: Tag,            label: "Promociones",   href: "/clubos/dashboard/promotions" },
   { icon: CreditCard,     label: "Membresías",    href: "/clubos/dashboard/memberships" },
+  { icon: Trophy,          label: "Torneos",       href: "/clubos/dashboard/tournaments" },
   { icon: Wallet,          label: "Finanzas",      href: "/clubos/dashboard/finanzas" },
   { icon: BarChart3,       label: "Reportes",      href: "/clubos/dashboard/reportes" },
 ]

@@ -522,3 +522,136 @@ export interface BookingMembershipMeta {
   membershipDiscountAmount?: number
   membershipApplied?: boolean
 }
+
+// ─── Tournaments module ───────────────────────────────────────────────────────
+
+export type TournamentStatus =
+  | "draft"
+  | "published"
+  | "registration_closed"
+  | "in_progress"
+  | "finished"
+  | "archived"
+
+export type TournamentFormat =
+  | "single_elimination"
+  | "round_robin"
+  | "groups_playoff"
+
+export type TournamentParticipationType = "individual" | "doubles" | "teams"
+
+export type TournamentRegistrationStatus =
+  | "pending"
+  | "approved"
+  | "paid"
+  | "cancelled"
+  | "waitlist"
+
+export type TournamentPaymentStatus =
+  | "not_required"
+  | "pending"
+  | "approved"
+  | "failed"
+
+export type TournamentMatchStatus =
+  | "scheduled"
+  | "in_progress"
+  | "completed"
+  | "cancelled"
+
+export interface TournamentDoc {
+  id?: string
+  clubId: string
+  clubSlug?: string
+  name: string
+  slug: string
+  sport: string
+  category?: string
+  description?: string
+  bannerImageUrl?: string
+  format: TournamentFormat
+  participationType: TournamentParticipationType
+  maxParticipants?: number
+  minParticipants?: number
+  entryFee?: number
+  currency?: string
+  isFree: boolean
+  registrationOpenAt?: any
+  registrationDeadline?: any
+  tournamentStartAt?: any
+  tournamentEndAt?: any
+  rulesText?: string
+  matchFormat?: string
+  scoringSystem?: string
+  guaranteedMatches?: number
+  status: TournamentStatus
+  visibility: "public" | "private"
+  approvalRequired: boolean
+  waitlistEnabled: boolean
+  selfRegister: boolean
+  createdAt?: any
+  updatedAt?: any
+}
+
+export interface TournamentRegistrationDoc {
+  id?: string
+  tournamentId: string
+  clubId: string
+  userId: string
+  userName?: string
+  userEmail?: string
+  partnerUserId?: string
+  partnerName?: string
+  teamName?: string
+  registrationStatus: TournamentRegistrationStatus
+  paymentStatus: TournamentPaymentStatus
+  notes?: string
+  createdAt?: any
+  updatedAt?: any
+}
+
+export interface TournamentMatchDoc {
+  id?: string
+  tournamentId: string
+  clubId: string
+  round: number
+  roundLabel?: string          // "Cuartos de Final", "Semifinal", etc.
+  groupName?: string
+  participantA?: TournamentParticipant
+  participantB?: TournamentParticipant
+  courtId?: string
+  courtName?: string
+  scheduledAt?: any
+  status: TournamentMatchStatus
+  scoreA?: string
+  scoreB?: string
+  winnerId?: string
+  walkoverId?: string          // walkover/forfeit
+  notes?: string
+  createdAt?: any
+  updatedAt?: any
+}
+
+export interface TournamentParticipant {
+  registrationId: string
+  userId: string
+  displayName: string
+}
+
+export interface TournamentStandingDoc {
+  id?: string
+  tournamentId: string
+  clubId: string
+  registrationId: string
+  participantId: string
+  participantName: string
+  groupName?: string
+  played: number
+  won: number
+  lost: number
+  drawn: number
+  points: number
+  scoreFor: number
+  scoreAgainst: number
+  updatedAt?: any
+}

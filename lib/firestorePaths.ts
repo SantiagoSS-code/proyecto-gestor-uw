@@ -36,6 +36,14 @@ export const MEMBERSHIPS_COLLECTIONS = {
   events:        "membership_events",
 } as const
 
+// ── Tournaments module – top-level collections ─────────────────────────────
+export const TOURNAMENTS_COLLECTIONS = {
+  tournaments:    "tournaments",
+  registrations:  "tournament_registrations",
+  matches:        "tournament_matches",
+  standings:      "tournament_standings",
+} as const
+
 export const CENTER_SETTINGS_DOCS = {
   booking: "booking",
   operations: "operations",
