@@ -380,3 +380,145 @@ export interface BookingDiscountMeta {
   discountAmount?: number       // ARS off
   originalAmount?: number
 }
+
+// ─── Memberships module ───────────────────────────────────────────────────────
+
+export type MembershipPlanStatus = "draft" | "active" | "paused" | "archived"
+export type MembershipBillingCycle = "monthly" | "quarterly" | "yearly"
+export type MembershipSubscriptionStatus = "active" | "paused" | "canceled" | "past_due" | "trial"
+export type MembershipBenefitType =
+  | "discount_percentage"
+  | "fixed_discount"
+  | "special_price"
+  | "priority_booking"
+  | "waitlist_priority"
+  | "free_class"
+  | "free_reservation"
+  | "exclusive_access"
+export type MembershipRuleTrigger = "frequency" | "tenure" | "low_occupancy" | "loyalty"
+export type MembershipEventType =
+  | "renewal"
+  | "cancellation"
+  | "pause"
+  | "reactivation"
+  | "upgrade"
+  | "downgrade"
+  | "benefit_applied"
+
+export interface MembershipTimeRange {
+  from: string   // "HH:MM"
+  to: string     // "HH:MM"
+}
+
+export interface MembershipPlanDoc {
+  id?: string
+  clubId: string
+  name: string
+  description?: string
+  billingCycle: MembershipBillingCycle
+  price: number
+  trialDays?: number
+  signupFee?: number
+  status: MembershipPlanStatus
+  // Inclusions
+  includedReservationsPerMonth?: number   // undefined = unlimited
+  includedClassesPerMonth?: number
+  includedSports?: string[]              // [] = all
+  includedCourtIds?: string[]            // [] = all
+  bookingPriorityHours?: string[]        // e.g. ["18:00","19:00"]
+  waitlistPriority?: boolean
+  // Restrictions
+  maxActiveBookings?: number
+  validWeekdays?: number[]               // 0=Sun … 6=Sat, [] = all
+  validTimeRanges?: MembershipTimeRange[]
+  createdAt?: any
+  updatedAt?: any
+}
+
+export interface MembershipBenefitDoc {
+  id?: string
+  clubId: string
+  planId: string
+  name: string
+  type: MembershipBenefitType
+  value?: number                         // % or ARS depending on type
+  appliesTo?: {
+    sports?: string[]
+    courtIds?: string[]
+    weekdays?: number[]
+    timeRanges?: MembershipTimeRange[]
+  }
+  status: "active" | "inactive"
+  createdAt?: any
+}
+
+export interface MembershipRuleCondition {
+  metric: string                         // e.g. "bookings_per_month"
+  operator: ">=" | "<=" | "==" | ">"
+  value: number
+}
+
+export interface MembershipRuleAction {
+  type: "add_discount" | "free_reservation" | "unlock_priority" | "unlock_waitlist" | "add_free_class"
+  value?: number
+}
+
+export interface MembershipRuleDoc {
+  id?: string
+  clubId: string
+  planId: string
+  name: string
+  triggerType: MembershipRuleTrigger
+  condition: MembershipRuleCondition
+  action: MembershipRuleAction
+  status: "active" | "inactive"
+  createdAt?: any
+}
+
+export interface MembershipSubscriptionDoc {
+  id?: string
+  clubId: string
+  userId: string
+  userEmail?: string
+  userName?: string
+  planId: string
+  planName?: string
+  status: MembershipSubscriptionStatus
+  startedAt: any
+  renewsAt?: any
+  canceledAt?: any
+  billingStatus?: "current" | "overdue" | "free_trial"
+  createdAt?: any
+  updatedAt?: any
+}
+
+export interface MembershipUsageDoc {
+  id?: string
+  clubId: string
+  subscriptionId: string
+  userId: string
+  monthKey: string                       // "YYYY-MM"
+  reservationsUsed: number
+  classesUsed: number
+  discountsUsed: number
+  savingsAmount: number
+  updatedAt?: any
+}
+
+export interface MembershipEventDoc {
+  id?: string
+  clubId: string
+  subscriptionId: string
+  type: MembershipEventType
+  payload?: Record<string, any>
+  createdAt?: any
+}
+
+/** Fields optionally added to a booking when membership benefit is applied */
+export interface BookingMembershipMeta {
+  membershipSubscriptionId?: string
+  membershipPlanId?: string
+  membershipBenefitId?: string
+  membershipDiscountAmount?: number
+  membershipApplied?: boolean
+}

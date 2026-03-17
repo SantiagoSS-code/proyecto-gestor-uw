@@ -174,5 +174,61 @@ service cloud.firestore {
       allow create: if request.auth != null
         && request.auth.uid == request.resource.data.clubId;
     }
+
+    // ── Memberships module ────────────────────────────────────────────────
+
+    // membership_plans – club admin CRUD; authenticated players can read active plans
+    match /membership_plans/{planId} {
+      allow read, write: if request.auth != null
+        && request.auth.uid == resource.data.clubId;
+      allow read: if request.auth != null
+        && resource.data.status == "active";
+      allow create: if request.auth != null
+        && request.auth.uid == request.resource.data.clubId;
+    }
+
+    // membership_benefits – club admin only
+    match /membership_benefits/{benefitId} {
+      allow read, write: if request.auth != null
+        && request.auth.uid == resource.data.clubId;
+      allow create: if request.auth != null
+        && request.auth.uid == request.resource.data.clubId;
+    }
+
+    // membership_rules – club admin only
+    match /membership_rules/{ruleId} {
+      allow read, write: if request.auth != null
+        && request.auth.uid == resource.data.clubId;
+      allow create: if request.auth != null
+        && request.auth.uid == request.resource.data.clubId;
+    }
+
+    // membership_subscriptions – club admin CRUD; subscribed player can read own
+    match /membership_subscriptions/{subscriptionId} {
+      allow read, write: if request.auth != null
+        && request.auth.uid == resource.data.clubId;
+      allow read: if request.auth != null
+        && request.auth.uid == resource.data.userId;
+      allow create: if request.auth != null
+        && request.auth.uid == request.resource.data.clubId;
+    }
+
+    // membership_usage – club admin reads; authenticated player can increment own usage
+    match /membership_usage/{usageId} {
+      allow read: if request.auth != null
+        && request.auth.uid == resource.data.clubId;
+      allow read: if request.auth != null
+        && request.auth.uid == resource.data.userId;
+      allow create, update: if request.auth != null
+        && request.auth.uid == request.resource.data.userId;
+    }
+
+    // membership_events – club admin reads; no direct client writes (server-side only)
+    match /membership_events/{eventId} {
+      allow read: if request.auth != null
+        && request.auth.uid == resource.data.clubId;
+      allow create: if request.auth != null;
+      allow update, delete: if false;
+    }
   }
 }

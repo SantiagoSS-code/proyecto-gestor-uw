@@ -19,6 +19,7 @@ import {
 } from "@/lib/booking-service"
 import type { PlayerBookingDoc, PlayerBookingStatus } from "@/lib/types"
 import { recordRedemption, type CouponValidationResult } from "@/lib/promotions"
+import { resolveMembershipBenefit, recordMembershipUsage, type MembershipBenefitApplicationResult } from "@/lib/memberships"
 import { CouponInput } from "@/components/players/coupon-input"
 import { auth } from "@/lib/firebaseClient"
 
@@ -76,6 +77,7 @@ export default function CheckoutTestClient() {
   const [msLeft, setMsLeft] = useState<number | null>(null)
   const expiredRef = useRef(false)
   const [appliedCoupon, setAppliedCoupon] = useState<CouponValidationResult | null>(null)
+  const [appliedMembership, setAppliedMembership] = useState<MembershipBenefitApplicationResult | null>(null)
 
   // ── Load booking ──────────────────────────────────────────────────────────
   useEffect(() => {
@@ -92,6 +94,21 @@ export default function CheckoutTestClient() {
                 ? (b.expiresAt as any).toDate().getTime()
                 : new Date(b.expiresAt as any).getTime()
             setMsLeft(Math.max(0, expiry - Date.now()))
+          }
+          // Resolve membership benefit silently
+          const uid = auth.currentUser?.uid
+          if (uid && b?.clubId && b?.sport && b?.courtId && b?.startTime && b?.date) {
+            resolveMembershipBenefit({
+              clubId: b.clubId,
+              userId: uid,
+              sport: b.sport,
+              courtId: b.courtId,
+              startTime: b.startTime,
+              weekday: new Date(`${b.date}T00:00:00`).getDay(),
+              originalAmount: b.price ?? 0,
+            }).then((result) => {
+              if (!cancelled) setAppliedMembership(result)
+            }).catch(() => {})
           }
         }
       } catch {
@@ -143,6 +160,17 @@ export default function CheckoutTestClient() {
           discountAmount: appliedCoupon.discountAmount,
           finalAmount: appliedCoupon.finalAmount,
         }).catch((e) => console.warn("[checkout] redemption record failed", e?.code ?? e?.message))
+      }
+      // Record membership usage if benefit was applied
+      if (appliedMembership?.applied) {
+        const userId = auth.currentUser?.uid ?? booking.userId
+        await recordMembershipUsage({
+          clubId: booking.clubId,
+          subscriptionId: appliedMembership.subscriptionId,
+          userId,
+          discountAmount: appliedMembership.discountAmount,
+          reservationIsIncluded: appliedMembership.reservationIsIncluded,
+        }).catch((e) => console.warn("[checkout] membership usage record failed", e?.code ?? e?.message))
       }
       fetch("/api/booking/notify", {
         method: "POST",
@@ -324,23 +352,36 @@ export default function CheckoutTestClient() {
 
             {/* Divider */}
             <div className="border-t border-slate-100 pt-3 space-y-1">
-              {appliedCoupon?.valid && appliedCoupon.discountAmount > 0 && (
+              {(appliedCoupon?.valid && appliedCoupon.discountAmount > 0) ||
+               (appliedMembership?.applied && appliedMembership.discountAmount > 0) ? (
                 <>
                   <div className="flex items-center justify-between text-sm">
                     <span className="text-slate-500">Subtotal</span>
                     <span className="text-slate-500">{formatCurrency(booking.price, booking.currency)}</span>
                   </div>
-                  <div className="flex items-center justify-between text-sm">
-                    <span className="text-emerald-600">Descuento ({appliedCoupon.discount?.code})</span>
-                    <span className="text-emerald-600 font-medium">-{formatCurrency(appliedCoupon.discountAmount, booking.currency)}</span>
-                  </div>
+                  {appliedMembership?.applied && appliedMembership.discountAmount > 0 && (
+                    <div className="flex items-center justify-between text-sm">
+                      <span className="text-violet-600">Membresía</span>
+                      <span className="text-violet-600 font-medium">-{formatCurrency(appliedMembership.discountAmount, booking.currency)}</span>
+                    </div>
+                  )}
+                  {appliedCoupon?.valid && appliedCoupon.discountAmount > 0 && (
+                    <div className="flex items-center justify-between text-sm">
+                      <span className="text-emerald-600">Descuento ({appliedCoupon.discount?.code})</span>
+                      <span className="text-emerald-600 font-medium">-{formatCurrency(appliedCoupon.discountAmount, booking.currency)}</span>
+                    </div>
+                  )}
                 </>
-              )}
+              ) : null}
               <div className="flex items-center justify-between">
                 <span className="text-sm text-slate-500">Total</span>
                 <span className="text-2xl font-bold text-slate-900">
                   {formatCurrency(
-                    appliedCoupon?.valid ? appliedCoupon.finalAmount : (booking.price ?? null),
+                    appliedCoupon?.valid
+                      ? appliedCoupon.finalAmount
+                      : appliedMembership?.applied
+                        ? appliedMembership.finalAmount
+                        : (booking.price ?? null),
                     booking.currency,
                   )}
                 </span>
@@ -348,6 +389,23 @@ export default function CheckoutTestClient() {
             </div>
           </div>
         </div>
+
+        {/* ── Membership benefit banner ─────────────────────────────────── */}
+        {isActionable && appliedMembership?.applied && (
+          <div className="rounded-2xl bg-violet-50 border border-violet-200 px-4 py-3.5 flex items-start gap-3">
+            <span className="text-violet-500 text-lg leading-none">💳</span>
+            <div className="flex-1 min-w-0">
+              <p className="text-sm font-semibold text-violet-800">
+                {appliedMembership.reservationIsIncluded ? "Reserva incluida en tu membresía" : "Descuento de membresía aplicado"}
+              </p>
+              <p className="text-xs text-violet-600 mt-0.5">
+                {appliedMembership.reservationIsIncluded
+                  ? "Esta reserva está cubierta por tu plan — sin costo adicional."
+                  : `Ahorrás ${formatCurrency(appliedMembership.discountAmount, booking.currency)} con tu membresía.`}
+              </p>
+            </div>
+          </div>
+        )}
 
         {/* ── Coupon input (only while actionable) ─────────────────────── */}
         {isActionable && booking.clubId && (

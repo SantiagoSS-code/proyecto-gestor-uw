@@ -26,6 +26,16 @@ export const PROMOTIONS_COLLECTIONS = {
   aiRecommendations: "ai_recommendations",
 } as const
 
+// ── Memberships module – top-level collections ─────────────────────────────
+export const MEMBERSHIPS_COLLECTIONS = {
+  plans:         "membership_plans",
+  benefits:      "membership_benefits",
+  rules:         "membership_rules",
+  subscriptions: "membership_subscriptions",
+  usage:         "membership_usage",
+  events:        "membership_events",
+} as const
+
 export const CENTER_SETTINGS_DOCS = {
   booking: "booking",
   operations: "operations",
