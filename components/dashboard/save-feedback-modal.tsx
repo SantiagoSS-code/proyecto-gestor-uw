@@ -30,7 +30,9 @@ export function SaveFeedbackModal() {
 
   const closeAndMaybeReload = () => {
     setOpen(false)
-    if (feedback.reload) {
+    if (feedback.redirectTo) {
+      window.location.href = feedback.redirectTo
+    } else if (feedback.reload) {
       window.location.reload()
     }
   }

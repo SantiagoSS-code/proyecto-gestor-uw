@@ -16,7 +16,7 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog"
-import { Search, RefreshCw, ExternalLink, Copy, Link as LinkIcon, Pencil, Trash2 } from "lucide-react"
+import { Search, RefreshCw, ExternalLink, Copy, Link as LinkIcon } from "lucide-react"
 
 type CenterOption = {
   centerId: string
@@ -44,8 +44,6 @@ type RegistrationLinkResponse = {
   expiresAt: string
   centerId: string
   email: string
-  emailSent?: boolean
-  emailWarning?: string | null
   message?: string
 }
 
@@ -54,7 +52,7 @@ export default function BackofficeUsersPage() {
   const [saving, setSaving] = useState(false)
   const [items, setItems] = useState<CenterOption[]>([])
   const [query, setQuery] = useState("")
-  const [message, setMessage] = useState<{ type: "ok" | "warn" | "error"; text: string } | null>(null)
+  const [message, setMessage] = useState<{ type: "ok" | "error"; text: string } | null>(null)
 
   // Users list state
   const [users, setUsers] = useState<ClubOSUser[]>([])
@@ -73,20 +71,6 @@ export default function BackofficeUsersPage() {
   const [registrationLinkLoading, setRegistrationLinkLoading] = useState(false)
   const [generatedRegistrationLink, setGeneratedRegistrationLink] = useState("")
   const [generatedRegistrationLinkExpiresAt, setGeneratedRegistrationLinkExpiresAt] = useState("")
-
-  const [editUserOpen, setEditUserOpen] = useState(false)
-  const [deleteUserOpen, setDeleteUserOpen] = useState(false)
-  const [editingUser, setEditingUser] = useState<ClubOSUser | null>(null)
-  const [editSaving, setEditSaving] = useState(false)
-  const [deleteSaving, setDeleteSaving] = useState(false)
-
-  const [editEmail, setEditEmail] = useState("")
-  const [editPassword, setEditPassword] = useState("")
-  const [editFirstName, setEditFirstName] = useState("")
-  const [editLastName, setEditLastName] = useState("")
-  const [editPhone, setEditPhone] = useState("")
-  const [editStatus, setEditStatus] = useState("active")
-  const [editOnboardingCompleted, setEditOnboardingCompleted] = useState(false)
 
   const filtered = useMemo(() => {
     const q = query.trim().toLowerCase()
@@ -180,14 +164,22 @@ export default function BackofficeUsersPage() {
   }
 
   const openRegistrationLinkModal = () => {
+    if (!centerId) {
+      setMessage({ type: "error", text: "Seleccioná un club para generar un link de registro." })
+      return
+    }
     setRegistrationLinkEmail(email || selectedCenter?.ownerEmail || "")
     setGeneratedRegistrationLink("")
     setGeneratedRegistrationLinkExpiresAt("")
-    setMessage(null)
     setRegistrationLinkOpen(true)
   }
 
   const createRegistrationLink = async () => {
+    if (!centerId) {
+      setMessage({ type: "error", text: "Seleccioná un club para generar un link de registro." })
+      return
+    }
+
     const cleanEmail = registrationLinkEmail.trim().toLowerCase()
     if (!cleanEmail) {
       setMessage({ type: "error", text: "Indicá el email destino del administrador." })
@@ -211,8 +203,7 @@ export default function BackofficeUsersPage() {
 
       setGeneratedRegistrationLink(res.url)
       setGeneratedRegistrationLinkExpiresAt(res.expiresAt)
-      const msgType = res.emailSent === false ? "warn" : "ok"
-      setMessage({ type: msgType as any, text: res.message || "Link de registro creado correctamente" })
+      setMessage({ type: "ok", text: res.message || "Link de registro creado correctamente" })
     } catch (e: any) {
       setMessage({ type: "error", text: e?.message || "No se pudo crear el link de registro" })
     } finally {
@@ -230,90 +221,6 @@ export default function BackofficeUsersPage() {
     }
   }
 
-  const openEditUserModal = (u: ClubOSUser) => {
-    setEditingUser(u)
-    setEditEmail(u.email || "")
-    setEditPassword("")
-    setEditFirstName(u.firstName || "")
-    setEditLastName(u.lastName || "")
-    setEditPhone(u.phone || "")
-    setEditStatus(u.status || "active")
-    setEditOnboardingCompleted(Boolean(u.onboardingCompleted))
-    setMessage(null)
-    setEditUserOpen(true)
-  }
-
-  const submitEditUser = async () => {
-    if (!editingUser) return
-    const cleanEmail = editEmail.trim().toLowerCase()
-    if (!cleanEmail) {
-      setMessage({ type: "error", text: "El email es obligatorio para actualizar el usuario." })
-      return
-    }
-    if (editPassword && editPassword.length < 8) {
-      setMessage({ type: "error", text: "La contraseña debe tener al menos 8 caracteres." })
-      return
-    }
-
-    try {
-      setEditSaving(true)
-      setMessage(null)
-      const res = await backofficeFetch<{ message?: string }>("/api/backoffice/users", {
-        method: "PATCH",
-        body: JSON.stringify({
-          uid: editingUser.uid,
-          centerId: editingUser.centerId,
-          email: cleanEmail,
-          password: editPassword || undefined,
-          firstName: editFirstName,
-          lastName: editLastName,
-          phone: editPhone,
-          status: editStatus,
-          onboardingCompleted: editOnboardingCompleted,
-        }),
-      })
-
-      setMessage({ type: "ok", text: res.message || "Usuario actualizado correctamente" })
-      setEditUserOpen(false)
-      setEditingUser(null)
-      await loadUsers()
-      await loadCenters()
-    } catch (e: any) {
-      setMessage({ type: "error", text: e?.message || "No se pudo actualizar el usuario" })
-    } finally {
-      setEditSaving(false)
-    }
-  }
-
-  const openDeleteUserModal = (u: ClubOSUser) => {
-    setEditingUser(u)
-    setMessage(null)
-    setDeleteUserOpen(true)
-  }
-
-  const submitDeleteUser = async () => {
-    if (!editingUser) return
-
-    try {
-      setDeleteSaving(true)
-      setMessage(null)
-      const res = await backofficeFetch<{ message?: string }>("/api/backoffice/users", {
-        method: "DELETE",
-        body: JSON.stringify({ uid: editingUser.uid, centerId: editingUser.centerId }),
-      })
-      setMessage({ type: "ok", text: res.message || "Usuario eliminado correctamente" })
-      setDeleteUserOpen(false)
-      setEditUserOpen(false)
-      setEditingUser(null)
-      await loadUsers()
-      await loadCenters()
-    } catch (e: any) {
-      setMessage({ type: "error", text: e?.message || "No se pudo eliminar el usuario" })
-    } finally {
-      setDeleteSaving(false)
-    }
-  }
-
   return (
     <div className="space-y-6">
       <PageHeader
@@ -326,8 +233,6 @@ export default function BackofficeUsersPage() {
           className={`rounded-xl px-4 py-3 text-sm ${
             message.type === "ok"
               ? "border border-emerald-200 bg-emerald-50 text-emerald-700"
-              : message.type === "warn"
-              ? "border border-amber-200 bg-amber-50 text-amber-800"
               : "border border-red-200 bg-red-50 text-red-700"
           }`}
         >
@@ -476,9 +381,7 @@ export default function BackofficeUsersPage() {
             <div className="space-y-1">
               <Label>Club seleccionado</Label>
               <div className="rounded-lg border border-slate-200 px-3 py-2 text-sm text-slate-700">
-                {selectedCenter
-                  ? `${selectedCenter.name || "(sin nombre)"} · ${selectedCenter.centerId}`
-                  : "Sin club asociado (registro desde cero)"}
+                {selectedCenter ? `${selectedCenter.name || "(sin nombre)"} · ${selectedCenter.centerId}` : "Sin club"}
               </div>
             </div>
 
@@ -609,19 +512,13 @@ export default function BackofficeUsersPage() {
                       </td>
                       <td className="px-4 py-3 text-xs text-slate-500 whitespace-nowrap">{createdDate}</td>
                       <td className="px-4 py-3">
-                        <div className="flex items-center justify-end gap-2">
-                          <Button type="button" variant="outline" size="sm" onClick={() => openEditUserModal(u)}>
-                            <Pencil className="w-3.5 h-3.5 mr-1" />
-                            Editar
-                          </Button>
-                          <Link
-                            href={`/backoffice/centers/${u.centerId}`}
-                            className="inline-flex items-center gap-1 text-xs text-blue-600 hover:text-blue-800 font-medium"
-                          >
-                            Ver club
-                            <ExternalLink className="w-3 h-3" />
-                          </Link>
-                        </div>
+                        <Link
+                          href={`/backoffice/centers/${u.centerId}`}
+                          className="inline-flex items-center gap-1 text-xs text-blue-600 hover:text-blue-800 font-medium"
+                        >
+                          Ver club
+                          <ExternalLink className="w-3 h-3" />
+                        </Link>
                       </td>
                     </tr>
                   )
@@ -631,127 +528,6 @@ export default function BackofficeUsersPage() {
           </div>
         )}
       </div>
-
-      <Dialog open={editUserOpen} onOpenChange={setEditUserOpen}>
-        <DialogContent>
-          <DialogHeader>
-            <DialogTitle>Editar usuario ClubOS</DialogTitle>
-            <DialogDescription>
-              Actualizá los datos del administrador. Si completás contraseña, se reemplaza la actual.
-            </DialogDescription>
-          </DialogHeader>
-
-          <div className="space-y-3">
-            <div className="space-y-1">
-              <Label>Email</Label>
-              <Input
-                type="email"
-                value={editEmail}
-                onChange={(e) => setEditEmail(e.target.value)}
-                placeholder="admin@club.com"
-              />
-            </div>
-
-            <div className="space-y-1">
-              <Label>Nueva contraseña (opcional)</Label>
-              <Input
-                type="password"
-                value={editPassword}
-                onChange={(e) => setEditPassword(e.target.value)}
-                placeholder="Dejar vacío para no cambiar"
-              />
-            </div>
-
-            <div className="grid grid-cols-2 gap-2">
-              <div className="space-y-1">
-                <Label>Nombre</Label>
-                <Input value={editFirstName} onChange={(e) => setEditFirstName(e.target.value)} />
-              </div>
-              <div className="space-y-1">
-                <Label>Apellido</Label>
-                <Input value={editLastName} onChange={(e) => setEditLastName(e.target.value)} />
-              </div>
-            </div>
-
-            <div className="space-y-1">
-              <Label>Teléfono</Label>
-              <Input value={editPhone} onChange={(e) => setEditPhone(e.target.value)} placeholder="+54 ..." />
-            </div>
-
-            <div className="grid grid-cols-2 gap-2">
-              <div className="space-y-1">
-                <Label>Estado</Label>
-                <select
-                  value={editStatus}
-                  onChange={(e) => setEditStatus(e.target.value)}
-                  className="h-9 w-full rounded-md border border-input bg-background px-3 text-sm"
-                >
-                  <option value="active">active</option>
-                  <option value="inactive">inactive</option>
-                </select>
-              </div>
-              <div className="space-y-1">
-                <Label>Onboarding</Label>
-                <select
-                  value={editOnboardingCompleted ? "done" : "pending"}
-                  onChange={(e) => setEditOnboardingCompleted(e.target.value === "done")}
-                  className="h-9 w-full rounded-md border border-input bg-background px-3 text-sm"
-                >
-                  <option value="pending">pendiente</option>
-                  <option value="done">completado</option>
-                </select>
-              </div>
-            </div>
-          </div>
-
-          <DialogFooter className="flex-row items-center justify-between gap-2">
-            <Button
-              type="button"
-              variant="outline"
-              className="text-red-600 border-red-200 hover:bg-red-50 hover:text-red-700 mr-auto"
-              onClick={() => setDeleteUserOpen(true)}
-              disabled={editSaving}
-            >
-              <Trash2 className="w-3.5 h-3.5 mr-1" />
-              Eliminar usuario
-            </Button>
-            <div className="flex gap-2">
-              <Button variant="outline" onClick={() => setEditUserOpen(false)}>Cancelar</Button>
-              <Button className="bg-blue-600 hover:bg-blue-700" onClick={submitEditUser} disabled={editSaving}>
-                {editSaving ? "Guardando..." : "Guardar cambios"}
-              </Button>
-            </div>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
-
-      <Dialog open={deleteUserOpen} onOpenChange={setDeleteUserOpen}>
-        <DialogContent>
-          <DialogHeader>
-            <DialogTitle>Eliminar usuario</DialogTitle>
-            <DialogDescription>
-              Esta acción eliminará el acceso del administrador seleccionado en ClubOS.
-            </DialogDescription>
-          </DialogHeader>
-
-          <div className="rounded-lg border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-700">
-            {editingUser
-              ? `Vas a eliminar a ${editingUser.email || editingUser.uid} (${editingUser.centerId}).`
-              : "Vas a eliminar este usuario."}
-          </div>
-
-          <DialogFooter>
-            <Button variant="outline" onClick={() => setDeleteUserOpen(false)}>Cancelar</Button>
-            <Button
-              className="bg-red-600 hover:bg-red-700"
-              onClick={submitDeleteUser}
-              disabled={deleteSaving}
-            >
-              {deleteSaving ? "Eliminando..." : "Eliminar usuario"}
-            </Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
     </div>
   )
 }

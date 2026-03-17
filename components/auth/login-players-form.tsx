@@ -75,9 +75,18 @@ export function LoginPlayersForm() {
         localStorage.setItem("playerIdentifier", email)
       }
 
-      const status = await getPlayerOnboardingStatus(userCredential.user.uid)
-      if (!status.exists) {
-        await createMinimalPlayerProfile(userCredential.user.uid, email)
+      try {
+        const status = await getPlayerOnboardingStatus(userCredential.user.uid)
+        if (!status.exists) {
+          await createMinimalPlayerProfile(userCredential.user.uid, email)
+        }
+      } catch (profileErr: any) {
+        // Auth already succeeded – don't block navigation because of a
+        // transient Firestore error (e.g. auth-token not yet propagated).
+        console.warn(
+          "[PlayersLogin] profile check/create failed, proceeding anyway",
+          profileErr?.code ?? profileErr?.message ?? profileErr
+        )
       }
 
       // Keep user in the same activity/page they came from.
@@ -113,9 +122,18 @@ export function LoginPlayersForm() {
         }
       }
 
-      const status = await getPlayerOnboardingStatus(user.uid)
-      if (!status.exists) {
-        await createMinimalPlayerProfile(user.uid, email || "")
+      try {
+        const status = await getPlayerOnboardingStatus(user.uid)
+        if (!status.exists) {
+          await createMinimalPlayerProfile(user.uid, email || "")
+        }
+      } catch (profileErr: any) {
+        // Auth already succeeded – don't block navigation because of a
+        // transient Firestore error (e.g. auth-token not yet propagated).
+        console.warn(
+          "[PlayersLogin] profile check/create failed, proceeding anyway",
+          profileErr?.code ?? profileErr?.message ?? profileErr
+        )
       }
 
       const nextDestination = resolveNext()

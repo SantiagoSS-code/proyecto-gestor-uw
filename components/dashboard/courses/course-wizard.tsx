@@ -579,11 +579,16 @@ export function CourseWizard({ courseId }: { courseId?: string }) {
         updatedAt: now,
       }
 
+      // Firestore does not accept `undefined` values — strip them before writing
+      const cleanPayload = Object.fromEntries(
+        Object.entries(payload).filter(([, v]) => v !== undefined)
+      )
+
       let savedId = courseId
       if (courseId) {
-        await updateDoc(doc(db, FIRESTORE_COLLECTIONS.centers, resolvedId, "courses", courseId), payload as any)
+        await updateDoc(doc(db, FIRESTORE_COLLECTIONS.centers, resolvedId, "courses", courseId), cleanPayload as any)
       } else {
-        const ref = await addDoc(collection(db, FIRESTORE_COLLECTIONS.centers, resolvedId, "courses"), payload as any)
+        const ref = await addDoc(collection(db, FIRESTORE_COLLECTIONS.centers, resolvedId, "courses"), cleanPayload as any)
         savedId = ref.id
       }
 

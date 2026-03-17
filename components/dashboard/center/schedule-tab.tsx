@@ -340,7 +340,12 @@ function ScheduleTab({
       
       const actionText = action === "publish" ? "publicada" : "guardada como borrador"
       setPublishDialogOpen(false)
-      showSavePopupAndRefresh(`La cancha fue ${actionText} correctamente.`, "success", false)
+      showSavePopupAndRefresh(
+        `La cancha fue ${actionText} correctamente.`,
+        "success",
+        false,
+        action === "publish" ? "/clubos/dashboard/courts?tab=courts" : undefined,
+      )
       return
     } catch (error) {
       console.error("Error saving schedule:", error)

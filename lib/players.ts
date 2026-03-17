@@ -41,8 +41,13 @@ export async function getPlayerOnboardingStatus(
       uid,
       docPath,
     }
-  } catch (error) {
-    console.error("[getPlayerOnboardingStatus] error", { uid, docPath, error })
+  } catch (error: any) {
+    console.error("[getPlayerOnboardingStatus] error", {
+      uid,
+      docPath,
+      code: error?.code,
+      message: error?.message,
+    })
     throw error
   }
 }

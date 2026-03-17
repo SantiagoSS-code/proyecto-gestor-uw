@@ -1,12 +1,14 @@
 "use client"
 
 import { useEffect, useMemo, useState, useRef, useCallback } from "react"
-import { collection, doc, getDoc, getDocs, limit, query, where } from "firebase/firestore"
+import { addDoc, collection, doc, getDoc, getDocs, increment, limit, query, updateDoc, where } from "firebase/firestore"
 import { auth, db } from "@/lib/firebaseClient"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import {
+  Building2,
+  BookOpen,
   Calendar,
   ChevronLeft,
   ChevronRight,
@@ -21,11 +23,18 @@ import {
   ShoppingBag,
   Info,
   Star,
+  Clock,
+  Users,
   ArrowLeft,
   X,
+  CheckCircle2,
+  Phone,
+  Mail,
+  User,
 } from "lucide-react"
 import { FIRESTORE_COLLECTIONS, CENTER_SETTINGS_DOCS, CENTER_SUBCOLLECTIONS, LEGACY_AVAILABILITY_DOCS } from "@/lib/firestorePaths"
 import type { AmenityKey, BookingSettings, CenterProfile, CourtDoc, SportKey, ClassDoc, ClassScheduleSlot, OperationSettings } from "@/lib/types"
+import type { Course } from "@/lib/courses-types"
 import { minutesToTime, timeToMinutes } from "@/lib/utils"
 import {
   createPendingBooking,
@@ -393,6 +402,7 @@ export function ClubDetail({ slug }: { slug: string }) {
   const [settings, setSettings] = useState<BookingSettings | null>(null)
   const [operationSettings, setOperationSettings] = useState<OperationSettings | null>(null)
   const [classes, setClasses] = useState<ClassDoc[]>([])
+  const [courses, setCourses] = useState<Course[]>([])
   const [selectedDate, setSelectedDate] = useState<string>(() => {
     const dateParam = searchParams.get("date")
     if (dateParam && /^\d{4}-\d{2}-\d{2}$/.test(dateParam)) {
@@ -411,9 +421,81 @@ export function ClubDetail({ slug }: { slug: string }) {
   const [checkoutLoading, setCheckoutLoading] = useState(false)
   const [checkoutError, setCheckoutError] = useState<string | null>(null)
 
+  // Course enrollment
+  const [enrollCourse, setEnrollCourse] = useState<Course | null>(null)
+  const [enrollForm, setEnrollForm] = useState({ playerName: "", playerEmail: "", playerPhone: "" })
+  const [enrollLoading, setEnrollLoading] = useState(false)
+  const [enrollSuccess, setEnrollSuccess] = useState(false)
+  const [enrollError, setEnrollError] = useState<string | null>(null)
+
   const gridRef = useRef<HTMLDivElement>(null)
   const slotPreviewPopoverRef = useRef<HTMLDivElement>(null)
   const hasScrolledToTimeRef = useRef(false)
+
+  const handleOpenEnroll = (course: Course) => {
+    const user = auth.currentUser
+    setEnrollCourse(course)
+    setEnrollSuccess(false)
+    setEnrollError(null)
+    setEnrollForm({
+      playerName: user?.displayName || "",
+      playerEmail: user?.email || "",
+      playerPhone: "",
+    })
+  }
+
+  const handleEnrollSubmit = async () => {
+    if (!enrollCourse || !centerId) return
+    if (!enrollForm.playerName.trim() || !enrollForm.playerEmail.trim()) {
+      setEnrollError("Por favor completá tu nombre y email.")
+      return
+    }
+    const user = auth.currentUser
+    if (!user) {
+      // Save intent and redirect to login
+      sessionStorage.setItem("voyd_enroll_draft", JSON.stringify({ slug, courseId: enrollCourse.id }))
+      router.push(`/auth/login?redirect=${encodeURIComponent(window.location.pathname + window.location.search)}`)
+      return
+    }
+    setEnrollLoading(true)
+    setEnrollError(null)
+    try {
+      const now = new Date().toISOString()
+      const spotsLeft = enrollCourse.maximumCapacity - (enrollCourse.enrolledCount ?? 0)
+      const isFull = spotsLeft <= 0
+      const status = isFull ? "waitlist" : "pending"
+      await addDoc(collection(db, "centers", centerId, "enrollments"), {
+        courseId: enrollCourse.id,
+        courseName: enrollCourse.name,
+        centerId,
+        playerId: user.uid,
+        playerName: enrollForm.playerName.trim(),
+        playerEmail: enrollForm.playerEmail.trim(),
+        playerPhone: enrollForm.playerPhone.trim() || undefined,
+        status,
+        paymentStatus: "pending",
+        paidAmount: 0,
+        pendingAmount: enrollCourse.priceTotal,
+        totalPrice: enrollCourse.priceTotal,
+        enrolledAt: now,
+      })
+      if (!isFull) {
+        await updateDoc(doc(db, "centers", centerId, "courses", enrollCourse.id), {
+          enrolledCount: increment(1),
+          updatedAt: now,
+        })
+        setCourses(prev => prev.map(c =>
+          c.id === enrollCourse.id ? { ...c, enrolledCount: (c.enrolledCount ?? 0) + 1 } : c
+        ))
+      }
+      setEnrollSuccess(true)
+    } catch (e) {
+      console.error(e)
+      setEnrollError("Ocurrió un error. Por favor intentá de nuevo.")
+    } finally {
+      setEnrollLoading(false)
+    }
+  }
 
   useEffect(() => {
     const load = async () => {
@@ -421,11 +503,16 @@ export function ClubDetail({ slug }: { slug: string }) {
         const found = await findCenterBySlug(slug)
         if (!found) { setCenter(null); return }
 
-        const [courtsData, bookingSettings, operationsData, classesData] = await Promise.all([
+        const [courtsData, bookingSettings, operationsData, classesData, coursesSnap] = await Promise.all([
           loadCourts(found.id),
           loadBookingSettings(found.id),
           loadOperationSettings(found.id),
           loadClasses(found.id),
+          getDocs(query(
+            collection(db, FIRESTORE_COLLECTIONS.centers, found.id, "courses"),
+            where("status", "==", "published"),
+            where("visibility", "==", "public"),
+          )),
         ])
 
         // Restore slot draft saved before login redirect
@@ -479,6 +566,10 @@ export function ClubDetail({ slug }: { slug: string }) {
         setCenter(found.data)
         setCourts(courtsData)
         setClasses(classesData)
+        const coursesData = coursesSnap.docs
+          .map((d) => ({ id: d.id, ...d.data() } as Course))
+          .sort((a, b) => (a.publicOrder ?? 999) - (b.publicOrder ?? 999))
+        setCourses(coursesData)
         setOperationSettings(operationsData)
         if (bookingSettings) setSettings(bookingSettings)
         else { const legacy = await loadLegacyAvailability(found.id); setSettings(legacy) }
@@ -1343,7 +1434,256 @@ export function ClubDetail({ slug }: { slug: string }) {
           </div>
         </div>
 
+        {/* Courses Section */}
+        {courses.length > 0 && (
+          <div className="mt-10">
+            <div className="flex items-center gap-3 mb-5">
+              <div className="flex items-center justify-center w-9 h-9 rounded-xl bg-violet-100">
+                <BookOpen className="w-5 h-5 text-violet-600" />
+              </div>
+              <div>
+                <h2 className="text-xl font-bold text-slate-900">Cursos y programas</h2>
+                <p className="text-sm text-slate-500">{courses.length} programa{courses.length !== 1 ? "s" : ""} disponible{courses.length !== 1 ? "s" : ""}</p>
+              </div>
+            </div>
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-5">
+              {courses.map((course) => {
+                const spotsLeft = course.maximumCapacity - (course.enrolledCount ?? 0)
+                const isFull = spotsLeft <= 0
+                const hasPromo = typeof course.promotionalPrice === "number" && course.promotionalPrice < course.priceTotal
+                const displayPrice = hasPromo ? course.promotionalPrice! : course.priceTotal
+                const startFmt = course.startDate
+                  ? new Date(`${course.startDate}T00:00:00`).toLocaleDateString("es-AR", { day: "numeric", month: "short", year: "numeric" })
+                  : null
+                const levelLabels: Record<string, string> = {
+                  beginner: "Principiante", intermediate: "Intermedio", advanced: "Avanzado", all: "Todos los niveles"
+                }
+                const sportLabel = course.sport
+                  ? course.sport.charAt(0).toUpperCase() + course.sport.slice(1)
+                  : ""
+                return (
+                  <div
+                    key={course.id}
+                    className="group flex flex-col rounded-2xl border border-slate-200 bg-white shadow-sm hover:shadow-md transition-shadow overflow-hidden"
+                  >
+                    {/* Cover */}
+                    <div className="relative h-36 bg-gradient-to-br from-violet-500 to-indigo-600 flex items-center justify-center">
+                      {course.coverImage ? (
+                        <img src={course.coverImage} alt={course.name} className="absolute inset-0 w-full h-full object-cover" />
+                      ) : (
+                        <BookOpen className="w-10 h-10 text-white/50" />
+                      )}
+                      <div className="absolute top-3 left-3 flex gap-1.5">
+                        <span className="inline-flex items-center rounded-full bg-white/90 backdrop-blur-sm px-2.5 py-0.5 text-[11px] font-semibold text-violet-700">
+                          {sportLabel}
+                        </span>
+                        {course.featured && (
+                          <span className="inline-flex items-center gap-1 rounded-full bg-amber-400/90 backdrop-blur-sm px-2 py-0.5 text-[11px] font-semibold text-amber-900">
+                            <Star className="w-3 h-3" /> Destacado
+                          </span>
+                        )}
+                      </div>
+                      {isFull && (
+                        <div className="absolute inset-0 bg-black/40 flex items-center justify-center">
+                          <span className="rounded-full bg-white/90 px-3 py-1 text-xs font-bold text-slate-700">Completo</span>
+                        </div>
+                      )}
+                    </div>
+
+                    {/* Body */}
+                    <div className="flex flex-col flex-1 p-4 gap-3">
+                      <div>
+                        <p className="text-[11px] font-medium text-slate-400 uppercase tracking-wider">
+                          {levelLabels[course.level] || course.level}
+                        </p>
+                        <h3 className="font-bold text-slate-900 text-base leading-snug mt-0.5">{course.name}</h3>
+                        {course.subtitle && (
+                          <p className="text-sm text-slate-500 mt-0.5 line-clamp-1">{course.subtitle}</p>
+                        )}
+                      </div>
+
+                      {course.description && (
+                        <p className="text-sm text-slate-600 line-clamp-2 leading-relaxed">{course.description}</p>
+                      )}
+
+                      <div className="flex flex-col gap-1.5 text-xs text-slate-500">
+                        {startFmt && (
+                          <div className="flex items-center gap-1.5">
+                            <Calendar className="w-3.5 h-3.5 text-slate-400" />
+                            <span>Inicio: <span className="font-medium text-slate-700">{startFmt}</span></span>
+                          </div>
+                        )}
+                        <div className="flex items-center gap-1.5">
+                          <Clock className="w-3.5 h-3.5 text-slate-400" />
+                          <span>{course.totalSessions} sesiones · {course.sessionDurationMinutes} min c/u</span>
+                        </div>
+                        {course.coachName && (
+                          <div className="flex items-center gap-1.5">
+                            <Dumbbell className="w-3.5 h-3.5 text-slate-400" />
+                            <span>Coach: <span className="font-medium text-slate-700">{course.coachName}</span></span>
+                          </div>
+                        )}
+                        <div className="flex items-center gap-1.5">
+                          <Users className="w-3.5 h-3.5 text-slate-400" />
+                          <span>
+                            {isFull
+                              ? "Sin cupos disponibles"
+                              : <><span className="font-medium text-slate-700">{spotsLeft}</span> cupo{spotsLeft !== 1 ? "s" : ""} disponible{spotsLeft !== 1 ? "s" : ""}</>}
+                          </span>
+                        </div>
+                      </div>
+
+                      {/* Price */}
+                      <div className="mt-auto pt-3 border-t border-slate-100 flex items-center justify-between">
+                        <div>
+                          {hasPromo && (
+                            <p className="text-xs text-slate-400 line-through">
+                              {course.currency} {course.priceTotal.toLocaleString("es-AR")}
+                            </p>
+                          )}
+                          <p className="text-lg font-bold text-slate-900">
+                            {course.currency} {displayPrice.toLocaleString("es-AR")}
+                          </p>
+                        </div>
+                        <button
+                          onClick={() => handleOpenEnroll(course)}
+                          className={`inline-flex items-center rounded-full px-3 py-1 text-xs font-semibold transition-colors ${
+                            isFull
+                              ? "bg-slate-100 text-slate-500 hover:bg-slate-200"
+                              : "bg-violet-100 text-violet-700 hover:bg-violet-200"
+                          }`}
+                        >
+                          {isFull ? "Lista de espera" : "Inscribirse"}
+                        </button>
+                      </div>
+                    </div>
+                  </div>
+                )
+              })}
+            </div>
+          </div>
+        )}
+
       </div>
+
+      {/* Course enrollment modal */}
+      {enrollCourse && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 px-4" onClick={(e) => { if (e.target === e.currentTarget) setEnrollCourse(null) }}>
+          <div className="bg-white rounded-2xl shadow-2xl w-full max-w-md overflow-hidden">
+            {/* Header */}
+            <div className="bg-gradient-to-r from-violet-600 to-indigo-600 p-5 text-white">
+              <div className="flex items-start justify-between gap-3">
+                <div>
+                  <p className="text-[11px] font-semibold uppercase tracking-wider text-violet-200 mb-0.5">Inscripción al curso</p>
+                  <h3 className="font-bold text-lg leading-snug">{enrollCourse.name}</h3>
+                  {enrollCourse.subtitle && <p className="text-sm text-violet-200 mt-0.5">{enrollCourse.subtitle}</p>}
+                </div>
+                <button onClick={() => setEnrollCourse(null)} className="rounded-full p-1 hover:bg-white/20 transition-colors">
+                  <X className="w-5 h-5" />
+                </button>
+              </div>
+              <div className="mt-3 flex items-center gap-4 text-sm text-violet-100">
+                <span className="flex items-center gap-1">
+                  <Calendar className="w-3.5 h-3.5" />
+                  {enrollCourse.startDate ? new Date(`${enrollCourse.startDate}T00:00:00`).toLocaleDateString("es-AR", { day: "numeric", month: "short" }) : ""}
+                </span>
+                <span className="flex items-center gap-1">
+                  <Clock className="w-3.5 h-3.5" />
+                  {enrollCourse.totalSessions} sesiones
+                </span>
+                <span className="font-semibold text-white">
+                  {enrollCourse.currency} {(enrollCourse.promotionalPrice ?? enrollCourse.priceTotal).toLocaleString("es-AR")}
+                </span>
+              </div>
+            </div>
+
+            <div className="p-5">
+              {enrollSuccess ? (
+                <div className="text-center py-6 space-y-3">
+                  <CheckCircle2 className="w-14 h-14 text-green-500 mx-auto" />
+                  <h4 className="font-bold text-slate-900 text-lg">
+                    {(() => { const s = enrollCourse.maximumCapacity - (enrollCourse.enrolledCount ?? 0); return s <= 0 ? "¡Anotado en lista de espera!" : "¡Solicitud enviada!" })()}
+                  </h4>
+                  <p className="text-sm text-slate-500">El centro se va a comunicar con vos para confirmar la inscripción y coordinar el pago.</p>
+                  <button
+                    onClick={() => setEnrollCourse(null)}
+                    className="mt-2 rounded-full bg-violet-600 text-white px-6 py-2 text-sm font-semibold hover:bg-violet-700 transition-colors"
+                  >
+                    Listo
+                  </button>
+                </div>
+              ) : (
+                <div className="space-y-4">
+                  <p className="text-sm text-slate-500">Completá tus datos y el centro se va a contactar para confirmar tu lugar.</p>
+
+                  <div className="space-y-3">
+                    <div>
+                      <label className="text-xs font-medium text-slate-700 flex items-center gap-1.5 mb-1">
+                        <User className="w-3.5 h-3.5" /> Nombre completo *
+                      </label>
+                      <input
+                        type="text"
+                        value={enrollForm.playerName}
+                        onChange={e => setEnrollForm(f => ({ ...f, playerName: e.target.value }))}
+                        placeholder="Tu nombre"
+                        className="w-full rounded-xl border border-slate-200 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-violet-500"
+                      />
+                    </div>
+                    <div>
+                      <label className="text-xs font-medium text-slate-700 flex items-center gap-1.5 mb-1">
+                        <Mail className="w-3.5 h-3.5" /> Email *
+                      </label>
+                      <input
+                        type="email"
+                        value={enrollForm.playerEmail}
+                        onChange={e => setEnrollForm(f => ({ ...f, playerEmail: e.target.value }))}
+                        placeholder="tu@email.com"
+                        className="w-full rounded-xl border border-slate-200 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-violet-500"
+                      />
+                    </div>
+                    <div>
+                      <label className="text-xs font-medium text-slate-700 flex items-center gap-1.5 mb-1">
+                        <Phone className="w-3.5 h-3.5" /> Teléfono (opcional)
+                      </label>
+                      <input
+                        type="tel"
+                        value={enrollForm.playerPhone}
+                        onChange={e => setEnrollForm(f => ({ ...f, playerPhone: e.target.value }))}
+                        placeholder="+54 11 1234 5678"
+                        className="w-full rounded-xl border border-slate-200 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-violet-500"
+                      />
+                    </div>
+                  </div>
+
+                  {enrollError && (
+                    <p className="text-xs text-red-600 bg-red-50 border border-red-200 rounded-lg px-3 py-2">{enrollError}</p>
+                  )}
+
+                  <div className="flex gap-3 pt-1">
+                    <button
+                      onClick={() => setEnrollCourse(null)}
+                      className="flex-1 rounded-xl border border-slate-200 py-2.5 text-sm font-medium text-slate-600 hover:bg-slate-50 transition-colors"
+                    >
+                      Cancelar
+                    </button>
+                    <button
+                      onClick={handleEnrollSubmit}
+                      disabled={enrollLoading}
+                      className="flex-1 rounded-xl bg-violet-600 py-2.5 text-sm font-semibold text-white hover:bg-violet-700 disabled:opacity-60 transition-colors flex items-center justify-center gap-2"
+                    >
+                      {enrollLoading ? (
+                        <><div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" /> Enviando…</>
+                      ) : (
+                        (enrollCourse.maximumCapacity - (enrollCourse.enrolledCount ?? 0)) <= 0 ? "Anotarme en lista" : "Confirmar inscripción"
+                      )}
+                    </button>
+                  </div>
+                </div>
+              )}
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* Slot preview popover (matches dashboard interaction) */}
       {slotPreview && (() => {
