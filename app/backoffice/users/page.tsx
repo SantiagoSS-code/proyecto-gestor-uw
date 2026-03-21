@@ -164,10 +164,6 @@ export default function BackofficeUsersPage() {
   }
 
   const openRegistrationLinkModal = () => {
-    if (!centerId) {
-      setMessage({ type: "error", text: "Seleccioná un club para generar un link de registro." })
-      return
-    }
     setRegistrationLinkEmail(email || selectedCenter?.ownerEmail || "")
     setGeneratedRegistrationLink("")
     setGeneratedRegistrationLinkExpiresAt("")
@@ -175,11 +171,6 @@ export default function BackofficeUsersPage() {
   }
 
   const createRegistrationLink = async () => {
-    if (!centerId) {
-      setMessage({ type: "error", text: "Seleccioná un club para generar un link de registro." })
-      return
-    }
-
     const cleanEmail = registrationLinkEmail.trim().toLowerCase()
     if (!cleanEmail) {
       setMessage({ type: "error", text: "Indicá el email destino del administrador." })

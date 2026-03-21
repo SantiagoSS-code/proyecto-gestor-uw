@@ -5,6 +5,7 @@ import { OnboardingBanner } from "@/components/dashboard/onboarding-banner"
 import { OnboardingGate } from "@/components/dashboard/onboarding-gate"
 import { WelcomeOverlay } from "@/components/dashboard/welcome-overlay"
 import { PendingReviewGate } from "@/components/dashboard/pending-review-gate"
+import { PermissionsProvider } from "@/lib/permissions-context"
 
 export default function DashboardLayout({
 	children,
@@ -13,6 +14,7 @@ export default function DashboardLayout({
 }) {
 	return (
 		<OnboardingProvider>
+			<PermissionsProvider>
 			<PendingReviewGate>
 				<WelcomeOverlay />
 				<div className="flex min-h-screen bg-muted/5">
@@ -31,6 +33,7 @@ export default function DashboardLayout({
 					</div>
 				</div>
 			</PendingReviewGate>
+			</PermissionsProvider>
 		</OnboardingProvider>
 	)
 }

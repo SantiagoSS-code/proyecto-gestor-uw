@@ -12,24 +12,21 @@ import {
   BarChart3,
   GraduationCap,
   Dumbbell,
-  MessageSquare,
-  CheckSquare,
   UserCircle2,
   Building2,
   Settings2,
-  ReceiptText,
   Bell,
   ShieldCheck,
   LifeBuoy,
   Menu,
   LogOut,
   ChevronDown,
-  FolderKanban,
   Lock,
   Check,
   Tag,
   CreditCard,
   Trophy,
+  Zap,
 } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { VoydLogo } from "@/components/ui/voyd-logo"
@@ -38,6 +35,77 @@ import { signOut } from "firebase/auth"
 import { auth } from "@/lib/firebaseClient"
 import { useAuth } from "@/lib/auth-context"
 import { useOnboarding, ONBOARDING_STEPS } from "@/lib/onboarding"
+import { usePermissions } from "@/lib/permissions-context"
+import { minimumPlanForModule } from "@/lib/permissions"
+import type { ModuleId, ClubPlanId } from "@/lib/permissions"
+import { PlanUpgradeModal } from "@/components/dashboard/plan-upgrade-modal"
+
+// Map sidebar hrefs → module IDs for permission gating
+const HREF_TO_MODULE: Record<string, ModuleId> = {
+  "/clubos/dashboard":               "dashboard",
+  "/clubos/dashboard/reservas":      "reservations",
+  "/clubos/dashboard/courts":        "courts",
+  "/clubos/dashboard/customers":     "clients",
+  "/clubos/dashboard/cursos":        "courses",
+  "/clubos/dashboard/trainers":      "trainers",
+  "/clubos/dashboard/promotions":    "promotions",
+  "/clubos/dashboard/memberships":   "memberships",
+  "/clubos/dashboard/tournaments":   "tournaments",
+  "/clubos/dashboard/finanzas":      "finances",
+  "/clubos/dashboard/reportes":      "reports",
+  // Settings sub-pages that require "settings" permission
+  "/clubos/dashboard/settings":              "settings",
+  "/clubos/dashboard/settings/center":       "settings",
+  "/clubos/dashboard/settings/operacion":    "settings",
+  "/clubos/dashboard/settings/facturacion":  "settings",
+  "/clubos/dashboard/settings/notificaciones": "settings",
+  // Team requires "team" permission
+  "/clubos/dashboard/settings/team":         "team",
+  // Profile and Help are accessible to everyone (no module mapping)
+}
+
+// ── Plan display helpers ────────────────────────────────────────────────────
+const PLAN_DISPLAY: Record<string, { label: string; icon: React.ComponentType<{ className?: string }>; color: string; pill: string }> = {
+  estandar:    { label: "Estándar",    icon: Building2,   color: "text-slate-600",  pill: "bg-slate-100 text-slate-600" },
+  profesional: { label: "Profesional", icon: CreditCard,  color: "text-blue-600",   pill: "bg-blue-100  text-blue-700"  },
+  maestro:     { label: "Maestro",     icon: Trophy,      color: "text-amber-600",  pill: "bg-amber-100 text-amber-700" },
+}
+
+const STATUS_LABEL: Record<string, string> = {
+  active:          "Activo",
+  pending_payment: "Pago pendiente",
+  suspended:       "Suspendido",
+  trial:           "Prueba",
+}
+
+const ROLE_LABELS: Record<string, { label: string; color: string }> = {
+  owner:     { label: "Dueño",         color: "bg-violet-100 text-violet-700" },
+  manager:   { label: "Manager",       color: "bg-blue-100   text-blue-700"   },
+  reception: { label: "Recepcionista", color: "bg-emerald-100 text-emerald-700" },
+  trainer:   { label: "Entrenador",    color: "bg-amber-100  text-amber-700"  },
+}
+
+function PlanBadge() {
+  const { plan, subscriptionStatus } = usePermissions()
+  if (!plan) return null
+
+  const meta = PLAN_DISPLAY[plan] ?? PLAN_DISPLAY.estandar
+  const PlanIcon = meta.icon
+  const statusLabel = STATUS_LABEL[subscriptionStatus ?? ""] ?? ""
+
+  return (
+    <div className="mb-2 flex items-center gap-2 px-2.5 py-1.5 rounded-lg border border-slate-200 bg-white">
+      <PlanIcon className={cn("size-3.5 flex-shrink-0", meta.color)} />
+      <p className="text-xs font-semibold text-slate-800 flex-1 min-w-0 truncate">Plan {meta.label}</p>
+      {statusLabel && (
+        <span className={cn("text-[10px] font-medium px-1.5 py-0.5 rounded-full flex-shrink-0", meta.pill)}>
+          {statusLabel}
+        </span>
+      )}
+    </div>
+  )
+}
+// ─────────────────────────────────────────────────────────────────────────────
 
 const primaryItems = [
   { icon: LayoutDashboard, label: "Panel",         href: "/clubos/dashboard" },
@@ -53,16 +121,10 @@ const primaryItems = [
   { icon: BarChart3,       label: "Reportes",      href: "/clubos/dashboard/reportes" },
 ]
 
-const gestionItems = [
-  { icon: MessageSquare, label: "Mensajes", href: "/clubos/dashboard/messages" },
-  { icon: CheckSquare, label: "Tareas", href: "/clubos/dashboard/tasks" },
-]
-
 const configItems = [
   { icon: UserCircle2, label: "Mi cuenta", href: "/clubos/dashboard/settings/profile" },
   { icon: Building2, label: "Centro", href: "/clubos/dashboard/settings/center" },
   { icon: Settings2, label: "Operación", href: "/clubos/dashboard/settings/operacion" },
-  { icon: ReceiptText, label: "Cobros y facturación", href: "/clubos/dashboard/settings/facturacion" },
   { icon: Bell, label: "Notificaciones", href: "/clubos/dashboard/settings/notificaciones" },
   { icon: ShieldCheck, label: "Equipo y permisos", href: "/clubos/dashboard/settings/team" },
   { icon: LifeBuoy, label: "Ayuda", href: "/clubos/dashboard/settings/help" },
@@ -113,12 +175,12 @@ function getOnboardingStatus(
 }
 
 export function AppSidebar() {
-  const { user } = useAuth()
+  const { user, centerId } = useAuth()
+  const { can, planIncludes, role } = usePermissions()
   const pathname = usePathname()
   const router = useRouter()
   const { isOnboarding, state: obState, currentStepIndex } = useOnboarding()
   const [isLoggingOut, setIsLoggingOut] = useState(false)
-  const [gestionOpen, setGestionOpen] = useState(pathname.startsWith("/clubos/dashboard/messages") || pathname.startsWith("/clubos/dashboard/tasks"))
   const [configOpen, setConfigOpen] = useState(
     pathname.startsWith("/clubos/dashboard/settings") || isOnboarding
   )
@@ -147,9 +209,6 @@ export function AppSidebar() {
   }
 
   useEffect(() => {
-    if (pathname.startsWith("/clubos/dashboard/messages") || pathname.startsWith("/clubos/dashboard/tasks")) {
-      setGestionOpen(true)
-    }
     if (pathname.startsWith("/clubos/dashboard/settings")) {
       setConfigOpen(true)
     }
@@ -164,13 +223,32 @@ export function AppSidebar() {
   const displayEmail = user?.email || "admin@club.com"
   const initial = (displayName?.[0] || displayEmail?.[0] || "A").toUpperCase()
 
-  /** Render a sidebar link that may be locked during onboarding */
+  const [upgradeModal, setUpgradeModal] = useState<{ sectionLabel: string; requiredPlan: ClubPlanId } | null>(null)
+
+  /** Render a sidebar link that may be locked (onboarding or plan) */
   const renderSidebarLink = (
     item: { icon: React.ComponentType<{ className?: string }>; label: string; href: string },
     locked: boolean,
     isActive: boolean,
     obStatus?: "completed" | "current" | "locked" | "none",
+    planLocked?: boolean,
   ) => {
+    if (planLocked) {
+      const module = HREF_TO_MODULE[item.href]
+      const minPlan = module ? minimumPlanForModule(module) : null
+      return (
+        <button
+          key={item.href}
+          type="button"
+          onClick={() => minPlan && setUpgradeModal({ sectionLabel: item.label, requiredPlan: minPlan })}
+          className="w-full flex items-center gap-3 px-3 py-2 text-sm font-medium rounded-md text-slate-400 hover:bg-amber-50 hover:text-amber-600 transition-colors cursor-pointer select-none"
+        >
+          <item.icon className="size-4" />
+          <span className="truncate flex-1 text-left">{item.label}</span>
+          <Zap className="size-3 text-amber-400 flex-shrink-0" />
+        </button>
+      )
+    }
     if (locked) {
       return (
         <span
@@ -215,6 +293,7 @@ export function AppSidebar() {
   }
 
   return (
+    <>
     <div className="flex flex-col h-screen w-64 border-r bg-card/50 hidden md:flex sticky top-0">
       <div className={cn("p-6", isOnboarding && "flex flex-col items-center")}>
         <Link
@@ -269,63 +348,27 @@ export function AppSidebar() {
           )
         }) : <>
         {/* ── Primary nav items ── */}
-        {primaryItems.map((item) => {
+        {primaryItems.filter((item) => {
+          const module = HREF_TO_MODULE[item.href]
+          if (!module) return true
+          // Plan-locked items are shown (with Zap indicator) so owner knows what to unlock
+          if (!planIncludes(module)) return true
+          return can.view(module)
+        }).map((item) => {
+          const module = HREF_TO_MODULE[item.href]
+          const planLocked = !!module && !planIncludes(module)
           const isActive = isActiveRoute(item.href)
-          // During onboarding, only "Canchas" (courts step) is reachable among primary items
-          const locked = isOnboarding && !isOnboardingReachable(item.href, obState.completed, obState.currentStep) && !isActive
+          const locked = !planLocked && isOnboarding && !isOnboardingReachable(item.href, obState.completed, obState.currentStep) && !isActive
 
           if (locked) {
             return renderSidebarLink(item, true, false)
           }
 
-          // If it's an onboarding item (courts), show status
           const obStatus = isOnboarding ? getOnboardingStatus(item.href, obState.completed, obState.currentStep) : "none"
-          return renderSidebarLink(item, false, isActive, obStatus)
+          return renderSidebarLink(item, false, isActive, obStatus, planLocked)
         })}
 
         <div className="my-3 border-t border-slate-200" />
-
-        {/* ── Gestión section ── */}
-        <button
-          type="button"
-          onClick={() => !isOnboarding && setGestionOpen((v) => !v)}
-          className={cn(
-            "w-full flex items-center justify-between px-3 py-2 text-xs font-semibold uppercase tracking-wider",
-            isOnboarding
-              ? "text-slate-300 cursor-not-allowed"
-              : "text-slate-500 hover:text-slate-700"
-          )}
-        >
-          <span className="inline-flex items-center gap-2">
-            <FolderKanban className="size-3.5" />
-            Gestión
-          </span>
-          {isOnboarding ? (
-            <Lock className="size-3 text-slate-300" />
-          ) : (
-            <ChevronDown className={cn("size-4 transition-transform", gestionOpen ? "rotate-180" : "")}/>
-          )}
-        </button>
-        {!isOnboarding && gestionOpen && (
-          <div className="space-y-1 pl-2">
-            {gestionItems.map((item) => {
-              const isActive = isActiveRoute(item.href)
-              return (
-                <Link
-                  key={item.href}
-                  href={item.href}
-                  className={cn(
-                    "flex items-center gap-3 px-3 py-2 text-sm font-medium rounded-md transition-colors text-black",
-                    isActive ? "bg-primary/10 text-primary" : "hover:bg-muted"
-                  )}
-                >
-                  <item.icon className="size-4" />
-                  {item.label}
-                </Link>
-              )
-            })}
-          </div>
-        )}
 
         {/* ── Configuración section ── */}
         <button
@@ -341,7 +384,10 @@ export function AppSidebar() {
         </button>
         {configOpen && (
           <div className="space-y-1 pl-2">
-            {configItems.map((item) => {
+            {configItems.filter((item) => {
+              const module = HREF_TO_MODULE[item.href]
+              return !module || can.view(module)
+            }).map((item) => {
               const isActive = isActiveRoute(item.href)
               const locked = isOnboarding && !isOnboardingReachable(item.href, obState.completed, obState.currentStep) && !isActive
               const obStatus = isOnboarding ? getOnboardingStatus(item.href, obState.completed, obState.currentStep) : "none"
@@ -354,6 +400,7 @@ export function AppSidebar() {
       </div>
 
       <div className="p-4 border-t">
+        <PlanBadge />
         <div className="flex items-center gap-3 text-black mb-3 p-2 rounded-lg bg-slate-50 border border-slate-200">
           <div className="size-9 rounded-full bg-gradient-to-br from-blue-500 to-purple-500 flex items-center justify-center text-white text-sm font-semibold">
             {initial}
@@ -361,6 +408,11 @@ export function AppSidebar() {
           <div className="text-sm min-w-0">
             <p className="font-medium truncate">{displayName}</p>
             <p className="text-xs text-slate-500 truncate">{displayEmail}</p>
+            {ROLE_LABELS[role] && (
+              <span className={cn("mt-1 inline-block text-[10px] font-semibold px-1.5 py-0.5 rounded-full", ROLE_LABELS[role].color)}>
+                {ROLE_LABELS[role].label}
+              </span>
+            )}
           </div>
         </div>
         <Button
@@ -374,17 +426,26 @@ export function AppSidebar() {
         </Button>
       </div>
     </div>
+    {upgradeModal && (
+      <PlanUpgradeModal
+        open
+        onClose={() => setUpgradeModal(null)}
+        sectionLabel={upgradeModal.sectionLabel}
+        requiredPlan={upgradeModal.requiredPlan}
+      />
+    )}
+    </>
   )
 }
 
 export function MobileSidebar() {
-    const { user } = useAuth()
+    const { user, centerId } = useAuth()
+    const { can, planIncludes, role } = usePermissions()
     const pathname = usePathname()
     const router = useRouter()
     const { isOnboarding, state: obState, currentStepIndex } = useOnboarding()
     const [open, setOpen] = useState(false)
     const [isLoggingOut, setIsLoggingOut] = useState(false)
-    const [gestionOpen, setGestionOpen] = useState(pathname.startsWith("/clubos/dashboard/messages") || pathname.startsWith("/clubos/dashboard/tasks"))
     const [configOpen, setConfigOpen] = useState(
       pathname.startsWith("/clubos/dashboard/settings") || isOnboarding
     )
@@ -414,9 +475,6 @@ export function MobileSidebar() {
     }
 
     useEffect(() => {
-      if (pathname.startsWith("/clubos/dashboard/messages") || pathname.startsWith("/clubos/dashboard/tasks")) {
-        setGestionOpen(true)
-      }
       if (pathname.startsWith("/clubos/dashboard/settings")) {
         setConfigOpen(true)
       }
@@ -430,13 +488,35 @@ export function MobileSidebar() {
     const displayEmail = user?.email || "admin@club.com"
     const initial = (displayName?.[0] || displayEmail?.[0] || "A").toUpperCase()
 
+    const [upgradeModal, setUpgradeModal] = useState<{ sectionLabel: string; requiredPlan: ClubPlanId } | null>(null)
+
     /** Render a mobile sidebar link */
     const renderMobileLink = (
       item: { icon: React.ComponentType<{ className?: string }>; label: string; href: string },
       locked: boolean,
       isActive: boolean,
       obStatus?: "completed" | "current" | "locked" | "none",
+      planLocked?: boolean,
     ) => {
+      if (planLocked) {
+        const module = HREF_TO_MODULE[item.href]
+        const minPlan = module ? minimumPlanForModule(module) : null
+        return (
+          <button
+            key={item.href}
+            type="button"
+            onClick={() => {
+              setOpen(false)
+              if (minPlan) setUpgradeModal({ sectionLabel: item.label, requiredPlan: minPlan })
+            }}
+            className="w-full flex items-center gap-3 px-3 py-2 text-sm font-medium rounded-md text-slate-400 hover:bg-amber-50 hover:text-amber-600 transition-colors cursor-pointer select-none"
+          >
+            <item.icon className="size-4" />
+            <span className="truncate flex-1 text-left">{item.label}</span>
+            <Zap className="size-3 text-amber-400 flex-shrink-0" />
+          </button>
+        )
+      }
       if (locked) {
         return (
           <span
@@ -478,6 +558,7 @@ export function MobileSidebar() {
     }
 
     return (
+      <>
             <div className="md:hidden flex items-center justify-between p-4 border-b bg-background sticky top-0 z-50">
                <Link href="/clubos/dashboard" className="flex items-center" aria-label="Ir al dashboard de ClubOS">
                  <VoydLogo className="h-7" />
@@ -515,51 +596,21 @@ export function MobileSidebar() {
                   )}
 
                   {/* ── Primary items ── */}
-                  {primaryItems.map((item) => {
+                  {primaryItems.filter((item) => {
+                    const module = HREF_TO_MODULE[item.href]
+                    if (!module) return true
+                    if (!planIncludes(module)) return true
+                    return can.view(module)
+                  }).map((item) => {
+                    const module = HREF_TO_MODULE[item.href]
+                    const planLocked = !!module && !planIncludes(module)
                     const isActive = isActiveRoute(item.href)
-                    const locked = isOnboarding && !isOnboardingReachable(item.href, obState.completed, obState.currentStep) && !isActive
+                    const locked = !planLocked && isOnboarding && !isOnboardingReachable(item.href, obState.completed, obState.currentStep) && !isActive
                     const obStatus = isOnboarding ? getOnboardingStatus(item.href, obState.completed, obState.currentStep) : "none"
-                    return renderMobileLink(item, locked, isActive, obStatus)
+                    return renderMobileLink(item, locked, isActive, obStatus, planLocked)
                   })}
 
                         <div className="my-1 border-t border-slate-200" />
-
-                        {/* ── Gestión ── */}
-                        <button
-                          type="button"
-                          onClick={() => !isOnboarding && setGestionOpen((v) => !v)}
-                          className={cn(
-                            "w-full flex items-center justify-between px-3 py-2 text-xs font-semibold uppercase tracking-wider",
-                            isOnboarding ? "text-slate-300 cursor-not-allowed" : "text-slate-500"
-                          )}
-                        >
-                          <span className="inline-flex items-center gap-2">
-                            <FolderKanban className="size-3.5" /> Gestión
-                          </span>
-                          {isOnboarding ? (
-                            <Lock className="size-3 text-slate-300" />
-                          ) : (
-                            <ChevronDown className={cn("size-4 transition-transform", gestionOpen ? "rotate-180" : "")}/>
-                          )}
-                        </button>
-                        {!isOnboarding && gestionOpen && (
-                          <div className="space-y-1 pl-2">
-                            {gestionItems.map((item) => (
-                              <Link
-                                key={item.href}
-                                href={item.href}
-                                onClick={() => setOpen(false)}
-                                className={cn(
-                                  "flex items-center gap-3 px-3 py-2 text-sm font-medium rounded-md text-black",
-                                  isActiveRoute(item.href) ? "bg-primary/10 text-primary" : "hover:bg-muted"
-                                )}
-                              >
-                                <item.icon className="size-4" />
-                                {item.label}
-                              </Link>
-                            ))}
-                          </div>
-                        )}
 
                         {/* ── Configuración ── */}
                         <button
@@ -574,7 +625,10 @@ export function MobileSidebar() {
                         </button>
                         {configOpen && (
                           <div className="space-y-1 pl-2">
-                            {configItems.map((item) => {
+                            {configItems.filter((item) => {
+                              const module = HREF_TO_MODULE[item.href]
+                              return !module || can.view(module)
+                            }).map((item) => {
                               const isActive = isActiveRoute(item.href)
                               const locked = isOnboarding && !isOnboardingReachable(item.href, obState.completed, obState.currentStep) && !isActive
                               const obStatus = isOnboarding ? getOnboardingStatus(item.href, obState.completed, obState.currentStep) : "none"
@@ -583,6 +637,7 @@ export function MobileSidebar() {
                           </div>
                         )}
 
+                        <PlanBadge />
                         <div className="mt-2 p-2 rounded-lg bg-slate-50 border border-slate-200 flex items-center gap-3">
                           <div className="size-8 rounded-full bg-gradient-to-br from-blue-500 to-purple-500 flex items-center justify-center text-white text-xs font-semibold">
                             {initial}
@@ -590,6 +645,11 @@ export function MobileSidebar() {
                           <div className="min-w-0">
                             <p className="text-sm font-medium text-slate-900 truncate">{displayName}</p>
                             <p className="text-xs text-slate-500 truncate">{displayEmail}</p>
+                            {ROLE_LABELS[role] && (
+                              <span className={cn("mt-1 inline-block text-[10px] font-semibold px-1.5 py-0.5 rounded-full", ROLE_LABELS[role].color)}>
+                                {ROLE_LABELS[role].label}
+                              </span>
+                            )}
                           </div>
                         </div>
 
@@ -606,5 +666,14 @@ export function MobileSidebar() {
                  </div>
              )}
         </div>
-    )
+    {upgradeModal && (
+      <PlanUpgradeModal
+        open
+        onClose={() => setUpgradeModal(null)}
+        sectionLabel={upgradeModal.sectionLabel}
+        requiredPlan={upgradeModal.requiredPlan}
+      />
+    )}
+    </>
+  )
 }

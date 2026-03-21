@@ -39,6 +39,14 @@
         { "fieldPath": "clubId",       "order": "ASCENDING" },
         { "fieldPath": "scheduledAt",  "order": "ASCENDING" }
       ]
+    },
+    {
+      "collectionGroup": "membership_usage",
+      "queryScope": "COLLECTION_GROUP",
+      "fields": [
+        { "fieldPath": "clubId",    "order": "ASCENDING" },
+        { "fieldPath": "updatedAt", "order": "DESCENDING" }
+      ]
     }
   ],
   "fieldOverrides": [

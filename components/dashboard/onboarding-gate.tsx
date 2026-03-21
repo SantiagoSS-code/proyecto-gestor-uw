@@ -3,7 +3,6 @@
 import { useEffect } from "react"
 import { usePathname, useRouter } from "next/navigation"
 import { useOnboarding, ONBOARDING_STEPS } from "@/lib/onboarding"
-import { Loader2 } from "lucide-react"
 
 /**
  * During onboarding, this component forces the user to stay on the current step's page.
@@ -46,14 +45,6 @@ export function OnboardingGate({ children }: { children: React.ReactNode }) {
       router.replace(expectedPath)
     }
   }, [loading, isOnboarding, currentStepIndex, pathname, router, state.currentStep, state.completed])
-
-  if (loading) {
-    return (
-      <div className="flex h-64 items-center justify-center">
-        <Loader2 className="w-6 h-6 animate-spin text-blue-600" />
-      </div>
-    )
-  }
 
   return <>{children}</>
 }

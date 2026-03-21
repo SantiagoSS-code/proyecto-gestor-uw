@@ -2,6 +2,7 @@
 
 import Link from "next/link"
 import { useEffect, useState } from "react"
+import { useRouter } from "next/navigation"
 import { Input } from "@/components/ui/input"
 import { Button } from "@/components/ui/button"
 import { BoBadge } from "@/components/backoffice/bo-badge"
@@ -30,6 +31,7 @@ export default function BackofficeCentersPage() {
   const [items, setItems] = useState<CenterRow[]>([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<{ message: string; status?: number } | null>(null)
+  const router = useRouter()
 
   const load = async (query: string) => {
     try {
@@ -118,7 +120,11 @@ export default function BackofficeCentersPage() {
               </tr>
             ) : (
               items.map((c) => (
-                <tr key={c.centerId} className="border-b border-slate-100 last:border-0 hover:bg-slate-50/50 transition-colors">
+                <tr
+                  key={c.centerId}
+                  className="border-b border-slate-100 last:border-0 hover:bg-blue-50/40 transition-colors cursor-pointer"
+                  onClick={() => router.push(`/backoffice/centers/${c.centerId}`)}
+                >
                   <td className="py-2.5 px-3 font-mono text-[11px] text-slate-400 max-w-[72px] truncate" title={c.centerId}>{c.centerId}</td>
                   <td className="py-2.5 px-3 font-medium text-slate-800">{c.name || "—"}</td>
                   <td className="py-2.5 px-3 font-mono text-xs text-slate-500">{c.slug || "—"}</td>
@@ -137,7 +143,7 @@ export default function BackofficeCentersPage() {
                       <span className="text-slate-400 text-xs">—</span>
                     )}
                   </td>
-                  <td className="py-2.5 px-3">
+                  <td className="py-2.5 px-3" onClick={(e) => e.stopPropagation()}>
                     <div className="flex items-center gap-2">
                       <Link
                         href={`/backoffice/centers/${c.centerId}`}

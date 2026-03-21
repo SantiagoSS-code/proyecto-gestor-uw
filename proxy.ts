@@ -29,6 +29,11 @@ const CLUBOS_ALLOWED_ROLES = new Set([
   "center_admin",
   "padel_center_admin",
   "club_admin",
+  // team member roles
+  "owner",
+  "manager",
+  "reception",
+  "trainer",
 ])
 
 type ClubRoleResult = { role: string; subscriptionStatus: string | null }
@@ -42,8 +47,18 @@ async function resolveClubRole(decodedToken: { uid: string; role?: unknown; lega
   try {
     const userSnap = await adminDb.collection("users").doc(decodedToken.uid).get()
     if (userSnap.exists) {
-      const data = userSnap.data() as { role?: unknown; legacyRole?: unknown; subscriptionStatus?: string }
-      const subscriptionStatus = data?.subscriptionStatus || null
+      const data = userSnap.data() as { role?: unknown; legacyRole?: unknown; subscriptionStatus?: string; centerId?: string; isTeamMember?: boolean }
+      let subscriptionStatus = data?.subscriptionStatus || null
+
+      // Team members inherit their center's subscription status
+      if (data?.isTeamMember && data?.centerId && !subscriptionStatus) {
+        try {
+          const centerSnap = await adminDb.collection("users").doc(data.centerId).get()
+          subscriptionStatus = centerSnap.exists ? (centerSnap.data()?.subscriptionStatus || "active") : "active"
+        } catch {
+          subscriptionStatus = "active"
+        }
+      }
 
       if (claimRole) return { role: claimRole, subscriptionStatus }
       if (claimLegacyRole) return { role: claimLegacyRole, subscriptionStatus }

@@ -92,6 +92,8 @@ const OnboardingContext = createContext<OnboardingContextValue>({
 export const useOnboarding = () => useContext(OnboardingContext)
 
 /* ────────── provider ────────── */
+const TEAM_MEMBER_ROLES = new Set(["owner", "manager", "reception", "trainer"])
+
 export function OnboardingProvider({ children }: { children: React.ReactNode }) {
   const { user, loading: authLoading } = useAuth()
   const [state, setState] = useState<OnboardingState>({ ...DEFAULT_STATE })
@@ -102,12 +104,27 @@ export function OnboardingProvider({ children }: { children: React.ReactNode }) 
     [user]
   )
 
+  const ONBOARDING_COMPLETE_STATE = useMemo(() => normalizeState({
+    completed: { profile: true, center: true, operations: true, courts: true, publish: true },
+  }), [])
+
   const load = useCallback(async () => {
-    if (!firestorePath) {
+    if (!firestorePath || !user) {
       setLoading(false)
       return
     }
     try {
+      // Team members (reception, trainer, manager, owner-as-employee) skip onboarding
+      const userSnap = await getDoc(doc(db, "users", user.uid))
+      if (userSnap.exists()) {
+        const userData = userSnap.data() as { isTeamMember?: boolean; role?: string }
+        if (userData.isTeamMember === true || TEAM_MEMBER_ROLES.has(userData.role ?? "")) {
+          setState(ONBOARDING_COMPLETE_STATE)
+          setLoading(false)
+          return
+        }
+      }
+
       const snap = await getDoc(firestorePath)
       if (snap.exists()) {
         const data = snap.data() as Partial<OnboardingState>
@@ -118,7 +135,7 @@ export function OnboardingProvider({ children }: { children: React.ReactNode }) 
     } finally {
       setLoading(false)
     }
-  }, [firestorePath])
+  }, [firestorePath, user, ONBOARDING_COMPLETE_STATE])
 
   useEffect(() => {
     if (!authLoading) load()

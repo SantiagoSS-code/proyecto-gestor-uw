@@ -8,7 +8,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { backofficeFetch } from "@/lib/backoffice/client"
-import { ChevronDown, Trash2 } from "lucide-react"
+import { ChevronDown, Trash2, Zap, Building2, Trophy, CreditCard, CheckCircle2, Clock, AlertCircle } from "lucide-react"
 
 function toDateLabel(value: any) {
   if (!value) return "—"
@@ -102,6 +102,13 @@ export default function BackofficeCenterDetailPage() {
     bufferMinutes: "",
   })
   const [courtDrafts, setCourtDrafts] = useState<Record<string, any>>({})
+  const [planForm, setPlanForm] = useState({
+    selectedPlan: "profesional",
+    subscriptionStatus: "active",
+    subscriptionPeriod: "monthly",
+  })
+  const [planSaving, setPlanSaving] = useState(false)
+  const [planSaved, setPlanSaved] = useState(false)
 
   const featuredValue = useMemo(() => {
     const v = data?.center?.featuredRank
@@ -201,6 +208,14 @@ export default function BackofficeCenterDetailPage() {
       }
     }
     setCourtDrafts(nextCourtDrafts)
+
+    if (data?.subscription) {
+      setPlanForm({
+        selectedPlan: data.subscription.selectedPlan || "profesional",
+        subscriptionStatus: data.subscription.subscriptionStatus || "pending_payment",
+        subscriptionPeriod: data.subscription.subscriptionPeriod || "monthly",
+      })
+    }
   }, [data])
 
   const patch = async (payload: any) => {
@@ -290,6 +305,21 @@ export default function BackofficeCenterDetailPage() {
         },
       },
     })
+  }
+
+  const savePlan = async () => {
+    try {
+      setPlanSaving(true)
+      await backofficeFetch(`/api/backoffice/centers/${centerId}`, {
+        method: "POST",
+        body: JSON.stringify({ planUpdate: planForm }),
+      })
+      await load()
+      setPlanSaved(true)
+      setTimeout(() => setPlanSaved(false), 2500)
+    } finally {
+      setPlanSaving(false)
+    }
   }
 
   return (
@@ -612,6 +642,119 @@ export default function BackofficeCenterDetailPage() {
             </CardContent>
           </Card>
         </div>
+
+        {/* ── Plan management ── */}
+        <Card className="border border-slate-200/70 shadow-sm overflow-hidden">
+          <CardHeader className="pb-2 border-b border-slate-100">
+            <div className="flex items-center justify-between">
+              <div className="flex items-center gap-2">
+                <CreditCard className="w-4 h-4 text-slate-500" />
+                <CardTitle className="text-base text-slate-900">Plan de suscripción</CardTitle>
+              </div>
+              {data?.subscription?.subscriptionStatus === "active" ? (
+                <span className="inline-flex items-center gap-1.5 text-xs font-semibold text-emerald-700 bg-emerald-50 border border-emerald-200 px-2.5 py-1 rounded-full">
+                  <CheckCircle2 className="w-3 h-3" /> Activo
+                </span>
+              ) : data?.subscription?.subscriptionStatus === "pending_payment" ? (
+                <span className="inline-flex items-center gap-1.5 text-xs font-semibold text-amber-700 bg-amber-50 border border-amber-200 px-2.5 py-1 rounded-full">
+                  <Clock className="w-3 h-3" /> Pago pendiente
+                </span>
+              ) : data?.subscription?.subscriptionStatus ? (
+                <span className="inline-flex items-center gap-1.5 text-xs font-semibold text-slate-600 bg-slate-100 border border-slate-200 px-2.5 py-1 rounded-full">
+                  <AlertCircle className="w-3 h-3" /> {data.subscription.subscriptionStatus}
+                </span>
+              ) : (
+                <span className="text-xs text-slate-400">Sin plan activo</span>
+              )}
+            </div>
+          </CardHeader>
+          <CardContent className="pt-5 space-y-6">
+            {/* Plan selector */}
+            <div>
+              <p className="text-xs font-semibold uppercase tracking-wide text-slate-400 mb-3">Plan</p>
+              <div className="grid grid-cols-3 gap-3">
+                {([
+                  { key: "estandar",    label: "Estándar",    sub: "1–3 canchas",  Icon: Zap,       color: "text-blue-600",   ring: "ring-blue-500",   bg: "bg-blue-50" },
+                  { key: "profesional", label: "Profesional", sub: "4–6 canchas",  Icon: Building2, color: "text-violet-600", ring: "ring-violet-500", bg: "bg-violet-50" },
+                  { key: "maestro",     label: "Maestro",     sub: "7+ canchas",   Icon: Trophy,    color: "text-amber-600",  ring: "ring-amber-500",  bg: "bg-amber-50" },
+                ] as const).map(({ key, label, sub, Icon, color, ring, bg }) => {
+                  const active = planForm.selectedPlan === key
+                  return (
+                    <button
+                      key={key}
+                      type="button"
+                      onClick={() => setPlanForm((p) => ({ ...p, selectedPlan: key }))}
+                      className={`rounded-xl border-2 p-4 text-left transition-all ${
+                        active
+                          ? `border-current ${ring} ring-1 ${bg} ${color}`
+                          : "border-slate-200 hover:border-slate-300 text-slate-600 hover:bg-slate-50"
+                      }`}
+                    >
+                      <Icon className={`w-5 h-5 mb-2 ${active ? color : "text-slate-400"}`} />
+                      <div className="font-semibold text-sm">{label}</div>
+                      <div className="text-xs text-slate-500 mt-0.5">{sub}</div>
+                    </button>
+                  )
+                })}
+              </div>
+            </div>
+
+            {/* Period + Status */}
+            <div className="grid grid-cols-2 gap-4">
+              <div>
+                <p className="text-xs font-semibold uppercase tracking-wide text-slate-400 mb-2">Período de facturación</p>
+                <div className="flex rounded-xl border border-slate-200 overflow-hidden">
+                  {(["monthly", "annual"] as const).map((period) => (
+                    <button
+                      key={period}
+                      type="button"
+                      onClick={() => setPlanForm((p) => ({ ...p, subscriptionPeriod: period }))}
+                      className={`flex-1 py-2.5 text-sm font-medium transition-colors ${
+                        planForm.subscriptionPeriod === period
+                          ? "bg-slate-900 text-white"
+                          : "bg-white text-slate-500 hover:bg-slate-50"
+                      }`}
+                    >
+                      {period === "monthly" ? "Mensual" : "Anual"}
+                    </button>
+                  ))}
+                </div>
+              </div>
+              <div>
+                <p className="text-xs font-semibold uppercase tracking-wide text-slate-400 mb-2">Estado</p>
+                <select
+                  value={planForm.subscriptionStatus}
+                  onChange={(e) => setPlanForm((p) => ({ ...p, subscriptionStatus: e.target.value }))}
+                  className="w-full h-10 rounded-xl border border-slate-200 bg-white px-3 text-sm text-slate-800 focus:outline-none focus:ring-2 focus:ring-blue-500"
+                >
+                  <option value="active">✓ Activo</option>
+                  <option value="pending_payment">⏳ Pago pendiente</option>
+                  <option value="suspended">✗ Suspendido</option>
+                  <option value="trial">⬡ Trial</option>
+                </select>
+              </div>
+            </div>
+
+            {/* Renewal info */}
+            {data?.subscription?.nextRenewalDate && (
+              <div className="rounded-lg bg-slate-50 border border-slate-200 px-4 py-3 text-sm text-slate-600">
+                <span className="font-medium text-slate-700">Próxima renovación:</span>{" "}
+                {toDateLabel(data.subscription.nextRenewalDate)}
+              </div>
+            )}
+
+            <div className="flex items-center justify-between pt-1">
+              <p className="text-xs text-slate-400">Los cambios se aplican inmediatamente al usuario del club.</p>
+              <Button
+                className="bg-slate-900 hover:bg-slate-800 text-white min-w-[140px]"
+                disabled={planSaving}
+                onClick={savePlan}
+              >
+                {planSaving ? "Guardando…" : planSaved ? "✓ Guardado" : "Guardar plan"}
+              </Button>
+            </div>
+          </CardContent>
+        </Card>
 
           <Card className="border border-slate-200/70 shadow-sm">
             <CardHeader>

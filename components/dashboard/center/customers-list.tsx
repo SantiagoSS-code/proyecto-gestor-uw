@@ -7,7 +7,7 @@ import { FIRESTORE_COLLECTIONS, CENTER_SUBCOLLECTIONS } from "@/lib/firestorePat
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
-import { Users, Mail, Phone, Calendar, DollarSign, Search, Copy, Check, TrendingUp, AlertCircle, Clock, MapPin, BarChart3, Zap, ArrowLeft, Loader2, ChevronLeft, ChevronRight, Eye } from "lucide-react"
+import { Users, Mail, Phone, Calendar, DollarSign, Search, Copy, Check, TrendingUp, AlertCircle, Clock, MapPin, BarChart3, Zap, ArrowLeft, Loader2, ChevronLeft, ChevronRight, Eye, Trophy, UserX, UserPlus } from "lucide-react"
 import { useAuth } from "@/lib/auth-context"
 import { formatCurrencyARS, formatDurationHours } from "@/lib/utils"
 
@@ -17,7 +17,17 @@ interface Customer {
   phone?: string
   totalReservations: number
   lastReservationDate?: Date | null
+  firstBookingDate?: Date | null
   totalSpent: number
+  favoriteSport?: string
+}
+
+const SPORT_LABELS: Record<string, string> = {
+  padel: "Padel",
+  tennis: "Tenis",
+  futbol: "Fútbol",
+  pickleball: "Pickleball",
+  squash: "Squash",
 }
 
 interface CustomerDetail {
@@ -44,7 +54,7 @@ interface CustomerDetail {
   internalNotes: string
 }
 
-type FilterType = 'all' | 'active30' | 'inactive60' | 'frequent' | 'highSpenders'
+type FilterType = 'all' | 'active30' | 'inactive30' | 'inactive60' | 'frequent' | 'highSpenders'
 
 export function CustomersList() {
   const ITEMS_PER_PAGE = 10
@@ -82,16 +92,38 @@ export function CustomersList() {
           }
         }
 
+        // Load courts to map courtId -> sport
+        const loadCourtsFromCollection = async (rootCollection: string) => {
+          try {
+            const courtsRef = collection(db, rootCollection, resolvedCenterId, CENTER_SUBCOLLECTIONS.courts)
+            const snapshot = await getDocs(courtsRef)
+            return snapshot.docs.map((docSnap) => ({
+              id: docSnap.id,
+              ...(docSnap.data() as any),
+            }))
+          } catch {
+            return []
+          }
+        }
+
         // Try new model first, then legacy
-        const [newBookings, legacyBookings] = await Promise.all([
+        const [newBookings, legacyBookings, newCourts, legacyCourts] = await Promise.all([
           loadBookingsFromCollection(FIRESTORE_COLLECTIONS.centers),
           loadBookingsFromCollection(FIRESTORE_COLLECTIONS.legacyCenters),
+          loadCourtsFromCollection(FIRESTORE_COLLECTIONS.centers),
+          loadCourtsFromCollection(FIRESTORE_COLLECTIONS.legacyCenters),
         ])
 
         const allBookings = [...newBookings, ...legacyBookings]
 
+        // Build courtId -> sport map
+        const courtSportMap = new Map<string, string>()
+        ;[...newCourts, ...legacyCourts].forEach((court: any) => {
+          if (court.id && court.sport) courtSportMap.set(court.id, court.sport)
+        })
+
         // Aggregate customers from bookings
-        const customersMap = new Map<string, Customer>()
+        const customersMap = new Map<string, Customer & { _sportCounts: Map<string, number> }>()
 
         allBookings.forEach((booking: any) => {
           const email = (booking.customerEmail || booking.email || "").toLowerCase()
@@ -103,7 +135,10 @@ export function CustomersList() {
             phone: booking.customerPhone || booking.phone || undefined,
             totalReservations: 0,
             lastReservationDate: null,
+            firstBookingDate: null,
             totalSpent: 0,
+            favoriteSport: undefined,
+            _sportCounts: new Map<string, number>(),
           }
 
           existing.totalReservations += 1
@@ -115,6 +150,16 @@ export function CustomersList() {
             if (!existing.lastReservationDate || dateObj > new Date(existing.lastReservationDate)) {
               existing.lastReservationDate = dateObj
             }
+            if (!existing.firstBookingDate || dateObj < new Date(existing.firstBookingDate)) {
+              existing.firstBookingDate = dateObj
+            }
+          }
+
+          // Track sport
+          const courtId = booking.court || booking.courtId || ""
+          const sport = booking.sport || courtSportMap.get(courtId) || ""
+          if (sport) {
+            existing._sportCounts.set(sport, (existing._sportCounts.get(sport) || 0) + 1)
           }
 
           // Update name/phone if we have better data
@@ -126,6 +171,18 @@ export function CustomersList() {
           }
 
           customersMap.set(email, existing)
+        })
+
+        // Resolve favorite sport per customer
+        customersMap.forEach((c) => {
+          if (c._sportCounts.size > 0) {
+            let maxSport = ""
+            let maxCount = 0
+            c._sportCounts.forEach((count, sport) => {
+              if (count > maxCount) { maxCount = count; maxSport = sport }
+            })
+            c.favoriteSport = maxSport
+          }
         })
 
         const customersList = Array.from(customersMap.values()).sort(
@@ -312,6 +369,8 @@ export function CustomersList() {
     // Aplicar filtro activo
     if (activeFilter === 'active30') {
       filtered = filtered.filter(c => isActive(c))
+    } else if (activeFilter === 'inactive30') {
+      filtered = filtered.filter(c => getDaysSinceLastReservation(c.lastReservationDate) > 30)
     } else if (activeFilter === 'inactive60') {
       filtered = filtered.filter(c => getDaysSinceLastReservation(c.lastReservationDate) > 60)
     } else if (activeFilter === 'frequent') {
@@ -528,22 +587,22 @@ export function CustomersList() {
   return (
     <div className="space-y-6">
       {/* KPI Cards */}
-      <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
-        <Card>
-          <CardHeader className="py-0">
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-4">
+        <Card className="overflow-hidden">
+          <CardHeader className="pt-4 pb-1">
             <CardTitle className="text-sm font-medium text-slate-600">Total Clientes</CardTitle>
           </CardHeader>
-          <CardContent className="py-0">
+          <CardContent className="pt-0 pb-4">
             <div className="text-3xl font-bold text-slate-900">{customers.length}</div>
             <p className="text-xs text-slate-500 mt-1">que han reservado</p>
           </CardContent>
         </Card>
 
-        <Card>
-          <CardHeader className="py-0">
+        <Card className="overflow-hidden">
+          <CardHeader className="pt-4 pb-1">
             <CardTitle className="text-sm font-medium text-slate-600">Clientes Activos (30d)</CardTitle>
           </CardHeader>
-          <CardContent className="py-0">
+          <CardContent className="pt-0 pb-4">
             <div className="text-3xl font-bold text-slate-900">
               {customers.filter((c) => {
                 if (!c.lastReservationDate) return false
@@ -555,18 +614,95 @@ export function CustomersList() {
           </CardContent>
         </Card>
 
-        <Card>
-          <CardHeader className="py-0">
+        <Card className="overflow-hidden">
+          <CardHeader className="pt-4 pb-1">
+            <CardTitle className="flex items-center gap-1.5 text-sm font-medium text-slate-600">
+              <UserX className="w-3.5 h-3.5" />
+              Clientes Inactivos
+            </CardTitle>
+          </CardHeader>
+          <CardContent className="pt-0 pb-4">
+            <div className="text-3xl font-bold text-slate-900">
+              {customers.filter((c) => getDaysSinceLastReservation(c.lastReservationDate) > 30).length}
+            </div>
+            <p className="text-xs text-slate-500 mt-1">sin reservas en 30 días</p>
+            <Button
+              variant="outline"
+              size="sm"
+              className="mt-2 h-7 text-xs px-2"
+              onClick={() => setActiveFilter(activeFilter === 'inactive30' ? 'all' : 'inactive30')}
+            >
+              {activeFilter === 'inactive30' ? 'Quitar filtro' : 'Ver lista'}
+            </Button>
+          </CardContent>
+        </Card>
+
+        <Card className="overflow-hidden">
+          <CardHeader className="pt-4 pb-1">
+            <CardTitle className="flex items-center gap-1.5 text-sm font-medium text-slate-600">
+              <UserPlus className="w-3.5 h-3.5" />
+              Clientes Nuevos
+            </CardTitle>
+          </CardHeader>
+          <CardContent className="pt-0 pb-4">
+            <div className="text-3xl font-bold text-slate-900">
+              {customers.filter((c) => {
+                if (!c.firstBookingDate) return false
+                const days = Math.floor((Date.now() - new Date(c.firstBookingDate).getTime()) / (1000 * 60 * 60 * 24))
+                return days <= 7
+              }).length}
+            </div>
+            <p className="text-xs text-slate-500 mt-1">nuevos esta semana</p>
+          </CardContent>
+        </Card>
+
+        <Card className="overflow-hidden">
+          <CardHeader className="pt-4 pb-1">
             <CardTitle className="text-sm font-medium text-slate-600">Gasto Promedio</CardTitle>
           </CardHeader>
-          <CardContent className="py-0">
-            <div className="text-3xl font-bold text-slate-900">
+          <CardContent className="pt-0 pb-4">
+            <div className="text-xl font-bold text-slate-900 leading-tight break-words">
               {formatCurrencyARS(customers.length ? customers.reduce((sum, c) => sum + c.totalSpent, 0) / customers.length : 0)}
             </div>
             <p className="text-xs text-slate-500 mt-1">por cliente</p>
           </CardContent>
         </Card>
       </div>
+
+      {/* Clientes más activos */}
+      {customers.length > 0 && (() => {
+        const topCustomers = [...customers]
+          .sort((a, b) => b.totalReservations - a.totalReservations)
+          .slice(0, 3)
+        return (
+          <Card>
+            <CardHeader className="py-0">
+              <CardTitle className="flex items-center gap-2 text-sm font-medium text-slate-600">
+                <Trophy className="w-4 h-4 text-amber-500" />
+                Clientes más activos
+              </CardTitle>
+            </CardHeader>
+            <CardContent className="py-0">
+              <div className="flex flex-col sm:flex-row gap-3">
+                {topCustomers.map((c, i) => (
+                  <div
+                    key={c.email}
+                    className="flex items-center gap-3 rounded-xl border border-slate-100 bg-slate-50/50 px-4 py-3 flex-1 min-w-0"
+                  >
+                    <span className="flex items-center justify-center w-7 h-7 rounded-full bg-amber-100 text-amber-700 text-xs font-bold flex-shrink-0">
+                      {i + 1}
+                    </span>
+                    <div className="min-w-0 flex-1">
+                      <p className="font-medium text-slate-900 text-sm truncate">{c.name}</p>
+                      <p className="text-xs text-slate-500">{c.totalReservations} reservas</p>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </CardContent>
+          </Card>
+        )
+      })()}
 
       {/* Customers Table with Integrated Filters */}
       <Card className="overflow-hidden">
@@ -600,6 +736,8 @@ export function CustomersList() {
                   <th className="text-left font-medium py-3 px-4 uppercase tracking-wider text-xs">Email</th>
                   <th className="text-left font-medium py-3 px-4 uppercase tracking-wider text-xs">Teléfono</th>
                   <th className="text-center font-medium py-3 px-4 uppercase tracking-wider text-xs">Reservas</th>
+                  <th className="text-left font-medium py-3 px-4 uppercase tracking-wider text-xs">Frecuencia</th>
+                  <th className="text-left font-medium py-3 px-4 uppercase tracking-wider text-xs">Deporte</th>
                   <th className="text-left font-medium py-3 px-4 uppercase tracking-wider text-xs">Última Reserva</th>
                   <th className="text-right font-medium py-3 px-4 uppercase tracking-wider text-xs">Revenue Total</th>
                   <th className="text-left font-medium py-3 pl-4 pr-6 uppercase tracking-wider text-xs">Estado</th>
@@ -609,7 +747,7 @@ export function CustomersList() {
               <tbody className="divide-y divide-slate-100">
                 {paginatedCustomers.length === 0 ? (
                   <tr>
-                    <td colSpan={8} className="py-12">
+                    <td colSpan={10} className="py-12">
                       <div className="flex flex-col items-center justify-center text-center">
                         <Users className="w-12 h-12 text-slate-300 mb-3" />
                         <p className="text-slate-500 font-medium">No hay clientes aún</p>
@@ -677,6 +815,28 @@ export function CustomersList() {
                       <td className="py-4 px-4 text-center whitespace-nowrap">
                         <span className="inline-flex items-center justify-center w-7 h-7 rounded-full bg-blue-50 text-blue-700 font-medium text-xs border border-blue-100">
                           {customer.totalReservations}
+                        </span>
+                      </td>
+
+                      {/* Frecuencia */}
+                      <td className="py-4 px-4 whitespace-nowrap">
+                        <span className="text-slate-600 text-xs">
+                          {(() => {
+                            if (!customer.firstBookingDate || customer.totalReservations < 2) return "Baja"
+                            const monthsActive = Math.max(1, (Date.now() - new Date(customer.firstBookingDate).getTime()) / (1000 * 60 * 60 * 24 * 30))
+                            const freq = Math.round(customer.totalReservations / monthsActive)
+                            if (freq >= 4) return `${freq} veces / mes`
+                            if (freq >= 2) return `${freq} veces / mes`
+                            if (freq === 1) return "1 vez / mes"
+                            return "Ocasional"
+                          })()}
+                        </span>
+                      </td>
+
+                      {/* Deporte Favorito */}
+                      <td className="py-4 px-4 whitespace-nowrap">
+                        <span className="text-slate-600 text-xs">
+                          {customer.favoriteSport ? (SPORT_LABELS[customer.favoriteSport] || customer.favoriteSport) : "—"}
                         </span>
                       </td>
 

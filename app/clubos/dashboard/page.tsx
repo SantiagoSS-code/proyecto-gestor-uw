@@ -5,19 +5,24 @@ import { KpiCard } from "@/components/dashboard/kpi-card"
 import { OverviewCharts } from "@/components/dashboard/overview-charts"
 import { RecentBookings } from "@/components/dashboard/recent-bookings"
 import { ActionItems } from "@/components/dashboard/action-items"
+import { DashboardCustomizeDrawer } from "@/components/dashboard/customize-drawer"
+import { NATIVE_WIDGET_IDS, renderWidget } from "@/components/dashboard/widget-registry"
 import {
 	DollarSign,
 	CalendarDays,
 	Users,
-	Star
+	Star,
+	SlidersHorizontal
 } from "lucide-react"
 import { Card, CardHeader, CardTitle, CardDescription, CardContent } from "@/components/ui/card"
-import { useEffect, useMemo, useState } from "react"
+import { useCallback, useEffect, useMemo, useState } from "react"
 import { useAuth } from "@/lib/auth-context"
 import { collection, doc, getDoc, getDocs } from "firebase/firestore"
 import { db } from "@/lib/firebaseClient"
 import { FIRESTORE_COLLECTIONS, CENTER_SUBCOLLECTIONS } from "@/lib/firestorePaths"
 import { formatCurrencyARS } from "@/lib/utils"
+import { DASHBOARD_CUSTOMIZE_SECTIONS } from "@/lib/dashboard-customize-config"
+import { loadSavedWidgets, saveWidgets } from "@/lib/dashboard-storage"
 
 type Booking = any
 
@@ -85,6 +90,41 @@ export default function DashboardCentrosPage() {
 	const [period, setPeriod] = useState("Hoy")
 	const [centerName, setCenterName] = useState("tu centro")
 	const [bookings, setBookings] = useState<Booking[]>([])
+	const [customizeOpen, setCustomizeOpen] = useState(false)
+
+	// ── Widget selection: localStorage-backed ──
+	const defaultWidgetIds = useMemo(() => {
+		const ids: string[] = []
+		DASHBOARD_CUSTOMIZE_SECTIONS.forEach((s) =>
+			s.groups.forEach((g) =>
+				g.metrics.forEach((m) => { if (m.enabled) ids.push(m.id) })
+			)
+		)
+		return ids
+	}, [])
+
+	const [activeWidgetIds, setActiveWidgetIds] = useState<string[]>(defaultWidgetIds)
+
+	// Load from localStorage on mount (client only)
+	useEffect(() => {
+		const stored = loadSavedWidgets()
+		if (stored && stored.length > 0) {
+			setActiveWidgetIds(stored)
+		}
+	}, [])
+
+	const activeMetrics = useMemo(() => new Set(activeWidgetIds), [activeWidgetIds])
+
+	// Callback for drawer "Guardar cambios"
+	const handleSaveCustomization = useCallback((ids: string[]) => {
+		setActiveWidgetIds(ids)
+		saveWidgets(ids)
+	}, [])
+
+	// Extra widgets = active IDs that are NOT native (rendered by hardcoded sections)
+	const extraWidgetIds = useMemo(() => {
+		return activeWidgetIds.filter((id) => !NATIVE_WIDGET_IDS.has(id))
+	}, [activeWidgetIds])
 
 	useEffect(() => {
 		const fetchDashboardData = async () => {
@@ -345,55 +385,72 @@ export default function DashboardCentrosPage() {
 	}, [bookings, now])
 
 	return (
+		<>
 		<div className="space-y-8 animate-in fade-in-50 duration-500">
 
-			{/* Encabezado */}
+			{/* ── Encabezado ── */}
 			<div className="flex flex-col md:flex-row items-start md:items-center justify-between gap-4">
 				<div>
 					<h1 className="text-3xl font-bold tracking-tight text-slate-900">Bienvenido de nuevo, {centerName}</h1>
 					<p className="text-slate-500 mt-2">Esto es lo que pasa hoy en tu centro.</p>
 				</div>
-				<div className="flex items-center space-x-2 bg-background p-1 rounded-lg border shadow-sm">
-					{["Hoy", "Semana", "Mes"].map((p) => (
-						<button
-							key={p}
-							onClick={() => setPeriod(p)}
-							className={`px-3 py-1.5 text-sm font-medium rounded-md transition-all ${
-								period === p ? "bg-primary text-primary-foreground shadow-sm" : "hover:text-black"
-							}`}
-						>
-							{p}
-						</button>
-					))}
+				<div className="flex items-center gap-2">
+					<div className="flex items-center space-x-2 bg-background p-1 rounded-lg border shadow-sm">
+						{["Hoy", "Semana", "Mes"].map((p) => (
+							<button
+								key={p}
+								onClick={() => setPeriod(p)}
+								className={`px-3 py-1.5 text-sm font-medium rounded-md transition-all ${
+									period === p ? "bg-primary text-primary-foreground shadow-sm" : "hover:text-black"
+								}`}
+							>
+								{p}
+							</button>
+						))}
+					</div>
+					<button
+						type="button"
+						onClick={() => setCustomizeOpen(true)}
+						className="flex items-center gap-2 px-3 py-2 text-sm font-medium rounded-lg border border-border bg-background hover:bg-muted transition-colors shadow-sm text-foreground/80 hover:text-foreground"
+					>
+						<SlidersHorizontal className="w-4 h-4" />
+						<span className="hidden sm:inline">Personalizar panel</span>
+					</button>
 				</div>
 			</div>
 
-			{/* Fila de KPIs */}
+			{/* ── KPIs ── */}
 			<div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
-				<KpiCard
-					title="Ingresos totales"
-					value={loading ? "—" : formatCurrencyARS(confirmedIncome)}
-					trend={loading ? "" : `${incomeTrend >= 0 ? "+" : ""}${incomeTrend.toFixed(1)}%`}
-					trendUp={incomeTrend >= 0}
-					description="vs período anterior"
-					icon={DollarSign}
-				/>
-				<KpiCard
-					title="Reservas activas"
-					value={loading ? "—" : String(nonCancelledCurrent.length)}
-					trend={loading ? "" : `${reservationsTrendDiff >= 0 ? "+" : ""}${reservationsTrendDiff}`}
-					trendUp={reservationsTrendDiff >= 0}
-					description={period.toLowerCase()}
-					icon={CalendarDays}
-				/>
-				<KpiCard
-					title="Clientes totales"
-					value={loading ? "—" : new Intl.NumberFormat("es-AR").format(totalClients)}
-					trend={loading ? "" : `+${newClientsCurrent}`}
-					trendUp={true}
-					description={period === "Hoy" ? "nuevos hoy" : period === "Semana" ? "nuevos en 7 días" : "nuevos este mes"}
-					icon={Users}
-				/>
+				{activeMetrics.has("totalRevenue") && (
+					<KpiCard
+						title="Ingresos totales"
+						value={loading ? "—" : formatCurrencyARS(confirmedIncome)}
+						trend={loading ? "" : `${incomeTrend >= 0 ? "+" : ""}${incomeTrend.toFixed(1)}%`}
+						trendUp={incomeTrend >= 0}
+						description="vs período anterior"
+						icon={DollarSign}
+					/>
+				)}
+				{activeMetrics.has("bookingsList") && (
+					<KpiCard
+						title="Reservas activas"
+						value={loading ? "—" : String(nonCancelledCurrent.length)}
+						trend={loading ? "" : `${reservationsTrendDiff >= 0 ? "+" : ""}${reservationsTrendDiff}`}
+						trendUp={reservationsTrendDiff >= 0}
+						description={period.toLowerCase()}
+						icon={CalendarDays}
+					/>
+				)}
+				{activeMetrics.has("totalClients") && (
+					<KpiCard
+						title="Clientes totales"
+						value={loading ? "—" : new Intl.NumberFormat("es-AR").format(totalClients)}
+						trend={loading ? "" : `+${newClientsCurrent}`}
+						trendUp={true}
+						description={period === "Hoy" ? "nuevos hoy" : period === "Semana" ? "nuevos en 7 días" : "nuevos este mes"}
+						icon={Users}
+					/>
+				)}
 				<KpiCard
 					title="Valoración promedio"
 					value={loading ? "—" : "N/D"}
@@ -402,38 +459,61 @@ export default function DashboardCentrosPage() {
 				/>
 			</div>
 
-			{/* Fila de Gráficos */}
-			<OverviewCharts revenueData={revenueData} hourlyData={hourlyData} loading={loading} />
+			{/* ── Gráficos ── */}
+			{(activeMetrics.has("revenueByDay") || activeMetrics.has("bookingsByHour")) && (
+				<OverviewCharts revenueData={revenueData} hourlyData={hourlyData} loading={loading} />
+			)}
 
-			{/* Fila Inferior */}
+			{/* ── Fila Inferior ── */}
+			{(activeMetrics.has("upcomingBookings") || activeMetrics.has("confirmedToday")) && (
 			<div className="grid gap-4 grid-cols-1 lg:grid-cols-7">
-
-				{/* Próximas reservas */}
+				{activeMetrics.has("upcomingBookings") && (
 				<Card className="col-span-1 lg:col-span-4 border-none shadow-sm">
 					<CardHeader className="flex flex-row items-center justify-between">
-						 <div className="space-y-1">
-								 <CardTitle>Próximas reservas</CardTitle>
-								 <CardDescription className="text-black">
-									Tienes {pendingToday} reservas pendientes hoy.
-								 </CardDescription>
-						 </div>
-							 <Button variant="outline" size="sm">Ver todo</Button>
+						<div className="space-y-1">
+							<CardTitle>Próximas reservas</CardTitle>
+							<CardDescription className="text-black">
+								Tienes {pendingToday} reservas pendientes hoy.
+							</CardDescription>
+						</div>
+						<Button variant="outline" size="sm">Ver todo</Button>
 					</CardHeader>
 					<CardContent>
 						<RecentBookings bookings={upcomingBookings} />
 					</CardContent>
 				</Card>
-
-				{/* Acciones y Operaciones */}
+				)}
+				{activeMetrics.has("confirmedToday") && (
 				<div className="col-span-1 lg:col-span-3">
-						 <ActionItems
-							pendingToday={pendingToday}
-							upcoming24h={upcoming24h}
-							confirmedToday={confirmedToday}
-							cancelled7d={cancelled7d}
-						 />
+					<ActionItems
+						pendingToday={pendingToday}
+						upcoming24h={upcoming24h}
+						confirmedToday={confirmedToday}
+						cancelled7d={cancelled7d}
+					/>
 				</div>
+				)}
 			</div>
+			)}
+
+			{/* ── Widgets personalizados (no-nativos) ── */}
+			{extraWidgetIds.length > 0 && (
+				<div className="space-y-4">
+					<h2 className="text-lg font-semibold text-slate-900">Métricas personalizadas</h2>
+					<div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
+						{extraWidgetIds.map((id) => renderWidget(id))}
+					</div>
+				</div>
+			)}
+
 		</div>
+
+		<DashboardCustomizeDrawer
+			open={customizeOpen}
+			onClose={() => setCustomizeOpen(false)}
+			savedWidgets={activeWidgetIds}
+			onSave={handleSaveCustomization}
+		/>
+		</>
 	)
 }

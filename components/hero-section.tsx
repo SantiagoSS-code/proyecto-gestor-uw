@@ -59,11 +59,13 @@ export function HeroSection() {
   const [date, setDate] = useState<Date | undefined>(undefined)
   const [time, setTime] = useState<string>(() => getNextTimeSlot())
   const [currentImageIndex, setCurrentImageIndex] = useState(0)
+  const [mounted, setMounted] = useState(false)
 
   const timeOptions = useMemo(() => buildTimeOptions(30), [])
 
   useEffect(() => {
     setDate(getTodayDate())
+    setMounted(true)
   }, [])
 
   const handleSearch = () => {
@@ -130,7 +132,7 @@ export function HeroSection() {
               }}
             >
               {/* Location Field */}
-              <div className="flex-[2] h-14 px-4 rounded-xl bg-secondary/50 group hover:bg-secondary transition-colors flex items-center gap-3">
+              <div className="md:flex-[1.65] h-14 px-4 rounded-xl bg-secondary/50 group hover:bg-secondary transition-colors flex items-center gap-3">
                 <MapPin className="w-5 h-5 text-primary shrink-0" />
                 <input
                   type="text"
@@ -142,53 +144,74 @@ export function HeroSection() {
               </div>
 
               {/* Sport Field */}
-              <Select value={sport} onValueChange={setSport}>
-                <SelectTrigger className="flex-1 h-14 data-[size=default]:h-14 px-4 rounded-xl bg-secondary/50 hover:bg-secondary transition-colors border-0 shadow-none gap-3 focus:ring-0 focus-visible:ring-0">
+              {mounted ? (
+                <Select value={sport} onValueChange={setSport}>
+                  <SelectTrigger className="flex-1 h-14 data-[size=default]:h-14 px-4 rounded-xl bg-secondary/50 hover:bg-secondary transition-colors border-0 shadow-none gap-3 focus:ring-0 focus-visible:ring-0">
+                    <Dumbbell className="w-5 h-5 text-primary shrink-0" />
+                    <SelectValue placeholder="Deporte" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="all">Todos los deportes</SelectItem>
+                    {Object.entries(SPORT_LABELS).map(([key, label]) => (
+                      <SelectItem key={key} value={key}>{label}</SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              ) : (
+                <div className="flex-1 h-14 px-4 rounded-xl bg-secondary/50 flex items-center gap-3">
                   <Dumbbell className="w-5 h-5 text-primary shrink-0" />
-                  <SelectValue placeholder="Deporte" />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="all">Todos los deportes</SelectItem>
-                  {Object.entries(SPORT_LABELS).map(([key, label]) => (
-                    <SelectItem key={key} value={key}>{label}</SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
+                  <span className="text-sm text-muted-foreground">Deporte</span>
+                </div>
+              )}
 
               {/* Date Field */}
-              <Popover>
-                <PopoverTrigger asChild>
-                  <div className="flex-1 h-14 px-4 rounded-xl bg-secondary/50 hover:bg-secondary transition-colors flex items-center gap-3 cursor-pointer">
-                    <Calendar className="w-5 h-5 text-primary shrink-0" />
-                    <span className="text-sm text-foreground leading-none whitespace-nowrap">
-                      {date ? format(date, "d MMM yyyy", { locale: es }) : <span className="text-muted-foreground">Fecha</span>}
-                    </span>
-                  </div>
-                </PopoverTrigger>
-                <PopoverContent align="start" className="w-auto p-0">
-                  <CalendarPicker
-                    mode="single"
-                    selected={date}
-                    onSelect={setDate}
-                    locale={es}
-                    initialFocus
-                    disabled={(d) => d < getTodayDate()}
-                  />
-                </PopoverContent>
-              </Popover>
+              {mounted ? (
+                <Popover>
+                  <PopoverTrigger asChild>
+                    <div className="flex-1 h-14 px-4 rounded-xl bg-secondary/50 hover:bg-secondary transition-colors flex items-center gap-3 cursor-pointer">
+                      <Calendar className="w-5 h-5 text-primary shrink-0" />
+                      <span className="text-sm text-foreground leading-none whitespace-nowrap">
+                        {date ? format(date, "d MMM yyyy", { locale: es }) : <span className="text-muted-foreground">Fecha</span>}
+                      </span>
+                    </div>
+                  </PopoverTrigger>
+                  <PopoverContent align="start" className="w-auto p-0">
+                    <CalendarPicker
+                      mode="single"
+                      selected={date}
+                      onSelect={setDate}
+                      locale={es}
+                      initialFocus
+                      disabled={(d) => d < getTodayDate()}
+                    />
+                  </PopoverContent>
+                </Popover>
+              ) : (
+                <div className="flex-1 h-14 px-4 rounded-xl bg-secondary/50 flex items-center gap-3">
+                  <Calendar className="w-5 h-5 text-primary shrink-0" />
+                  <span className="text-sm text-muted-foreground">Fecha</span>
+                </div>
+              )}
 
               {/* Time Field */}
-              <Select value={time} onValueChange={setTime}>
-                <SelectTrigger className="flex-1 h-14 data-[size=default]:h-14 px-4 rounded-xl bg-secondary/50 hover:bg-secondary transition-colors border-0 shadow-none gap-3 focus:ring-0 focus-visible:ring-0">
+              {mounted ? (
+                <Select value={time} onValueChange={setTime}>
+                  <SelectTrigger className="flex-1 h-14 data-[size=default]:h-14 px-4 rounded-xl bg-secondary/50 hover:bg-secondary transition-colors border-0 shadow-none gap-3 focus:ring-0 focus-visible:ring-0">
+                    <Clock className="w-5 h-5 text-primary shrink-0" />
+                    <SelectValue placeholder="Seleccionar hora" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {timeOptions.map((t) => (
+                      <SelectItem key={t} value={t}>{t}</SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              ) : (
+                <div className="flex-1 h-14 px-4 rounded-xl bg-secondary/50 flex items-center gap-3">
                   <Clock className="w-5 h-5 text-primary shrink-0" />
-                  <SelectValue placeholder="Seleccionar hora" />
-                </SelectTrigger>
-                <SelectContent>
-                  {timeOptions.map((t) => (
-                    <SelectItem key={t} value={t}>{t}</SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
+                  <span className="text-sm text-muted-foreground">Hora</span>
+                </div>
+              )}
 
               {/* Search Button */}
               <Button

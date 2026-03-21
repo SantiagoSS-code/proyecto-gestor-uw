@@ -1,6 +1,7 @@
 "use client"
 
 import { useState, useMemo, useEffect, useRef } from "react"
+import { PermissionGate } from "@/components/dashboard/permission-gate"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Calendar, Clock, MapPin, Phone, ChevronLeft, ChevronRight, DollarSign, ChevronDown, X, Check } from "lucide-react"
 import { useAuth } from "@/lib/auth-context"
@@ -584,6 +585,7 @@ export default function ReservasPage() {
 	}
 
 	return (
+		<PermissionGate module="reservations">
 		<div className="space-y-6">
 			<div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
 				<div>
@@ -1665,5 +1667,6 @@ export default function ReservasPage() {
 					</div>
 				)}
 		</div>
+		</PermissionGate>
 	)
 }

@@ -225,6 +225,13 @@ export async function GET(request: Request, { params }: { params: { centerId: st
         email: centerAdmin?.email || user?.email || "",
         phone: centerAdmin?.phone || user?.phone || "",
       },
+      subscription: {
+        selectedPlan: data?.selectedPlan || user?.selectedPlan || null,
+        subscriptionStatus: data?.subscriptionStatus || user?.subscriptionStatus || null,
+        subscriptionPeriod: data?.subscriptionPeriod || user?.subscriptionPeriod || null,
+        subscriptionStartDate: data?.subscriptionStartDate || user?.subscriptionStartDate || null,
+        nextRenewalDate: data?.nextRenewalDate || user?.nextRenewalDate || null,
+      },
       onboarding,
       operations,
       booking,
@@ -412,6 +419,43 @@ export async function POST(request: Request, { params }: { params: { centerId: s
 
       const targetCourtRef = centerCourtSnap.exists ? targetRef.collection("courts").doc(courtId) : legacyCourtSnap.exists ? legacyCourtRef : targetRef.collection("courts").doc(courtId)
       await targetCourtRef.set(courtPatch, { merge: true })
+    }
+
+    if (body?.planUpdate && typeof body.planUpdate === "object") {
+      handledCustomUpdate = true
+      const pu = body.planUpdate as any
+      const VALID_PLANS = ["estandar", "profesional", "maestro"]
+      const VALID_STATUSES = ["active", "suspended", "pending_payment", "trial"]
+      const VALID_PERIODS = ["monthly", "annual"]
+
+      const planPatch: Record<string, any> = { updatedAt: new Date() }
+
+      if (typeof pu.selectedPlan === "string" && VALID_PLANS.includes(pu.selectedPlan)) {
+        planPatch.selectedPlan = pu.selectedPlan
+      }
+      if (typeof pu.subscriptionStatus === "string" && VALID_STATUSES.includes(pu.subscriptionStatus)) {
+        planPatch.subscriptionStatus = pu.subscriptionStatus
+      }
+      if (typeof pu.subscriptionPeriod === "string" && VALID_PERIODS.includes(pu.subscriptionPeriod)) {
+        planPatch.subscriptionPeriod = pu.subscriptionPeriod
+        // Recompute next renewal from now
+        const next = new Date()
+        if (pu.subscriptionPeriod === "annual") {
+          next.setFullYear(next.getFullYear() + 1)
+        } else {
+          next.setMonth(next.getMonth() + 1)
+        }
+        planPatch.nextRenewalDate = next
+      }
+      if (typeof pu.nextRenewalDate === "string") {
+        const d = new Date(pu.nextRenewalDate)
+        if (!Number.isNaN(d.getTime())) planPatch.nextRenewalDate = d
+      }
+
+      await Promise.all([
+        adminDb.collection("users").doc(centerId).set(planPatch, { merge: true }),
+        targetRef.set(planPatch, { merge: true }),
+      ])
     }
 
     if (Object.keys(patch).length === 0 && !handledCustomUpdate) {
